@@ -9717,6 +9717,44 @@ PDF:</p><p class="mb-2 text-slate-700 leading-relaxed">For a continuous variable
     </div>
   </div>
 
+
+    <!-- SINGLE SUBJECT PAPER DETAIL MODAL / DRAWER -->
+    <div id="paperModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+      <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-4">
+        <!-- Modal Header -->
+        <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <span id="modalCode" class="text-xs font-mono font-bold bg-blue-600 px-2.5 py-1 rounded-md">CODE</span>
+            <h3 id="modalTitle" class="text-lg font-bold text-white">Subject Title</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="printCurrentPaper()" class="text-slate-300 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition text-sm flex items-center gap-1.5" title="Print Paper">
+              <i data-lucide="printer" class="w-4 h-4"></i> Print
+            </button>
+            <a id="modalPdfBtn" href="#" download class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+              <i data-lucide="file-down" class="w-4 h-4"></i> Download PDF
+            </a>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Modal Body -->
+        <div id="modalBody" class="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800 printable-paper">
+          <!-- Filled dynamically via openModal() -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 no-print">
+          <span>Brainware University Examination Cell &copy; 2026</span>
+          <button onclick="toggleAllAnswers()" id="toggleAnsBtn" class="text-blue-600 hover:underline font-semibold flex items-center gap-1">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i> Show All Answers & Rationales
+          </button>
+        </div>
+      </div>
+    </div>
+
 </main>
 
   <!-- FOOTER -->
