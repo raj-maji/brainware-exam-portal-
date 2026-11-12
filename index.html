@@ -9717,44 +9717,6 @@ PDF:</p><p class="mb-2 text-slate-700 leading-relaxed">For a continuous variable
     </div>
   </div>
 
-
-    <!-- SINGLE SUBJECT PAPER DETAIL MODAL / DRAWER -->
-    <div id="paperModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
-      <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-4">
-        <!-- Modal Header -->
-        <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
-          <div class="flex items-center gap-3">
-            <span id="modalCode" class="text-xs font-mono font-bold bg-blue-600 px-2.5 py-1 rounded-md">CODE</span>
-            <h3 id="modalTitle" class="text-lg font-bold text-white">Subject Title</h3>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="printCurrentPaper()" class="text-slate-300 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition text-sm flex items-center gap-1.5" title="Print Paper">
-              <i data-lucide="printer" class="w-4 h-4"></i> Print
-            </button>
-            <a id="modalPdfBtn" href="#" download class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
-              <i data-lucide="file-down" class="w-4 h-4"></i> Download PDF
-            </a>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
-              <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-          </div>
-        </div>
-        
-        <!-- Modal Body -->
-        <div id="modalBody" class="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800 printable-paper">
-          <!-- Filled dynamically via openModal() -->
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 no-print">
-          <span>Brainware University Examination Cell &copy; 2026</span>
-          <button onclick="toggleAllAnswers()" id="toggleAnsBtn" class="text-blue-600 hover:underline font-semibold flex items-center gap-1">
-            <i data-lucide="eye" class="w-3.5 h-3.5"></i> Show All Answers & Rationales
-          </button>
-        </div>
-      </div>
-    </div>
-
 </main>
 
   <!-- FOOTER -->
@@ -10178,131 +10140,165 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
       if (typeof window.lucide !== "undefined" && typeof window.lucide.createIcons === "function") { window.lucide.createIcons(); }
     }
 
+    
     function openModal(paperId) {
-      const paper = papersData.find(p => p.id === paperId);
-      if (!paper) return;
-      currentActivePaper = paper;
-      answersVisible = false;
+      try {
+        const paper = (window.papersData || papersData).find(p => p.id === paperId);
+        if (!paper) {
+          console.warn('Paper not found for id:', paperId);
+          return;
+        }
+        currentActivePaper = paper;
+        answersVisible = false;
 
-      document.getElementById('modalCode').innerText = paper.code;
-      document.getElementById('modalTitle').innerText = paper.title + ' — Sample Question Paper';
-      document.getElementById('modalPdfBtn').href = 'Question%20Set/' + paper.filename;
+        const modalEl = document.getElementById('paperModal');
+        const codeEl = document.getElementById('modalCode');
+        const titleEl = document.getElementById('modalTitle');
+        const pdfBtnEl = document.getElementById('modalPdfBtn');
+        const bodyEl = document.getElementById('modalBody');
 
-      const body = document.getElementById('modalBody');
-      body.innerHTML = '';
+        if (!modalEl || !codeEl || !titleEl || !pdfBtnEl || !bodyEl) {
+          console.error('Modal DOM elements missing');
+          return;
+        }
 
-      // University Header Block
-      const headerBox = document.createElement('div');
-      headerBox.className = 'text-center border-b pb-6 space-y-1';
-      headerBox.innerHTML = `
-        <h2 class="text-2xl font-black tracking-tight text-slate-900">BRAINWARE UNIVERSITY</h2>
-        <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">School of Computational & Applied Sciences | Department of Computational Sciences</p>
-        <p class="text-xs font-semibold text-blue-700">TERM-END EXAMINATION (ODD SEMESTER) — 2026</p>
-        <div class="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-2 text-left text-xs bg-slate-50 p-3 rounded-xl">
-          <div><span class="text-slate-500">Programme:</span> <b class="text-slate-800">${paper.programme}</b></div>
-          <div><span class="text-slate-500">Course Code:</span> <b class="font-mono text-slate-800">${paper.code}</b></div>
-          <div><span class="text-slate-500">Time Allowed:</span> <b class="text-slate-800">2 Hours 30 Mins</b></div>
-          <div><span class="text-slate-500">Course Name:</span> <b class="text-slate-800">${paper.title}</b></div>
-          <div><span class="text-slate-500">Type:</span> <b class="text-slate-800">${paper.type || 'Core Major'}</b></div>
-          <div><span class="text-slate-500">Full Marks:</span> <b class="text-slate-800">${paper.fm || 60} (CIA: 40 | TEE: 60)</b></div>
-        </div>
-        <div class="mt-3 p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl text-left text-xs text-amber-900 space-y-1">
-          <b>Instructions for Candidates:</b>
-          <p>1. Figures in the right margin indicate full marks for the questions.</p>
-          <p>2. Group A is compulsory. Answer all 15 Multiple Choice Questions.</p>
-          <p>3. Group B: Answer any FIVE (5) questions out of 7 (5 &times; 3 = 15 Marks).</p>
-          <p>4. Group C: Answer any SIX (6) questions out of 8 (6 &times; 5 = 30 Marks).</p>
-        </div>
-      `;
-      body.appendChild(headerBox);
+        codeEl.innerText = paper.code;
+        titleEl.innerText = paper.title + ' — Sample Examination Paper';
+        pdfBtnEl.href = 'Question%20Set/' + paper.filename;
 
-      // GROUP A
-      const groupABox = document.createElement('div');
-      groupABox.className = 'space-y-4';
-      groupABox.innerHTML = `
-        <div class="bg-blue-900 text-white px-4 py-2 rounded-xl flex items-center justify-between font-bold text-xs uppercase tracking-wider">
-          <span>GROUP - A (Multiple Choice Questions) — Compulsory</span>
-          <span>[15 &times; 1 = 15 Marks]</span>
-        </div>
-      `;
-      paper.group_a.forEach((q, i) => {
-        const qCard = document.createElement('div');
-        qCard.className = 'p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2';
-        qCard.innerHTML = `
-          <div class="flex justify-between items-start gap-3">
-            <span class="text-xs font-bold text-slate-900">Q${i+1}. ${q.q}</span>
-            <span class="text-xs font-mono font-bold text-slate-400">[1]</span>
+        bodyEl.innerHTML = '';
+
+        // University Header Block
+        const headerBox = document.createElement('div');
+        headerBox.className = 'text-center border-b pb-6 space-y-1.5';
+        headerBox.innerHTML = `
+          <h2 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">BRAINWARE UNIVERSITY</h2>
+          <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">School of Computational & Applied Sciences | Department of Computational Sciences</p>
+          <p class="text-xs font-bold text-blue-700 bg-blue-50 py-1 px-3 rounded-full inline-block mt-1">TERM-END EXAMINATION (ODD SEMESTER) — 2026</p>
+          
+          <div class="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-left text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div><span class="text-slate-500 font-medium">Programme:</span> <b class="text-slate-900 block">${paper.programme}</b></div>
+            <div><span class="text-slate-500 font-medium">Course Code:</span> <b class="font-mono text-blue-700 font-bold block">${paper.code}</b></div>
+            <div><span class="text-slate-500 font-medium">Time Allowed:</span> <b class="text-slate-900 block">2 Hours 30 Mins</b></div>
+            <div><span class="text-slate-500 font-medium">Course Name:</span> <b class="text-slate-900 block">${paper.title}</b></div>
+            <div><span class="text-slate-500 font-medium">Paper Category:</span> <b class="text-slate-900 block">${paper.type || 'Core Major (Theory + Lab)'}</b></div>
+            <div><span class="text-slate-500 font-medium">Full Marks:</span> <b class="text-slate-900 block">${paper.fm || 60} (CIA: 40 | TEE: 60)</b></div>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-slate-700 pl-2">
-            <div><b>(A)</b> ${q.options[0]}</div>
-            <div><b>(B)</b> ${q.options[1]}</div>
-            <div><b>(C)</b> ${q.options[2]}</div>
-            <div><b>(D)</b> ${q.options[3]}</div>
-          </div>
-          <div class="ans-block hidden mt-2 pt-2 border-t border-slate-200 text-xs text-emerald-800 bg-emerald-50/60 p-2 rounded-lg">
-            <b>Answer:</b> ${q.ans} &nbsp;|&nbsp; <i>Rationale:</i> ${q.expl}
+
+          <div class="mt-3 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-left text-xs text-amber-950 space-y-1 shadow-sm">
+            <b class="flex items-center gap-1.5 text-amber-900"><i data-lucide="alert-circle" class="w-4 h-4"></i> Instructions for Candidates:</b>
+            <p>1. Figures in the right margin indicate full marks for the respective questions.</p>
+            <p>2. <b>Group A is compulsory.</b> Answer all 15 Multiple Choice Questions (15 &times; 1 = 15 Marks).</p>
+            <p>3. <b>Group B:</b> Answer any FIVE (5) questions out of 7 (5 &times; 3 = 15 Marks).</p>
+            <p>4. <b>Group C:</b> Answer any SIX (6) questions out of 8 (6 &times; 5 = 30 Marks).</p>
           </div>
         `;
-        groupABox.appendChild(qCard);
-      });
-      body.appendChild(groupABox);
+        bodyEl.appendChild(headerBox);
 
-      // GROUP B
-      const groupBBox = document.createElement('div');
-      groupBBox.className = 'space-y-4';
-      groupBBox.innerHTML = `
-        <div class="bg-emerald-800 text-white px-4 py-2 rounded-xl flex items-center justify-between font-bold text-xs uppercase tracking-wider">
-          <span>GROUP - B (Short Answer Questions) — Answer Any FIVE</span>
-          <span>[5 &times; 3 = 15 Marks]</span>
-        </div>
-      `;
-      paper.group_b.forEach((q, i) => {
-        const qCard = document.createElement('div');
-        qCard.className = 'p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2';
-        qCard.innerHTML = `
-          <div class="flex justify-between items-start gap-3">
-            <span class="text-xs font-bold text-slate-900">Q${i+16}. ${q.q}</span>
-            <span class="text-xs font-mono font-bold text-slate-400">[${q.marks || 3}]</span>
-          </div>
-          <div class="ans-block hidden mt-2 pt-2 border-t border-slate-200 text-xs text-emerald-800 bg-emerald-50/60 p-2 rounded-lg">
-            <b>Evaluation Outline:</b> ${q.hint}
+        // GROUP A
+        const groupABox = document.createElement('div');
+        groupABox.className = 'space-y-4';
+        groupABox.innerHTML = `
+          <div class="bg-blue-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-between font-bold text-xs uppercase tracking-wider shadow">
+            <span>GROUP - A (Multiple Choice Questions) — Compulsory</span>
+            <span class="bg-blue-800 px-2 py-0.5 rounded text-[11px]">[15 &times; 1 = 15 Marks]</span>
           </div>
         `;
-        groupBBox.appendChild(qCard);
-      });
-      body.appendChild(groupBBox);
+        (paper.group_a || []).forEach((q, i) => {
+          const qCard = document.createElement('div');
+          qCard.className = 'p-4 bg-slate-50 hover:bg-slate-100/70 rounded-2xl border border-slate-200/80 space-y-2.5 transition';
+          qCard.innerHTML = `
+            <div class="flex justify-between items-start gap-3">
+              <span class="text-xs sm:text-sm font-bold text-slate-900 leading-snug">Q${i+1}. ${q.q}</span>
+              <span class="text-xs font-mono font-bold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md shrink-0">[1]</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700 pl-1">
+              <div class="p-2 bg-white rounded-xl border border-slate-200/60"><b>(A)</b> ${q.options ? q.options[0] : ''}</div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200/60"><b>(B)</b> ${q.options ? q.options[1] : ''}</div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200/60"><b>(C)</b> ${q.options ? q.options[2] : ''}</div>
+              <div class="p-2 bg-white rounded-xl border border-slate-200/60"><b>(D)</b> ${q.options ? q.options[3] : ''}</div>
+            </div>
+            <div class="ans-block hidden mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-emerald-900 bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/60">
+              <span class="font-bold bg-emerald-600 text-white px-2 py-0.5 rounded text-[11px]">Correct Ans: ${q.ans}</span>
+              <p class="mt-1.5 text-emerald-800 leading-relaxed"><b>Rationale:</b> ${q.expl || 'Standard syllabus definition and evaluation benchmark.'}</p>
+            </div>
+          `;
+          groupABox.appendChild(qCard);
+        });
+        bodyEl.appendChild(groupABox);
 
-      // GROUP C
-      const groupCBox = document.createElement('div');
-      groupCBox.className = 'space-y-4';
-      groupCBox.innerHTML = `
-        <div class="bg-amber-800 text-white px-4 py-2 rounded-xl flex items-center justify-between font-bold text-xs uppercase tracking-wider">
-          <span>GROUP - C (Long Answer / Descriptive Questions) — Answer Any SIX</span>
-          <span>[6 &times; 5 = 30 Marks]</span>
-        </div>
-      `;
-      paper.group_c.forEach((q, i) => {
-        const qCard = document.createElement('div');
-        qCard.className = 'p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2';
-        qCard.innerHTML = `
-          <div class="flex justify-between items-start gap-3">
-            <span class="text-xs font-bold text-slate-900">Q${i+23}. ${q.q}</span>
-            <span class="text-xs font-mono font-bold text-slate-400">[${q.marks || 5}]</span>
-          </div>
-          <div class="ans-block hidden mt-2 pt-2 border-t border-slate-200 text-xs text-emerald-800 bg-emerald-50/60 p-2 rounded-lg">
-            <b>Solution Framework:</b> ${q.hint}
+        // GROUP B
+        const groupBBox = document.createElement('div');
+        groupBBox.className = 'space-y-4';
+        groupBBox.innerHTML = `
+          <div class="bg-emerald-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-between font-bold text-xs uppercase tracking-wider shadow">
+            <span>GROUP - B (Short Answer Questions) — Answer Any FIVE</span>
+            <span class="bg-emerald-800 px-2 py-0.5 rounded text-[11px]">[5 &times; 3 = 15 Marks]</span>
           </div>
         `;
-        groupCBox.appendChild(qCard);
-      });
-      body.appendChild(groupCBox);
+        (paper.group_b || []).forEach((q, i) => {
+          const qCard = document.createElement('div');
+          qCard.className = 'p-4 bg-slate-50 hover:bg-slate-100/70 rounded-2xl border border-slate-200/80 space-y-2 transition';
+          qCard.innerHTML = `
+            <div class="flex justify-between items-start gap-3">
+              <span class="text-xs sm:text-sm font-bold text-slate-900 leading-snug">Q${i+16}. ${q.q}</span>
+              <span class="text-xs font-mono font-bold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md shrink-0">[${q.marks || 3}]</span>
+            </div>
+            <div class="ans-block hidden mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-emerald-900 bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/60">
+              <b class="text-emerald-950 block mb-1">Key Conceptual Outline:</b>
+              <p class="text-emerald-800 leading-relaxed">${q.hint || 'Clear step-by-step breakdown as specified in course outcome metrics.'}</p>
+            </div>
+          `;
+          groupBBox.appendChild(qCard);
+        });
+        bodyEl.appendChild(groupBBox);
 
-      document.getElementById('paperModal').classList.remove('hidden');
-      if (typeof window.lucide !== "undefined" && typeof window.lucide.createIcons === "function") { window.lucide.createIcons(); }
+        // GROUP C
+        const groupCBox = document.createElement('div');
+        groupCBox.className = 'space-y-4';
+        groupCBox.innerHTML = `
+          <div class="bg-amber-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-between font-bold text-xs uppercase tracking-wider shadow">
+            <span>GROUP - C (Long Answer / Descriptive Questions) — Answer Any SIX</span>
+            <span class="bg-amber-800 px-2 py-0.5 rounded text-[11px]">[6 &times; 5 = 30 Marks]</span>
+          </div>
+        `;
+        (paper.group_c || []).forEach((q, i) => {
+          const qCard = document.createElement('div');
+          qCard.className = 'p-4 bg-slate-50 hover:bg-slate-100/70 rounded-2xl border border-slate-200/80 space-y-2 transition';
+          qCard.innerHTML = `
+            <div class="flex justify-between items-start gap-3">
+              <span class="text-xs sm:text-sm font-bold text-slate-900 leading-snug">Q${i+23}. ${q.q}</span>
+              <span class="text-xs font-mono font-bold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md shrink-0">[${q.marks || 5}]</span>
+            </div>
+            <div class="ans-block hidden mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-emerald-900 bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/60">
+              <b class="text-emerald-950 block mb-1">Detailed Solution Framework:</b>
+              <p class="text-emerald-800 leading-relaxed">${q.hint || 'Full structural solution with proofs, diagrams, and illustrative examples.'}</p>
+            </div>
+          `;
+          groupCBox.appendChild(qCard);
+        });
+        bodyEl.appendChild(groupCBox);
+
+        // Show Modal with explicit display: flex and remove hidden
+        modalEl.classList.remove('hidden');
+        modalEl.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (err) {
+        console.error('Error opening paper modal:', err);
+      }
     }
 
     function closeModal() {
-      document.getElementById('paperModal').classList.add('hidden');
+      const modalEl = document.getElementById('paperModal');
+      if (modalEl) {
+        modalEl.classList.add('hidden');
+        modalEl.style.display = 'none';
+      }
+      document.body.style.overflow = '';
     }
 
     function toggleAllAnswers() {
@@ -10312,20 +10308,27 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
         if (answersVisible) el.classList.remove('hidden');
         else el.classList.add('hidden');
       });
-      document.getElementById('toggleAnsBtn').innerHTML = answersVisible
-        ? '<i data-lucide="eye-off" class="w-3.5 h-3.5"></i> Hide Answers & Rationales'
-        : '<i data-lucide="eye" class="w-3.5 h-3.5"></i> Show All Answers & Rationales';
-      if (typeof window.lucide !== "undefined" && typeof window.lucide.createIcons === "function") { window.lucide.createIcons(); }
+      const btn = document.getElementById('toggleAnsBtn');
+      if (btn) {
+        btn.innerHTML = answersVisible
+          ? '<i data-lucide="eye-off" class="w-3.5 h-3.5"></i> Hide Answers & Rationales'
+          : '<i data-lucide="eye" class="w-3.5 h-3.5"></i> Show All Answers & Rationales';
+      }
+      if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     }
 
     function printCurrentPaper() {
       window.print();
     }
 
-    // Close modal on escape
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
-    });
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.toggleAllAnswers = toggleAllAnswers;
+    window.printCurrentPaper = printCurrentPaper;
+
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
     // Initial render
     renderPapers();
@@ -10396,6 +10399,55 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
       <i data-lucide="message-circle" class="w-7 h-7"></i>
       <span class="absolute top-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full"></span>
     </button>
+  </div>
+
+
+  <!-- SINGLE SUBJECT PAPER DETAIL MODAL / DRAWER -->
+  <div id="paperModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[99999] hidden flex items-center justify-center p-3 sm:p-6 overflow-y-auto" style="display: none;" onclick="if(event.target===this) closeModal();">
+    <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-auto animate-fade-in relative z-10" onclick="event.stopPropagation();">
+      
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-blue-800/40 shadow-sm">
+        <div class="flex items-center gap-3">
+          <span id="modalCode" class="text-xs font-mono font-bold bg-blue-600 text-white px-2.5 py-1 rounded-lg shadow-sm">CODE</span>
+          <h3 id="modalTitle" class="text-base sm:text-lg font-bold text-white tracking-tight">Subject Title</h3>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <button onclick="printCurrentPaper()" class="text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl transition text-xs font-medium flex items-center gap-1.5 shadow-sm" title="Print Paper">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print
+          </button>
+          <a id="modalPdfBtn" href="#" target="_blank" download class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> Download PDF
+          </a>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" title="Close (Esc)">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Modal Body (Printable Paper) -->
+      <div id="modalBody" class="p-4 sm:p-8 overflow-y-auto space-y-6 flex-1 text-slate-800 printable-paper bg-white">
+        <!-- Injected dynamically via openModal() -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex flex-wrap justify-between items-center gap-3 text-xs text-slate-600 no-print">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Brainware University Examination Scheme &copy; 2026 Batch</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="toggleAllAnswers()" id="toggleAnsBtn" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 text-xs shadow-sm">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i> Show All Answers & Rationales
+          </button>
+          <button onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-xl font-semibold transition text-xs">
+            Close
+          </button>
+        </div>
+      </div>
+
+    </div>
   </div>
 
 </body>
