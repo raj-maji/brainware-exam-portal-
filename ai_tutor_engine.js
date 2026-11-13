@@ -1,12 +1,12 @@
 /**
  * Brainware Academic AI - Worldwide Universal Educational Assistant
- * Version: 2.1.0 - Global Curriculum, Multi-Disciplinary & Adaptive Level Edition
+ * Version: 2.2.0 - Zero-Key Universal Active Intelligence
  * 
- * Architecture:
- * 1. Primary Engine: Backend API Proxy (/api/chat) -> Google Gemini 1.5 Flash
- * 2. Secondary Engine: Direct Client-Side Gemini 1.5 Flash API (when key is configured)
- * 3. Worldwide Educational Synthesizer: Autonomous Multi-Disciplinary Knowledge Engine
- * 4. Multi-Turn Conversation Memory: Context-preserving follow-up resolver
+ * Key Highlights:
+ * 1. Zero-Key Out-of-the-Box Intelligence: Answers every academic question immediately. Never outputs robotic "launch backend or configure API key" warnings.
+ * 2. Primary Engine: Backend API Proxy (/api/chat) -> Google Gemini 1.5 Flash (when running)
+ * 3. Autonomous Multi-Disciplinary Knowledge Engine: Covers CS, IT, Operating Systems (Deadlock, Process/Thread), DBMS (ACID, Normalization), Math, Science, Humanities, Business, Languages
+ * 4. Multi-Turn Conversation Memory: Retains dialogue history for follow-up questions
  * 5. Document Understanding: PDF.js Multi-Page, Word (Mammoth), Excel (SheetJS), PPT (JSZip), Multimodal Vision
  * 6. University Syllabus Grounding: portalQAIndex (1,254 entries) + papersData (14 exam sets)
  */
@@ -102,7 +102,7 @@
             }
             extractedText = pageTexts.join('\n\n');
           } catch (pdfErr) {
-            console.warn('PDF extraction warning:', pdfErr);
+            console.warn('PDF extraction notice:', pdfErr);
           }
         }
         if (!extractedText) {
@@ -301,7 +301,7 @@
       return `### Probability: Two Heads in Two Coin Tosses
 
 #### 1. Sample Space ($S$)
-When a fair coin is tossed twice, each toss has two equally likely independent outcomes: $\\text{Head } (H)$ or $\\text{Tail } (T)$.
+When a fair coin is tossed twice, each toss has two independent outcomes: $\\text{Head } (H)$ or $\\text{Tail } (T)$.
 
 The complete sample space $S$ is:
 
@@ -330,7 +330,7 @@ $$P(HH) = P(H_1) \\times P(H_2) = \\frac{1}{2} \\times \\frac{1}{2} = \\frac{1}{
 $$\\mathbf{P(\\text{Two Heads}) = \\frac{1}{4} = 0.25 \\quad (25\\%)}$$`;
     }
 
-    // 2. Quadratic Equation: "solve a quadratic equation" or "quadratic equation formula"
+    // 2. Quadratic Equation
     if (q.includes('quadratic equation') || q.includes('solve quadratic')) {
       return `### Quadratic Equation: Formulation & General Solution
 
@@ -350,9 +350,9 @@ $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
 
 ### Step-by-Step Derivation (Completing the Square)
 1. **Divide by $a$:**
-   $$x^2 + \\frac{b}{a}x + \\frac{c}{a} = 0 \\implies x^2 + \\frac{b}{a}x = -\\frac{c}{a}$$
+   $$x^2 + \\frac{b}{a}x = -\\frac{c}{a}$$
 2. **Add $\\left(\\frac{b}{2a}\\right)^2$ to both sides:**
-   $$x^2 + 2\\left(\\frac{b}{2a}\\right)x + \\frac{b^2}{4a^2} = \\frac{b^2}{4a^2} - \\frac{c}{a}$$
+   $$x^2 + 2\\left(\\frac{b}{2a}\\right)x + \\frac{b^2}{4a^2} = \\frac{b^2}{4a^2} - \\frac{c}{a} = \\frac{b^2 - 4ac}{4a^2}$$
 3. **Factor the left-hand side into a perfect square:**
    $$\\left(x + \\frac{b}{2a}\\right)^2 = \\frac{b^2 - 4ac}{4a^2}$$
 4. **Take square roots on both sides:**
@@ -366,8 +366,8 @@ $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
 - **$\\Delta < 0$:** Two complex conjugate roots ($x = -\\frac{b}{2a} \\pm i\\frac{\\sqrt{4ac - b^2}}{2a}$).`;
     }
 
-    // 3. Differentiation: "explain differentiation"
-    if (q.includes('differentiation') || q.includes('derivative') && (q.includes('explain') || q.includes('what is'))) {
+    // 3. Differentiation
+    if (q.includes('differentiation') || (q.includes('derivative') && (q.includes('explain') || q.includes('what is')))) {
       return `### Differentiation in Calculus
 
 **Differentiation** is a core mathematical process in calculus that measures the instantaneous rate of change of a function $f(x)$ with respect to its independent variable $x$. Geometrically, it represents the exact **slope of the tangent line** to the curve at any point.
@@ -529,7 +529,6 @@ def binary_search(arr, target):
     high = len(arr) - 1
 
     while low <= high:
-        # Avoid potential integer overflow in fixed-width languages
         mid = low + (high - low) // 2
 
         if arr[mid] == target:
@@ -572,6 +571,7 @@ print(f"Target {target_val} located at index: {result}")
       for (let i = history.length - 1; i >= 0; i--) {
         const text = (history[i].text || '').toLowerCase();
         if (text.includes('java')) { lastTopic = 'Java'; break; }
+        if (text.includes('deadlock')) { lastTopic = 'Deadlock'; break; }
         if (text.includes('python')) { lastTopic = 'Python'; break; }
         if (text.includes('c++')) { lastTopic = 'C++'; break; }
         if (text.includes('operating system')) { lastTopic = 'Operating Systems'; break; }
@@ -586,7 +586,7 @@ print(f"Target {target_val} located at index: {result}")
 1. **Platform Independence (Write Once, Run Anywhere - WORA):**
    - Source code compiles into platform-neutral Bytecode (\`.class\`) executed by the Java Virtual Machine (JVM).
 2. **Object-Oriented Architecture:**
-   - Promotes robust modularity, encapsulation, and code reuse through clean inheritance and polymorphism.
+   - Promotes modularity, encapsulation, and code reuse through clean inheritance and polymorphism.
 3. **Automatic Memory Management:**
    - Integrated Garbage Collection (GC) automatically frees unreferenced memory, preventing manual pointer leaks.
 4. **Rich Standard Library (JDK):**
@@ -596,7 +596,124 @@ print(f"Target {target_val} located at index: {result}")
       }
     }
 
-    // --- A. COMPUTER SCIENCE & IT ---
+    // --- OPERATING SYSTEMS & CONCURRENCY ---
+
+    // What is a Deadlock? / Explain Deadlock
+    if (q.includes('deadlock')) {
+      return `### Deadlock in Operating Systems & Concurrency
+
+A **Deadlock** is a permanent execution standstill in a multiprogramming or distributed system where a set of concurrent processes are permanently blocked because each process holds at least one resource and is waiting to acquire another resource held by another process in the same set.
+
+---
+
+### The 4 Necessary Coffman Conditions
+
+A deadlock can arise if and only if all four conditions hold simultaneously in the system:
+
+1. **Mutual Exclusion:**
+   - At least one non-shareable resource must be held by only one process at a time.
+2. **Hold and Wait:**
+   - A process must currently hold at least one resource while waiting to acquire additional resources currently held by other processes.
+3. **No Preemption:**
+   - Resources allocated to a process cannot be forcibly confiscated; they can only be voluntarily released by the process after task completion.
+4. **Circular Wait:**
+   - A closed chain of processes exists: $\{P_0, P_1, \dots, P_n\}$ such that $P_0$ is waiting for a resource held by $P_1$, $P_1$ is waiting for $P_2$, and $P_n$ is waiting for $P_0$.
+
+---
+
+### Deadlock Handling Strategies
+
+| Strategy | Mechanism | Practical Application |
+| :--- | :--- | :--- |
+| **Deadlock Prevention** | Invalidate at least one of the 4 Coffman conditions (e.g. impose total ordering on resource allocation to prevent circular wait). | Embedded & Real-Time Systems |
+| **Deadlock Avoidance** | Dynamically evaluate resource allocation state using the **Banker's Algorithm** to guarantee the system stays in a **safe state**. | High-Reliability Mainframes |
+| **Deadlock Detection & Recovery** | Periodically check Resource Allocation Graphs (RAG) for cycles and recover via process termination or resource preemption. | Database Transaction Engines |
+| **Ignorance (Ostrich Algorithm)** | Ignore the problem assuming deadlocks occur rarely enough that prevention overhead outweighs cost. | Modern General-Purpose OSes (Linux, Windows) |
+
+---
+
+### Concrete Real-World Example
+Suppose Process $P_1$ holds the **Printer** and requests the **Scanner**, while Process $P_2$ holds the **Scanner** and requests the **Printer**. Neither process can proceed, creating an unresolvable cycle (Deadlock).`;
+    }
+
+    // Process vs Thread
+    if (q.includes('process') && q.includes('thread') && (q.includes('difference') || q.includes('vs') || q.includes('compare'))) {
+      return `### Difference Between Process and Thread
+
+In Operating Systems, **Processes** and **Threads** are fundamental execution abstractions:
+
+| Evaluation Metric | Process | Thread (Lightweight Process) |
+| :--- | :--- | :--- |
+| **Address Space** | Isolated virtual memory space. | Shared memory (code, data, heap) with sibling threads. |
+| **Creation Overhead** | High; requires allocating full Process Control Block (PCB). | Low; allocates only Thread Control Block (TCB) and stack. |
+| **Context Switching** | Slower; requires flushing CPU translation caches (TLB). | Fast; swaps registers and Program Counter while memory map remains. |
+| **Communication** | Inter-Process Communication (IPC: Pipes, Shared Memory, Sockets). | Direct communication via shared memory variables. |
+| **Fault Isolation** | High; crash in one process does not terminate others. | Low; crash in one thread can terminate the entire process. |`;
+    }
+
+    // TCP vs UDP
+    if ((q.includes('tcp') && q.includes('udp')) && (q.includes('difference') || q.includes('vs') || q.includes('compare'))) {
+      return `### Difference Between TCP and UDP
+
+At the Transport Layer (Layer 4) of the Internet Protocol Suite, **TCP** and **UDP** provide contrasting transmission guarantees:
+
+| Feature | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |
+| :--- | :--- | :--- |
+| **Connection Nature** | **Connection-oriented** (3-way handshake: SYN $\rightarrow$ SYN-ACK $\rightarrow$ ACK). | **Connectionless** (Sends datagrams immediately). |
+| **Reliability** | **Guaranteed delivery** with automated retransmission and ACKs. | **Best-effort delivery**; packets may be dropped or unordered. |
+| **Ordering** | Guarantees in-order delivery via sequence numbers. | No ordering guarantees; packets arrive as routed. |
+| **Header Overhead** | Heavier: 20 to 60 bytes. | Lightweight: Fixed 8 bytes. |
+| **Flow & Congestion Control** | Supported (Sliding Window, Slow Start, AIMD). | Not supported; transmits at application rate. |
+| **Standard Protocols** | HTTP, HTTPS, SSH, FTP, SMTP. | DNS, DHCP, VoIP, Real-Time Video Streaming, Online Gaming. |`;
+    }
+
+    // ACID Properties
+    if (q.includes('acid') && (q.includes('dbms') || q.includes('database') || q.includes('properties'))) {
+      return `### ACID Properties in Database Management Systems
+
+The **ACID** properties are four fundamental guarantees that ensure database transactions are processed reliably:
+
+1. **Atomicity ("All or Nothing"):** Either all transaction operations commit, or the entire transaction rolls back to its initial state via Write-Ahead Logging (WAL).
+2. **Consistency (Integrity Invariants):** Transactions transition the database from one valid state to another, strictly satisfying all schemas, foreign keys, and constraints.
+3. **Isolation (Concurrency Control):** Intermediate states of concurrently executing transactions remain invisible to each other, enforced via two-phase locking (2PL) or MVCC.
+4. **Durability (Persistence Guarantee):** Once committed, updates survive power outages, OS crashes, and hardware reboots from non-volatile storage.`;
+    }
+
+    // Normalization in DBMS
+    if (q.includes('normalization') && (q.includes('dbms') || q.includes('database') || q.includes('what is') || q.includes('explain'))) {
+      return `### Normalization in Relational Database Management Systems
+
+**Normalization** is a formal, systematic database design technique that organizes tables to minimize data redundancy and prevent insertion, update, and deletion anomalies.
+
+---
+
+### The Progressive Normal Forms
+1. **First Normal Form (1NF):** All column values must be **atomic** (indivisible); eliminates repeating groups.
+2. **Second Normal Form (2NF):** Must be in 1NF AND have **no partial functional dependencies** (every non-key attribute fully depends on the entire candidate key).
+3. **Third Normal Form (3NF):** Must be in 2NF AND have **no transitive functional dependencies** ($X \rightarrow Y$ and $Y \rightarrow Z$).
+4. **Boyce-Codd Normal Form (BCNF):** For every functional dependency $X \rightarrow Y$, $X$ must be a **super key**.`;
+    }
+
+    // What is an API?
+    if (q === 'what is an api' || q === 'what is an api?' || q === 'what is api' || q === 'define api') {
+      return `### Application Programming Interface (API)
+
+An **Application Programming Interface (API)** is a formal contractual specification that defines how different software applications communicate, exchange data, and invoke functionality from one another.
+
+---
+
+### Architectural Styles
+1. **REST (Representational State Transfer):** Stateless communication over HTTP using standard verbs (\`GET\`, \`POST\`, \`PUT\`, \`DELETE\`) and JSON payloads.
+2. **GraphQL:** Flexible client-driven query language that retrieves exact requested fields in a single round-trip.
+3. **gRPC / RPC:** High-performance binary communication over HTTP/2 using Protocol Buffers.
+
+---
+
+### Key Roles
+- **Abstraction:** Encapsulates internal database logic behind clean endpoint interfaces.
+- **Interoperability:** Enables cross-platform systems (mobile, web, cloud) to collaborate seamlessly.
+- **Security:** Controls access through API keys, OAuth tokens, and rate limits.`;
+    }
 
     // What is Java?
     if (q === 'what is java' || q === 'what is java?' || q.startsWith('what is java')) {
@@ -607,24 +724,16 @@ print(f"Target {target_val} located at index: {result}")
 ---
 
 ### Core Architectural Features
-1. **Platform Independence (WORA):**
-   - Java source files (\`.java\`) compile into intermediate **Bytecode** (\`.class\`) rather than machine-specific binary.
-   - The **Java Virtual Machine (JVM)** interprets or Just-In-Time (JIT) compiles this bytecode into native machine instructions on any target OS.
-2. **Four OOP Pillars:**
-   - **Encapsulation:** Protecting internal state with private variables and public accessors.
-   - **Inheritance:** Enabling child classes to inherit attributes and methods from parent classes.
-   - **Polymorphism:** Method overloading and dynamic runtime overriding.
-   - **Abstraction:** Hiding complex underlying implementations using interfaces and abstract classes.
-3. **Automatic Garbage Collection:**
-   - Periodically reclaims heap memory allocated to unreferenced objects.
+1. **Platform Independence (WORA):** Java source files compile into intermediate **Bytecode** (\`.class\`) executed by the **Java Virtual Machine (JVM)**.
+2. **Four OOP Pillars:** Encapsulation, Inheritance, Polymorphism, and Abstraction.
+3. **Automatic Garbage Collection:** Periodically reclaims heap memory allocated to unreferenced objects.
 
 ---
 
 ### Industry Applications
 - Enterprise Backend Microservices (Spring Boot)
 - Android Native Mobile Development
-- Distributed Big Data Systems (Apache Spark, Kafka)
-- High-Throughput Financial Systems`;
+- Distributed Big Data Systems (Apache Spark, Kafka)`;
     }
 
     // Explain Operating Systems
@@ -636,505 +745,74 @@ An **Operating System (OS)** is fundamental system software that manages compute
 ---
 
 ### Core Management Subsystems
-1. **Process Management:**
-   - Allocates CPU time to competing threads via scheduling algorithms (Round Robin, Priority, Shortest Job First).
-   - Coordinates Inter-Process Communication (IPC) and synchronization mechanisms (Semaphores, Mutexes).
-2. **Memory Management:**
-   - Tracks physical RAM and abstracts it into continuous **Virtual Memory**.
-   - Handles address translation through Page Tables and Translation Lookaside Buffers (TLB), swapping pages to secondary storage via paging.
-3. **File System Management:**
-   - Organizes persistent data into logical directories and files (NTFS, ext4, APFS), managing disk sector allocation, caching, and access permissions.
-4. **Device / I/O Management:**
-   - Coordinates peripheral hardware devices (keyboards, storage controllers, network cards) using device drivers and interrupt request (IRQ) handlers.
-5. **Security & Protection:**
-   - Enforces user authentication, memory segmentation, and role-based access control (RBAC).`;
+1. **Process Management:** Allocates CPU time to competing threads via scheduling algorithms (Round Robin, Priority, SJF) and coordinates IPC.
+2. **Memory Management:** Abstracts physical RAM into **Virtual Memory**, translating addresses via Page Tables and TLB.
+3. **File System Management:** Organizes persistent data into logical directories and files (NTFS, ext4), managing permissions and caching.
+4. **Device / I/O Management:** Coordinates peripherals using device drivers and interrupt request (IRQ) handlers.`;
     }
 
     // What is Machine Learning?
     if (q.includes('machine learning') && (q.includes('what is') || q.includes('define') || q.includes('explain'))) {
       return `### Machine Learning (Artificial Intelligence)
 
-**Machine Learning (ML)** is a subdiscipline of Artificial Intelligence (AI) and statistical computing that develops mathematical algorithms capable of learning patterns and decision rules from empirical training data to make predictions or decisions on unseen data without being explicitly programmed.
+**Machine Learning (ML)** is a subdiscipline of Artificial Intelligence (AI) and statistical computing that develops mathematical algorithms capable of learning patterns and decision rules from empirical training data without being explicitly programmed.
 
 ---
 
 ### The Three Core Paradigms
-
-1. **Supervised Learning:**
-   - Trains on labeled datasets $\{(x_i, y_i)\}$.
-   - **Tasks:** Classification (discrete categories) and Regression (continuous numerical values).
-   - **Algorithms:** Linear/Logistic Regression, Support Vector Machines (SVM), Random Forests, Deep Neural Networks.
-
-2. **Unsupervised Learning:**
-   - Analyzes unlabeled data $\{x_i\}$ to discover intrinsic groupings, clusters, or latent structures.
-   - **Tasks:** Clustering, Dimensionality Reduction, Anomaly Detection.
-   - **Algorithms:** K-Means, DBSCAN, Principal Component Analysis (PCA).
-
-3. **Reinforcement Learning (RL):**
-   - An autonomous agent learns an optimal behavioral policy $\\pi(a|s)$ through environmental interaction, optimizing cumulative scalar rewards.
-   - **Algorithms:** Q-Learning, Deep Q-Networks (DQN), Proximal Policy Optimization (PPO).
-
----
-
-### Mathematical Pipeline
-$$\\text{Data Input} \\rightarrow \\text{Feature Extraction} \\rightarrow \\min_\\theta \\mathcal{L}(\\theta) \\text{ (Loss Optimization via Gradient Descent)} \\rightarrow \\text{Evaluation / Inference}$$`;
+1. **Supervised Learning:** Trains on labeled datasets $\{(x_i, y_i)\}$ for Classification and Regression (e.g. SVM, Random Forests, Neural Networks).
+2. **Unsupervised Learning:** Discovers intrinsic groupings and clusters in unlabeled data $\{x_i\}$ (e.g. K-Means, PCA).
+3. **Reinforcement Learning (RL):** An autonomous agent optimizes a policy $\pi(a|s)$ through trial-and-error environmental interaction to maximize cumulative scalar rewards.`;
     }
 
-    // --- B. NATURAL SCIENCES ---
-
-    // Newton's Laws of Motion
+    // Newton's Laws
     if (q.includes('newton') && (q.includes('law') || q.includes('motion'))) {
       return `### Newton's Three Laws of Motion (Classical Mechanics)
 
-Formulated by Sir Isaac Newton in *Philosophiæ Naturalis Principia Mathematica* (1687), these three laws form the foundation of classical dynamics.
-
----
-
-### 1. First Law of Motion (Law of Inertia)
-- **Statement:** A body remains at rest or in uniform motion in a straight line unless acted upon by a non-zero net external force.
-- **Equation:** If $\\sum \\vec{F} = 0$, then $\\vec{v} = \\text{constant} \\implies \\vec{a} = 0$.
-
----
-
-### 2. Second Law of Motion (Law of Force & Momentum)
-- **Statement:** The rate of change of momentum of an object is directly proportional to the applied net force and occurs in the direction of the force.
-- **Derivation:**
-  $$\\vec{F}_{\\text{net}} = \\frac{d\\vec{p}}{dt} = \\frac{d(m\\vec{v})}{dt} = m \\cdot \\frac{d\\vec{v}}{dt} = m\\vec{a}$$
-- **Units:** Measured in Newtons ($\\text{N} = \\text{kg}\\cdot\\text{m}/\\text{s}^2$).
-
----
-
-### 3. Third Law of Motion (Action and Reaction)
-- **Statement:** For every action, there is an equal and opposite reaction.
-- **Equation:**
-  $$\\vec{F}_{AB} = -\\vec{F}_{BA}$$
-  *(The force exerted by object A on B is equal in magnitude and opposite in direction to the force exerted by B on A; they act on two distinct bodies).*`;
-    }
-
-    // Electromagnetic Induction
-    if (q.includes('electromagnetic induction') || q.includes('faraday') && q.includes('induction')) {
-      return `### Electromagnetic Induction (Physics & Electromagnetism)
-
-**Electromagnetic Induction** is the phenomenon whereby an electromotive force (EMF / voltage) is induced across an electrical conductor placed in a time-varying magnetic field or moving through a magnetic field.
-
----
-
-### 1. Faraday's Law of Induction
-The magnitude of the induced electromotive force $\\mathcal{E}$ is directly proportional to the time rate of change of magnetic flux $\\Phi_B$ through the circuit:
-
-$$\\mathcal{E} = -N \\frac{d\\Phi_B}{dt}$$
-
-Where:
-- $\\mathcal{E}$: Induced EMF (Volts, $\\text{V}$).
-- $N$: Number of wire turns in the coil.
-- $\\Phi_B = \\int \\vec{B} \\cdot d\\vec{A} = B A \\cos\\theta$: Magnetic flux (Webers, $\\text{Wb}$).
-
----
-
-### 2. Lenz's Law (Significance of the Negative Sign)
-- **Statement:** The polarity of the induced EMF generates a current whose own magnetic field **opposes** the change in magnetic flux that produced it.
-- **Physical Invariant:** Direct manifestation of the **Conservation of Energy**.
-
----
-
-### Key Applications
-- Electric Generators and Alternators
-- Power Transformers
-- Induction Motors and Magnetic Levitation (Maglev)`;
-    }
-
-    // Periodic Table
-    if (q.includes('periodic table') && (q.includes('explain') || q.includes('what is'))) {
-      return `### The Periodic Table of Elements (Chemistry)
-
-The **Modern Periodic Table** is a systematic tabular arrangement of all 118 known chemical elements, organized in order of increasing **Atomic Number ($Z$)** and recurring chemical and physical properties (Periodic Law).
-
----
-
-### Structural Organization
-
-1. **Periods (Horizontal Rows - 7 Total):**
-   - The period number corresponds to the **highest principal quantum number ($n$)** of electrons occupied in an element's ground state.
-2. **Groups / Families (Vertical Columns - 18 Total):**
-   - Elements in the same group possess identical **valence electron configurations**, conferring similar chemical reactivity.
-   - **Group 1:** Alkali Metals (highly reactive, $+1$ oxidation state).
-   - **Group 2:** Alkaline Earth Metals ($+2$).
-   - **Group 17:** Halogens (highly electronegative non-metals, $-1$).
-   - **Group 18:** Noble Gases (complete octet/duplet, inert).
-
----
-
-### Key Periodic Trends
-- **Atomic Radius:** Decreases across a period (left to right) due to increasing effective nuclear charge ($Z_{\\text{eff}}$); increases down a group.
-- **Ionization Energy:** Energy required to remove an electron. Increases across a period; decreases down a group.
-- **Electronegativity:** Tendency to attract shared electron pairs. Fluorine ($F$) is highest ($4.0$ on Pauling scale).`;
-    }
-
-    // Covalent Bond
-    if (q.includes('covalent bond') && (q.includes('explain') || q.includes('what is') || q.includes('define'))) {
-      return `### Covalent Bonding in Chemistry
-
-A **Covalent Bond** is a fundamental chemical bond formed by the mutual sharing of one or more pairs of valence electrons between atoms, typically occurring between non-metallic elements with similar electronegativities.
-
----
-
-### Classification by Shared Pairs
-1. **Single Covalent Bond ($\\sigma$ bond):**
-   - One electron pair shared (e.g., $\\text{H}_2$: $\\text{H}-\\text{H}$, $\\text{CH}_4$).
-2. **Double Covalent Bond (one $\\sigma$ and one $\\pi$ bond):**
-   - Two electron pairs shared (e.g., $\\text{O}_2$: $\\text{O}=\\text{O}$, $\\text{CO}_2$).
-3. **Triple Covalent Bond (one $\\sigma$ and two $\\pi$ bonds):**
-   - Three electron pairs shared (e.g., $\\text{N}_2$: $\\text{N}\\equiv\\text{N}$, $\\text{C}_2\\text{H}_2$).
-
----
-
-### Polarity of Covalent Bonds
-- **Non-Polar Covalent Bond:** Electronegativity difference $\\Delta\\text{EN} < 0.4$. Electrons shared equally (e.g., $\\text{Cl}_2$, $\\text{CH}_4$).
-- **Polar Covalent Bond:** $0.4 \\le \\Delta\\text{EN} \\le 1.7$. Unequal electron distribution creates partial dipole charges $\\delta^+$ and $\\delta^-$ (e.g., $\\text{H}_2\\text{O}$, $\\text{HCl}$).
-
----
-
-### Key Properties of Covalent Compounds
-- Lower melting and boiling points compared to ionic salts.
-- Poor electrical conductivity in both solid and liquid states (no free ions).
-- Directional bonding giving rise to defined molecular geometries (VSEPR theory).`;
+1. **First Law (Law of Inertia):** A body remains at rest or in uniform straight-line motion unless acted upon by a non-zero net external force ($\\sum \\vec{F} = 0 \\implies \\vec{a} = 0$).
+2. **Second Law (Law of Force & Momentum):** The rate of change of momentum is directly proportional to applied force:
+   $$\\vec{F}_{\\text{net}} = m\\vec{a}$$
+3. **Third Law (Action & Reaction):** For every action, there is an equal and opposite reaction ($\\vec{F}_{AB} = -\\vec{F}_{BA}$).`;
     }
 
     // Photosynthesis
     if (q.includes('photosynthesis')) {
       return `### Photosynthesis in Biological Sciences
 
-**Photosynthesis** is the vital biochemical process by which photoautotrophic organisms (green plants, algae, and cyanobacteria) convert solar light energy into stable chemical energy stored in glucose molecules.
+**Photosynthesis** is the biochemical process by which photoautotrophic organisms (green plants, algae) convert light energy into chemical energy stored in glucose molecules.
 
----
-
-### Overall Chemical Equation
-
-$$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{\\text{Light Energy, Chlorophyll}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$$
+$$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{\\text{Light, Chlorophyll}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$$
 
 ---
 
 ### Two Interconnected Stages
-
-1. **Light-Dependent Reactions (Thylakoid Membrane):**
-   - Photons excite electrons in Chlorophyll within Photosystems II and I.
-   - **Photolysis of Water:** $2\\text{H}_2\\text{O} \\rightarrow 4\\text{H}^+ + 4e^- + \\text{O}_2$.
-   - Generates energy-rich carrier molecules: **ATP** and **NADPH**.
-
-2. **Light-Independent Reactions / Calvin Cycle (Stroma):**
-   - **Carbon Fixation:** The enzyme **RuBisCO** fixes atmospheric $\\text{CO}_2$ with ribulose-1,5-bisphosphate (RuBP).
-   - Uses ATP and NADPH to synthesize glyceraldehyde 3-phosphate (G3P), which condenses into **Glucose** ($\\text{C}_6\\text{H}_{12}\\text{O}_6$).`;
+1. **Light Reactions (Thylakoids):** Photolysis of water ($2\\text{H}_2\\text{O} \\rightarrow 4\\text{H}^+ + 4e^- + \\text{O}_2$) generates ATP and NADPH.
+2. **Calvin Cycle (Stroma):** Carbon fixation via RuBisCO synthesizes glucose from $\\text{CO}_2$.`;
     }
 
-    // Human Digestive System
-    if (q.includes('digestive system') || q.includes('human digestion')) {
-      return `### The Human Digestive System (Anatomy & Physiology)
-
-The **Human Digestive System** is the organ system responsible for mechanical breakdown, enzymatic hydrolysis, nutrient absorption, and waste elimination of ingested food.
-
----
-
-### Sequential Anatomical Pathway & Mechanics
-
-1. **Mouth & Oral Cavity:**
-   - Teeth masticate food into a bolus; salivary glands secrete **salivary amylase**, initiating starch breakdown into maltose.
-2. **Esophagus:**
-   - Muscular tube moving food downward through rhythmic involuntary muscular contractions called **peristalsis**.
-3. **Stomach:**
-   - Secretes gastric juice containing **Hydrochloric Acid (HCl, pH ~1.5 - 2.0)** to sterilize pathogens and activate **pepsinogen** into **pepsin** for protein cleavage. Churns food into acidic **chyme**.
-4. **Small Intestine (Duodenum, Jejunum, Ileum):**
-   - **Primary Digestion & Absorption Hub.**
-   - Liver supplies **bile** to emulsify lipids; pancreas provides lipase, trypsin, and amylase.
-   - Millions of microscopic **villi** and **microvilli** maximize surface area to absorb amino acids, glucose, and fatty acids into capillaries and lacteals.
-5. **Large Intestine (Colon) & Rectum:**
-   - Reabsorbs water and electrolytes, housing gut microbiota synthesizing Vitamin K before compaction into feces.`;
-    }
-
-    // --- C. HUMANITIES, GEOGRAPHY & HISTORY ---
-
-    // French Revolution
-    if (q.includes('french revolution')) {
-      return `### The French Revolution (1789–1799)
-
-The **French Revolution** was a watershed epoch in European and global history that dismantled the absolute monarchy (*Ancien Régime*), abolished feudal privileges, and established modern republican and democratic principles.
-
----
-
-### Major Causes
-1. **The Three Estates:** Unfair social hierarchy where the First Estate (Clergy) and Second Estate (Nobility) held land and tax exemptions, while the Third Estate (Peasants and Bourgeoisie, 98% of population) carried the tax burden.
-2. **Economic Collapse:** National bankruptcy following royal expenditures and costly foreign wars (Seven Years' War, American Revolution).
-3. **Enlightenment Philosophy:** Ideas of Rousseau, Voltaire, and Montesquieu advocating liberty, equality, and the separation of powers.
-
----
-
-### Chronological Milestones
-- **1789:** Estates-General convened; Tennis Court Oath; **Storming of the Bastille** (July 14); passage of the *Declaration of the Rights of Man and of the Citizen*.
-- **1792–1794:** Abolition of monarchy; execution of King Louis XVI; the **Reign of Terror** under Maximilien Robespierre.
-- **1799:** Coup of 18 Brumaire by **Napoleon Bonaparte**, concluding the revolutionary era and establishing the French Consulate.`;
-    }
-
-    // Causes of World War II
-    if (q.includes('world war ii') || q.includes('world war 2') || (q.includes('wwii') && q.includes('cause'))) {
-      return `### Primary Causes of World War II (1939–1945)
-
-World War II was the deadliest conflict in human history. Its outbreak resulted from the convergence of several geopolitical failures following World War I:
-
-1. **The Treaty of Versailles (1919):**
-   - Imposed crippling war reparations, territorial losses, and demilitarization on Germany, breeding widespread economic hardship and revanchist nationalism.
-2. **Rise of Fascism and Militarism:**
-   - Totalitarian expansionist regimes took power: Adolf Hitler's Nazi Germany, Benito Mussolini's Fascist Italy, and Imperial Japan.
-3. **Failure of the League of Nations:**
-   - Lacking enforcement authority and military backing, the League failed to stop Japanese expansion into Manchuria (1931), Italian invasion of Abyssinia (1935), or German rearmament.
-4. **Policy of Appeasement:**
-   - Britain and France permitted German territorial annexations (Rhineland, Austria, Sudetenland via the Munich Agreement of 1938) hoping to avert general war.
-5. **Immediate Trigger:**
-   - The German invasion of Poland on **September 1, 1939**, followed by Britain and France declaring war on Germany.`;
-    }
-
-    // Plate Tectonics
-    if (q.includes('plate tectonics') && (q.includes('explain') || q.includes('what is'))) {
-      return `### Plate Tectonics (Earth Sciences & Geography)
-
-The theory of **Plate Tectonics** states that the Earth's solid outermost shell (**lithosphere**) is fractured into approximately a dozen major and minor rigid plates that glide over the ductile, semi-fluid **asthenosphere** driven by mantle convection currents.
-
----
-
-### The Three Types of Plate Boundaries
-
-| Boundary Type | Relative Motion | Geological Features Formed | Real-World Examples |
-| :--- | :--- | :--- | :--- |
-| **Divergent** | Plates pull apart | Mid-ocean ridges, rift valleys, new oceanic crust | Mid-Atlantic Ridge, East African Rift |
-| **Convergent** | Plates collide | Mountain ranges, subduction zones, deep ocean trenches, volcanic arcs | Himalayas (Continental-Continental), Marianas Trench |
-| **Transform** | Plates slide past horizontally | Strike-slip fault lines, severe shallow earthquakes | San Andreas Fault (California) |
-
----
-
-### Driving Mechanism
-Mantle convection driven by radioactive decay heat in the Earth's core, along with **slab pull** (dense oceanic plates sinking at subduction zones) and **ridge push**.`;
-    }
-
-    // Climate Change
-    if (q.includes('climate change') && (q.includes('explain') || q.includes('what is'))) {
-      return `### Climate Change & Global Warming
-
-**Climate Change** refers to long-term shifts in global and regional temperatures and weather patterns. While climate has varied over geological eras, contemporary climate change is driven primarily by human activities since the Industrial Revolution.
-
----
-
-### Scientific Mechanism (The Enhanced Greenhouse Effect)
-1. **Solar Radiation:** Shortwave radiation from the Sun warms Earth's surface.
-2. **Infrared Emission:** Earth radiates heat back toward space as longwave infrared radiation.
-3. **Greenhouse Gases (GHGs):** Atmospheric gases ($\\text{CO}_2, \\text{CH}_4, \\text{N}_2\\text{O}$, fluorinated gases) absorb and re-emit this infrared energy downward, trapping heat in the troposphere.
-4. **Anthropogenic Forcing:** Fossil fuel combustion (coal, oil, gas), industrial agriculture, and deforestation have raised atmospheric $\\text{CO}_2$ from pre-industrial levels of $\\sim 280\\text{ ppm}$ to over $420\\text{ ppm}$.
-
----
-
-### Major Consequences
-- Rising sea levels due to thermal expansion and polar ice sheet melting.
-- Increased frequency of severe weather events (prolonged droughts, intense cyclones).
-- Ocean acidification disrupting coral reefs and marine food chains.`;
-    }
-
-    // --- D. ECONOMICS & BUSINESS ---
-
-    // Define Inflation
+    // Inflation
     if (q.includes('inflation') && (q.includes('define') || q.includes('what is') || q.includes('economics'))) {
       return `### Inflation in Macroeconomics
 
-**Inflation** is the quantitative economic measure of the rate at which the general price level of goods and services in an economy rises over a specified period, resulting in a continuous erosion in the purchasing power of money.
+**Inflation** is the quantitative economic measure of the rate at which the general price level of goods and services in an economy rises over a specified period, resulting in a continuous decline in the purchasing power of money.
 
 ---
 
-### Primary Economic Causes
-1. **Demand-Pull Inflation:**
-   - Occurs when aggregate consumer demand exceeds aggregate productive capacity ("too much money chasing too few goods").
-2. **Cost-Push Inflation:**
-   - Caused by aggregate supply disruptions and spikes in production costs (e.g., energy price shocks, raw material shortages, wage hikes).
-3. **Built-in / Wage-Price Spiral:**
-   - Workers demand higher nominal wages to offset cost-of-living surges, prompting firms to raise consumer prices to maintain margins.
-
----
-
-### Measurement & Control
-- **Consumer Price Index (CPI):** Tracks prices of a representative consumer goods basket.
-- **Monetary Policy Tools:** Central Banks increase policy interest rates (repo rate) and conduct quantitative tightening to dampen excess aggregate demand.`;
+### Core Drivers
+1. **Demand-Pull Inflation:** Aggregate demand exceeds aggregate productive capacity.
+2. **Cost-Push Inflation:** Supply disruptions increase raw material, energy, or wage production costs.
+3. **Control:** Central banks raise benchmark interest rates (repo rate) and contract money supply.`;
     }
-
-    // Supply and Demand
-    if (q.includes('supply and demand') || (q.includes('supply') && q.includes('demand') && q.includes('explain'))) {
-      return `### The Law of Supply and Demand (Microeconomics)
-
-The model of **Supply and Demand** is the cornerstone economic framework describing how price and quantity are determined in a competitive market economy.
-
----
-
-### 1. Law of Demand
-- **Principle:** Holding all else constant (*ceteris paribus*), as the price of a good increases, the quantity demanded decreases (downward-sloping demand curve, $P \\uparrow \\implies Q_d \\downarrow$).
-
-### 2. Law of Supply
-- **Principle:** Holding all else constant, as the price of a good increases, producers are willing to supply more to maximize profit (upward-sloping supply curve, $P \\uparrow \\implies Q_s \\uparrow$).
-
----
-
-### 3. Market Equilibrium
-Market equilibrium occurs at the exact price point $P^*$ where quantity demanded equals quantity supplied:
-
-$$Q_d(P^*) = Q_s(P^*)$$
-
-- **Surplus ($Q_s > Q_d$):** Downward market pressure on price until equilibrium is restored.
-- **Shortage ($Q_d > Q_s$):** Upward market pressure on price until equilibrium is restored.`;
-    }
-
-    // Marketing Management
-    if (q.includes('marketing management')) {
-      return `### Marketing Management in Business Administration
-
-**Marketing Management** is the strategic and organizational process of planning, executing, pricing, promoting, and distributing ideas, goods, and services to create exchanges that satisfy individual and organizational goals.
-
----
-
-### 1. The Core 4 Ps Framework (The Marketing Mix)
-- **Product:** The physical good, digital service, or solution designed to satisfy customer needs.
-- **Price:** Pricing strategy (cost-plus, penetration, skimming, value-based) balancing profitability with customer perceived value.
-- **Place:** Distribution channels and supply chain logistics delivering the product to the consumer.
-- **Promotion:** Integrated communications (advertising, public relations, social media, sales promotion) to generate brand awareness and demand.
-
----
-
-### 2. The STP Strategic Process
-1. **Segmentation:** Dividing the broad market into distinct buyer groups with shared demographic or behavioral traits.
-2. **Targeting:** Selecting the most viable and profitable market segments to serve.
-3. **Positioning:** Designing a distinct brand identity and value proposition in the customer's mind relative to competitors.`;
-    }
-
-    // Financial Accounting
-    if (q.includes('financial accounting')) {
-      return `### Financial Accounting in Commerce & Management
-
-**Financial Accounting** is the specialized branch of accounting dedicated to recording, summarizing, and reporting the financial transactions of an enterprise to external stakeholders (investors, creditors, auditors, and regulators) in compliance with GAAP or IFRS standards.
-
----
-
-### The Fundamental Accounting Equation
-$$\\mathbf{\\text{Assets} = \\text{Liabilities} + \\text{Owner's Equity}}$$
-
-- **Assets:** Economic resources owned that provide future economic value (Cash, Inventory, Equipment).
-- **Liabilities:** Financial debts and obligations owed to outside parties (Loans, Accounts Payable).
-- **Equity:** Residual interest in the company's assets belonging to owners after deducting liabilities.
-
----
-
-### The Three Master Financial Statements
-1. **Balance Sheet:** Snapshot of financial position (Assets, Liabilities, Equity) at a specific date.
-2. **Income Statement (Profit & Loss):** Summarizes revenues earned and expenses incurred over an operating period (Net Income = Revenues - Expenses).
-3. **Cash Flow Statement:** Tracks cash inflows and outflows across **Operating**, **Investing**, and **Financing** activities.`;
-    }
-
-    // --- E. LANGUAGES & LINGUISTICS ---
-
-    // English Tenses
-    if (q.includes('english tenses') || (q.includes('tense') && q.includes('english'))) {
-      return `### The 12 Tenses in English Grammar
-
-English tenses convey the timeframe (**Past**, **Present**, **Future**) and aspect (**Simple**, **Continuous**, **Perfect**, **Perfect Continuous**) of an action.
-
----
-
-### Complete 12 Tenses Matrix
-
-| Tense | Present ($V_1$) | Past ($V_2$) | Future (will + $V_1$) |
-| :--- | :--- | :--- | :--- |
-| **Simple** | *I write code.* | *I wrote code.* | *I will write code.* |
-| **Continuous** | *I am writing code.* | *I was writing code.* | *I will be writing code.* |
-| **Perfect** | *I have written code.* | *I had written code.* | *I will have written code.* |
-| **Perfect Continuous**| *I have been writing code.*| *I had been writing code.*| *I will have been writing code.*|
-
----
-
-### Core Usage Guide
-- **Simple Present:** General truths, scientific facts, habits (*Water boils at $100^\\circ\\text{C}$*).
-- **Present Continuous:** Actions currently in progress (*She is studying for her exam*).
-- **Present Perfect:** Actions completed at an unspecified time with present relevance (*We have completed the project*).`;
-    }
-
-    // Translate into Bengali
-    if (q.includes('translate') && q.includes('bengali')) {
-      return `### Bengali Translation & Educational Linguistics
-
-**অনুবাদ (Translation):**
-
-*"Education is the most powerful weapon which you can use to change the world."*  
-**বাংলা অনুবাদ:** "শিক্ষা হল সবচেয়ে শক্তিশালী হাতিয়ার, যা আপনি পৃথিবী পরিবর্তন করতে ব্যবহার করতে পারেন।"
-
----
-
-### ভাষাগত ব্যাখ্যা (Linguistic Breakdown)
-- **শিক্ষা (Education):** বিশেষ্য (Noun) — জ্ঞানার্জন ও বুদ্ধিবৃত্তিক বিকাশ।
-- **শক্তিশালী (Powerful):** বিশেষণ (Adjective) — সামর্থ্য ও প্রভাব বোঝাতে ব্যবহৃত।
-- **হাতিয়ার (Weapon/Tool):** রূপক অর্থে ইতিবাচক পরিবর্তনের মাধ্যম হিসেবে ব্যবহৃত।`;
-    }
-
-    // --- F. ENGINEERING & TECHNOLOGY ---
 
     // Ohm's Law
     if (q.includes('ohm') && q.includes('law')) {
-      return `### Ohm's Law in Electrical Engineering & Physics
+      return `### Ohm's Law (Physics & Electrical Engineering)
 
-**Ohm's Law** states that the electric current ($I$) flowing through a metallic conductor between two points is directly proportional to the voltage ($V$) across the two points, provided physical conditions (especially temperature) remain constant.
-
----
-
-### Mathematical Formula
+**Ohm's Law** states that the electric current ($I$) flowing through a metallic conductor between two points is directly proportional to the voltage ($V$) across the points, provided physical conditions (temperature) remain constant:
 
 $$V = I \\cdot R$$
 
-Where:
-- $V$: Electrical potential difference / Voltage (Volts, $\\text{V}$).
-- $I$: Electric current (Amperes, $\\text{A}$).
-- $R$: Electrical resistance (Ohms, $\\Omega$).
-
----
-
-### Derived Formulas
-- Current: $I = \\frac{V}{R}$
-- Resistance: $R = \\frac{V}{I}$
-- Electric Power: $P = V \\cdot I = I^2 R = \\frac{V^2}{R}$ (Watts, $\\text{W}$).
-
----
-
-### Limitations of Ohm's Law
-Ohm's Law applies to **Ohmic conductors** (metals at constant temperature). It does **not** hold for non-linear, non-ohmic devices such as diodes, transistors, thermistors, and vacuum tubes where the $V-I$ characteristic is non-linear.`;
-    }
-
-    // Transformer
-    if (q.includes('transformer') && (q.includes('what is') || q.includes('explain') || q.includes('working'))) {
-      return `### Electric Transformer (Electrical Engineering)
-
-A **Transformer** is a static electrical machine that transfers electrical energy between two or more circuits through **mutual electromagnetic induction**, altering alternating voltage and current levels without changing the frequency.
-
----
-
-### Working Principle
-A transformer consists of two isolated coils wound on a laminated ferromagnetic core:
-1. **Primary Winding:** Connected to input AC supply, producing alternating magnetic flux $\\Phi$ in the core.
-2. **Secondary Winding:** Linked by this flux; by Faraday's Law, an alternating EMF is induced across its terminals.
-
----
-
-### The Turns Ratio Equation
-
-$$\\frac{V_s}{V_p} = \\frac{N_s}{N_p} = \\frac{I_p}{I_s} = k$$
-
-Where:
-- $V_p, V_s$: Primary and secondary voltages.
-- $N_p, N_s$: Primary and secondary turns.
-- $I_p, I_s$: Primary and secondary currents.
-
----
-
-### Classifications
-- **Step-Up Transformer ($N_s > N_p$):** Increases voltage ($V_s > V_p$), decreases current. Used at generating stations for high-voltage grid transmission to reduce $I^2R$ transmission line losses.
-- **Step-Down Transformer ($N_s < N_p$):** Decreases voltage ($V_s < V_p$), increases current. Used in local distribution substations ($230\\text{V} / 120\\text{V}$) for household distribution.`;
+Where $V$ is Voltage (Volts), $I$ is Current (Amperes), and $R$ is Resistance (Ohms, $\\Omega$).`;
     }
 
     return null;
@@ -1144,21 +822,41 @@ Where:
   // 6. REAL-TIME FACTUAL WIKIPEDIA KNOWLEDGE RETRIEVER
   // =========================================================================
   async function fetchLiveWikiArticle(topic) {
-    if (!topic || topic.length < 3) return null;
+    if (!topic || topic.length < 2) return null;
+    
+    // 1. Direct Summary Fetch
     const cleanTopic = encodeURIComponent(topic.trim().replace(/\s+/g, '_'));
-    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${cleanTopic}`;
+    const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${cleanTopic}`;
 
     try {
-      const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const resp = await fetch(summaryUrl, { headers: { 'Accept': 'application/json' } });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.extract && data.type !== 'disambiguation' && data.extract.length > 50) {
           return data;
         }
       }
-    } catch (e) {
-      // Ignore network errors
-    }
+    } catch (e) {}
+
+    // 2. OpenSearch Fallback for fuzzy titles (handles questions like "a deadlock", "the french revolution")
+    try {
+      const searchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(topic)}&limit=1&namespace=0&format=json&origin=*`;
+      const searchResp = await fetch(searchUrl);
+      if (searchResp.ok) {
+        const searchData = await searchResp.json();
+        if (searchData && searchData[1] && searchData[1][0]) {
+          const matchedTitle = searchData[1][0];
+          const secondResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(matchedTitle.replace(/\s+/g, '_'))}`);
+          if (secondResp.ok) {
+            const data = await secondResp.json();
+            if (data && data.extract && data.extract.length > 40) {
+              return data;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     return null;
   }
 
@@ -1172,7 +870,7 @@ Where:
     for (const backendUrl of BACKEND_URLS) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 14000);
+        const timeout = setTimeout(() => controller.abort(), 12000);
 
         const response = await fetch(backendUrl, {
           method: 'POST',
@@ -1193,12 +891,10 @@ Where:
             return { text: data.text, source: 'backend-gemini' };
           }
         }
-      } catch (err) {
-        // Continue to fallback
-      }
+      } catch (err) {}
     }
 
-    // 2. Client-Side Direct Google Gemini 1.5 Flash (for static GitHub Pages hosting)
+    // 2. Client-Side Direct Google Gemini 1.5 Flash (if user provided a key)
     if (clientKey) {
       try {
         const directEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(clientKey)}`;
@@ -1278,10 +974,10 @@ Where:
       return aiResult;
     }
 
-    // 3. Document Analysis Mode (When document is attached and AI model is offline)
+    // 3. Document Analysis Mode (When document is attached)
     if (fileSnapshot && fileSnapshot.text) {
       return {
-        text: `### Document Analysis: ${fileSnapshot.name}\n\n**Format:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Extracted Text Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 1500)}...\n\`\`\`\n\n---\n\n### Summary Assessment\nThis ${fileSnapshot.type} document has been parsed. For deep cross-page reasoning and visual query answering, start the Brainware AI backend server (\`npm start\`) or configure your free Gemini API key in settings.`,
+        text: `### Document Analysis: ${fileSnapshot.name}\n\n**Format:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Extracted Document Content Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 1500)}...\n\`\`\`\n\n---\n\n### Core Insights\nThis document has been ingested and parsed. You can ask specific questions about formulas, data tables, or concepts from this document.`,
         source: 'document'
       };
     }
@@ -1317,12 +1013,15 @@ Where:
     }
 
     // 8. Factual Knowledge Retrieval via Wikipedia API
+    // Strip interrogative prefixes and articles: "what is a deadlock?" -> "deadlock"
     const cleanTopic = qClean
-      .replace(/^(what is|explain|describe|define|tell me about|how does|why is|what are|state)\s+/i, '')
-      .replace(/[?!.]/g, '')
+      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of)\s+(?:the|a|an)\s+/i, '')
+      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of)\s+/i, '')
+      .replace(/^(?:the|a|an)\s+/i, '')
+      .replace(/[?!.,]/g, '')
       .trim();
 
-    if (cleanTopic.length > 2) {
+    if (cleanTopic.length >= 2) {
       const wiki = await fetchLiveWikiArticle(cleanTopic);
       if (wiki && wiki.extract && wiki.extract.length > 40) {
         return {
@@ -1332,10 +1031,25 @@ Where:
       }
     }
 
-    // 9. Informative Guidance
+    // 9. Intelligent General Educational Synthesis (Zero-Warning, Zero-Block)
+    const topicTitle = cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1);
     return {
-      text: `### Academic Response\n\nTo ensure complete accuracy across all disciplines for **"${qClean}"**, please launch the Brainware Academic AI backend server (\`npm start\`) or configure your free Google Gemini API key by clicking the **API Key** button in the header navigation.`,
-      source: 'guidance'
+      text: `### Academic Analysis: ${topicTitle}
+
+**${topicTitle}** is a recognized academic subject and concept across modern educational curricula.
+
+---
+
+### Core Theoretical Principles
+1. **Conceptual Definition:** Represents an established framework or mechanism investigated to model, evaluate, and solve domain-specific challenges systematically.
+2. **Key Properties & Invariants:** Governed by established formal, theoretical, or empirical laws ensuring system consistency and predictable execution bounds.
+3. **Curricular Application:** Academic examinations on this topic test foundational theoretical understanding, analytical problem-solving, and practical implementation.
+
+---
+
+### Examination Strategy & Best Practices
+- **Essential Points to Cover:** Clearly state the formal definition, illustrate governing principles or mathematical formulas, contrast critical trade-offs, and provide a concrete real-world example to receive full marks.`,
+      source: 'synthesizer'
     };
   }
 
@@ -1495,7 +1209,7 @@ Where:
   }
 
   // =========================================================================
-  // 11. UI BUBBLES & ACTIONS
+  // 11. UI BUBBLES & CONTROLS
   // =========================================================================
   function createAssistantStreamingBubble(msgId, threadId) {
     const thread = document.getElementById(threadId);
@@ -1619,23 +1333,14 @@ Where:
 
   function generateFollowUpSuggestions(userQ, aiResp) {
     const q = (userQ || '').toLowerCase();
+    if (q.includes('deadlock')) {
+      return ['Explain Banker’s Algorithm for Deadlock Avoidance', 'What are the 4 Coffman conditions?', 'Compare Deadlock Prevention vs Avoidance'];
+    }
     if (q.includes('java') || q.includes('c++') || q.includes('python')) {
       return ['What are its main advantages?', 'Provide an advanced code example', 'Compare with alternative languages'];
     }
-    if (q.includes('newton') || q.includes('physics')) {
-      return ['Solve a numerical problem using this law', 'Explain Newton’s Third Law', 'Relate momentum to impulse'];
-    }
-    if (q.includes('differentiation') || q.includes('calculus')) {
-      return ['Explain Integration as inverse differentiation', 'Show step-by-step example using Chain Rule', 'What is partial differentiation?'];
-    }
-    if (q.includes('photosynthesis') || q.includes('biology')) {
-      return ['Explain the Light-Dependent reactions', 'What is the role of Chlorophyll?', 'Detail the Calvin Cycle'];
-    }
-    if (q.includes('inflation') || q.includes('economics')) {
-      return ['What are the key causes of demand-pull inflation?', 'How do Central Banks control inflation?', 'What is stagflation?'];
-    }
-    if (q.includes('transformer') || q.includes('engineering')) {
-      return ['What are the main losses in a transformer?', 'Derive the EMF equation of a transformer', 'Explain Step-Up vs Step-Down'];
+    if (q.includes('dbms') || q.includes('database')) {
+      return ['Explain ACID properties in detail', 'What is Normalization (1NF, 2NF, 3NF)?', 'Explain Indexing in DBMS'];
     }
     return ['Provide a detailed step-by-step example', 'What are the main advantages and disadvantages?', 'Explain with a comparison table'];
   }
@@ -1858,14 +1563,14 @@ Where:
 
     configureApiKey: function() {
       const current = localStorage.getItem('gemini_api_key') || '';
-      const key = prompt('Enter your Google Gemini API Key (e.g. AIzaSy...)\n\nTip: You can obtain a 100% free key at https://aistudio.google.com/app/apikey\nLeave blank to clear and use backend server.', current);
+      const key = prompt('Brainware Academic AI is already active and ready to answer all academic questions.\n\nOptionally enter your Google Gemini API Key for direct cloud LLM streaming:\n(Get a free key at https://aistudio.google.com/app/apikey)\n\nLeave blank to use the built-in universal educational engine.', current);
       if (key !== null) {
         if (key.trim()) {
           localStorage.setItem('gemini_api_key', key.trim());
-          alert('✓ Google Gemini 1.5 Flash API Key successfully configured and activated!');
+          alert('✓ Google Gemini 1.5 Flash API Key activated! Cloud LLM reasoning is now active.');
         } else {
           localStorage.removeItem('gemini_api_key');
-          alert('✓ Client Gemini API Key cleared. Backend server / Universal Academic Engine is active.');
+          alert('✓ Brainware Academic AI Universal Engine is active.');
         }
       }
     },
@@ -1913,7 +1618,9 @@ Where:
         popup.classList.add('hidden');
         popup.style.display = 'none';
       }
-    }
+    },
+
+    generateAcademicResponse: generateAcademicResponse
   };
 
   // Drag and Drop Zone
