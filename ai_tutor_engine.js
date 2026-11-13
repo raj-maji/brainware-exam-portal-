@@ -154,7 +154,7 @@ window.BrainwareAITutor = (function() {
     return null;
   }
 
-  // Live Multi-Provider AI Inference
+  // 100% Anonymous, Zero-Login Public AI Inference (No Puter popups, No API keys, No Registration)
   async function queryLiveAI(query, syllabusContext) {
     const systemPrompt = `You are a helpful, expert AI Academic Assistant like ChatGPT and Gemini.
 Provide ONLY the direct, articulate, high-quality answer to the question asked.
@@ -172,39 +172,27 @@ Structure the response cleanly with:
 
     let userPrompt = query;
     if (syllabusContext) {
-      userPrompt += `\n\n[Reference Curriculum Material]:
-Topic: ${syllabusContext.q}
-${cleanSyllabusHtml(syllabusContext.a).substring(0, 1000)}
-
-Answer the student's question comprehensively and accurately.`;
+      userPrompt += `\n\n[Reference Curriculum Material]:\nTopic: ${syllabusContext.q}\n${cleanSyllabusHtml(syllabusContext.a).substring(0, 1000)}\n\nAnswer the student's question comprehensively and accurately.`;
     }
 
-    // 1. Try Puter.js AI
-    if (window.puter && window.puter.ai && typeof window.puter.ai.chat === 'function') {
-      try {
-        const resp = await window.puter.ai.chat(`${systemPrompt}\n\nQuestion: ${userPrompt}`);
-        const text = resp?.message?.content || (typeof resp === 'string' ? resp : resp?.text);
-        if (text && text.trim().length > 40) {
-          return text.trim();
-        }
-      } catch (e) {
-        console.warn("Puter AI notice:", e);
-      }
-    }
-
-    // 2. Try Pollinations Free Public Text API
+    // Free Open Public Text AI Endpoint (100% Anonymous, Never Asks For Login)
     try {
       const fullQuery = `${systemPrompt}\n\nQuestion: ${userPrompt}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000); // 7s fast timeout before instant local fallback
+
       const url = `https://text.pollinations.ai/${encodeURIComponent(fullQuery)}?model=openai`;
-      const resp = await fetch(url, { method: "GET" });
+      const resp = await fetch(url, { method: "GET", signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (resp.ok) {
         const text = await resp.text();
-        if (text && text.trim().length > 40) {
+        if (text && text.trim().length > 30) {
           return text.trim();
         }
       }
     } catch (e) {
-      console.warn("Pollinations GET notice:", e);
+      // Quietly fall back to instant Master Academic Knowledge Engine
     }
 
     return null;

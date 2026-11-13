@@ -46,8 +46,7 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<script src="https://js.puter.com/v2/"></script>
-<script src="ai_tutor_engine.js?v=20261112_agent_v5"></script>
+<script src="ai_tutor_engine.js?v=20261113_nologin"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
 
@@ -282,7 +281,7 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
-        <button onclick="selectQSetSubject('NLP'); document.getElementById('pdfViewerContainer').scrollIntoView({behavior:'smooth'});" class="w-full text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
+        <button onclick=" document.getElementById('pdfViewerContainer').scrollIntoView({behavior:'smooth'});" class="w-full text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
           <i data-lucide="eye" class="w-4 h-4"></i> View Solutions in Portal
         </button>
         <div class="grid grid-cols-2 gap-2">
@@ -10333,10 +10332,10 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
     // Initial render
     renderPapers();
     if (typeof switchTab === 'function') {
-      switchTab('QUESTION_SET');
+      switchTab('AI_TUTOR');
     }
     if (typeof selectQSetSubject === 'function') {
-      selectQSetSubject('NLP');
+      
     }
     if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
       window.lucide.createIcons();
