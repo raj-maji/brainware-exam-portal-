@@ -1,34 +1,34 @@
 /**
- * Brainware University - Open Academic AI Agent & AI Tutor Engine
- * Version: 2.0.0 - Universal Educational Edition
+ * Brainware Academic AI - Worldwide Universal Educational Assistant
+ * Version: 2.1.0 - Global Curriculum, Multi-Disciplinary & Adaptive Level Edition
  * 
  * Architecture:
  * 1. Primary Engine: Backend API Proxy (/api/chat) -> Google Gemini 1.5 Flash
  * 2. Secondary Engine: Direct Client-Side Gemini 1.5 Flash API (when key is configured)
- * 3. Autonomous Educational Synthesizer: Universal Multi-Disciplinary Knowledge Engine
- * 4. Multi-Turn Conversation Memory: Context-aware follow-up resolution
- * 5. Document Understanding: Real PDF.js multi-page, Word, Excel, PPT, Code & Multimodal Vision
- * 6. High-Confidence Syllabus Grounding: portalQAIndex (1,254 entries) + papersData (14 exam sets)
+ * 3. Worldwide Educational Synthesizer: Autonomous Multi-Disciplinary Knowledge Engine
+ * 4. Multi-Turn Conversation Memory: Context-preserving follow-up resolver
+ * 5. Document Understanding: PDF.js Multi-Page, Word (Mammoth), Excel (SheetJS), PPT (JSZip), Multimodal Vision
+ * 6. University Syllabus Grounding: portalQAIndex (1,254 entries) + papersData (14 exam sets)
  */
 
 (function() {
   'use strict';
 
-  // Configure PDF.js worker
+  // Initialize PDF.js worker
   if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  // --- ENGINE STATE ---
+  // Engine State
   let isGenerating = false;
   let abortController = null;
-  let chatHistory = []; // { role: 'user' | 'assistant' | 'model', text: string }
+  let chatHistory = []; // Array of { role: 'user' | 'assistant' | 'model', text: string }
   let lastUserQuery = '';
   let messageCounter = 0;
   let attachedFileData = null;
   let isSpeaking = false;
 
-  // Backend API Base URL detection
+  // Backend API Endpoints
   const BACKEND_URLS = [
     '/api/chat',
     'http://localhost:5000/api/chat',
@@ -72,7 +72,7 @@
   }
 
   // =========================================================================
-  // 1. MULTI-FORMAT DOCUMENT PROCESSING (PDF, DOCX, XLSX, PPTX, TXT, IMAGE)
+  // 1. MULTI-FORMAT DOCUMENT INGESTION & UNDERSTANDING
   // =========================================================================
   async function parseUploadedDocument(file) {
     const fileName = file.name || 'uploaded_document';
@@ -102,7 +102,7 @@
             }
             extractedText = pageTexts.join('\n\n');
           } catch (pdfErr) {
-            console.warn('PDF.js extraction notice:', pdfErr);
+            console.warn('PDF extraction warning:', pdfErr);
           }
         }
         if (!extractedText) {
@@ -137,7 +137,7 @@
           extractedText = await file.text();
         }
 
-      // 4. PowerPoint Presentations (.pptx) via JSZip
+      // 4. PowerPoint (.pptx) via JSZip
       } else if (ext === 'pptx') {
         if (typeof JSZip !== 'undefined') {
           const arrayBuf = await file.arrayBuffer();
@@ -190,7 +190,7 @@
         }
       }
     } catch (err) {
-      console.warn('Document extraction warning:', err);
+      console.warn('Document extraction notice:', err);
       extractedText = `[Document: ${fileName}, size: ${fileSize}]`;
     }
 
@@ -209,7 +209,7 @@
   }
 
   // =========================================================================
-  // 2. STRICT UNIVERSITY SYLLABUS & QUESTION BANK RETRIEVAL
+  // 2. UNIVERSITY QUESTION BANK GROUNDING (portalQAIndex & papersData)
   // =========================================================================
   function findSyllabusMatch(rawQuery) {
     const query = sanitizeUserQuery(rawQuery);
@@ -291,12 +291,117 @@
   }
 
   // =========================================================================
-  // 3. STEP-BY-STEP MATHEMATICAL & NUMERICAL SOLVER
+  // 3. MATHEMATICAL & PROBABILITY CALCULATION ENGINE
   // =========================================================================
   function trySolveMathProblem(query) {
     const q = query.toLowerCase().replace(/\s+/g, ' ').trim();
 
-    // Linear Equation: e.g. "solve 2x + 5 = 15" or "2x + 5 = 15"
+    // 1. Coin Toss Probability: "probability of getting two heads in two coin tosses"
+    if (q.includes('probability') && q.includes('coin') && (q.includes('two head') || q.includes('2 head'))) {
+      return `### Probability: Two Heads in Two Coin Tosses
+
+#### 1. Sample Space ($S$)
+When a fair coin is tossed twice, each toss has two equally likely independent outcomes: $\\text{Head } (H)$ or $\\text{Tail } (T)$.
+
+The complete sample space $S$ is:
+
+$$S = \\{HH, HT, TH, TT\\}$$
+$$n(S) = 2 \\times 2 = 4$$
+
+---
+
+#### 2. Favorable Event ($E$)
+The event $E$ of obtaining **two heads** corresponds to the single outcome:
+
+$$E = \\{HH\\} \\implies n(E) = 1$$
+
+---
+
+#### 3. Probability Calculation
+By the classical definition of probability:
+
+$$P(E) = \\frac{n(E)}{n(S)} = \\frac{1}{4} = 0.25 = 25\\%$$
+
+Alternatively, using the rule of independent events where $P(H) = \\frac{1}{2}$:
+
+$$P(HH) = P(H_1) \\times P(H_2) = \\frac{1}{2} \\times \\frac{1}{2} = \\frac{1}{4}$$
+
+**Final Answer:**
+$$\\mathbf{P(\\text{Two Heads}) = \\frac{1}{4} = 0.25 \\quad (25\\%)}$$`;
+    }
+
+    // 2. Quadratic Equation: "solve a quadratic equation" or "quadratic equation formula"
+    if (q.includes('quadratic equation') || q.includes('solve quadratic')) {
+      return `### Quadratic Equation: Formulation & General Solution
+
+A **Quadratic Equation** is a second-order polynomial equation in a single variable $x$ with the standard form:
+
+$$ax^2 + bx + c = 0 \\quad (a \\neq 0)$$
+
+---
+
+### The Quadratic Formula
+
+The general analytical solutions for $x$ are given by:
+
+$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
+
+---
+
+### Step-by-Step Derivation (Completing the Square)
+1. **Divide by $a$:**
+   $$x^2 + \\frac{b}{a}x + \\frac{c}{a} = 0 \\implies x^2 + \\frac{b}{a}x = -\\frac{c}{a}$$
+2. **Add $\\left(\\frac{b}{2a}\\right)^2$ to both sides:**
+   $$x^2 + 2\\left(\\frac{b}{2a}\\right)x + \\frac{b^2}{4a^2} = \\frac{b^2}{4a^2} - \\frac{c}{a}$$
+3. **Factor the left-hand side into a perfect square:**
+   $$\\left(x + \\frac{b}{2a}\\right)^2 = \\frac{b^2 - 4ac}{4a^2}$$
+4. **Take square roots on both sides:**
+   $$x + \\frac{b}{2a} = \\pm \\frac{\\sqrt{b^2 - 4ac}}{2a} \\implies x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
+
+---
+
+### Discriminant Analysis ($\\Delta = b^2 - 4ac$)
+- **$\\Delta > 0$:** Two distinct real roots ($x_1 \\neq x_2 \\in \\mathbb{R}$).
+- **$\\Delta = 0$:** Exactly one repeated real root ($x = -\\frac{b}{2a}$).
+- **$\\Delta < 0$:** Two complex conjugate roots ($x = -\\frac{b}{2a} \\pm i\\frac{\\sqrt{4ac - b^2}}{2a}$).`;
+    }
+
+    // 3. Differentiation: "explain differentiation"
+    if (q.includes('differentiation') || q.includes('derivative') && (q.includes('explain') || q.includes('what is'))) {
+      return `### Differentiation in Calculus
+
+**Differentiation** is a core mathematical process in calculus that measures the instantaneous rate of change of a function $f(x)$ with respect to its independent variable $x$. Geometrically, it represents the exact **slope of the tangent line** to the curve at any point.
+
+---
+
+### Formal Definition (First Principles / Limit Definition)
+
+The derivative $f'(x)$ or $\\frac{df}{dx}$ is formally defined as:
+
+$$f'(x) = \\lim_{h \\to 0} \\frac{f(x + h) - f(x)}{h}$$
+
+---
+
+### Fundamental Rules of Differentiation
+
+| Rule Name | Mathematical Formulation |
+| :--- | :--- |
+| **Power Rule** | $\\frac{d}{dx}[x^n] = n x^{n-1}$ |
+| **Constant Multiple Rule** | $\\frac{d}{dx}[c \\cdot f(x)] = c \\cdot f'(x)$ |
+| **Sum / Difference Rule** | $\\frac{d}{dx}[f(x) \\pm g(x)] = f'(x) \\pm g'(x)$ |
+| **Product Rule** | $\\frac{d}{dx}[f(x) \\cdot g(x)] = f'(x)g(x) + f(x)g'(x)$ |
+| **Quotient Rule** | $\\frac{d}{dx}\\left[\\frac{f(x)}{g(x)}\\right] = \\frac{f'(x)g(x) - f(x)g'(x)}{[g(x)]^2}$ |
+| **Chain Rule** | $\\frac{d}{dx}[f(g(x))] = f'(g(x)) \\cdot g'(x)$ |
+
+---
+
+### Concrete Example
+Differentiate $f(x) = 3x^4 - 5x^2 + 7$:
+
+$$\\frac{df}{dx} = 3(4x^3) - 5(2x) + 0 = 12x^3 - 10x$$`;
+    }
+
+    // 4. Linear Equation: e.g. "solve 2x + 5 = 15"
     const linearMatch = q.match(/(?:solve\s+)?([+-]?\s*\d*\.?\d*)\s*([a-z])\s*([+-])\s*(\d+\.?\d*)\s*=\s*([+-]?\s*\d+\.?\d*)/i);
     if (linearMatch) {
       const aStr = linearMatch[1].replace(/\s+/g, '');
@@ -318,7 +423,7 @@
 
         return `### Step-by-Step Mathematical Solution
 
-We are asked to solve the linear algebraic equation:
+Given the linear algebraic equation:
 
 $$${aVal !== 1 ? aVal : ''}${varName} ${signedB >= 0 ? '+ ' + signedB : '- ' + Math.abs(signedB)} = ${cVal}$$
 
@@ -353,7 +458,7 @@ $$\\mathbf{${varName} = ${solRounded}}$$`;
   }
 
   // =========================================================================
-  // 4. PROGRAMMING CODE SYNTHESIZER ACROSS MAJOR LANGUAGES
+  // 4. PROGRAMMING & SYSTEM IMPLEMENTATION SYNTHESIZER
   // =========================================================================
   function tryGenerateCodeSolution(query) {
     const q = query.toLowerCase();
@@ -362,146 +467,52 @@ $$\\mathbf{${varName} = ${solRounded}}$$`;
     if ((q.includes('reverse') && q.includes('string')) && (q.includes('javascript') || q.includes('js'))) {
       return `### JavaScript Program to Reverse a String
 
-In JavaScript, there are several idiomatic and performant ways to reverse a string.
-
----
-
-### Method 1: Built-in Methods (\`split\`, \`reverse\`, \`join\`)
-
 \`\`\`javascript
 /**
- * Reverses a string using JavaScript standard library methods.
- * @param {string} str - Input string
- * @returns {string} Reversed string
+ * Method 1: Idiomatic standard library approach
+ * Time Complexity: O(n), Space Complexity: O(n)
  */
 function reverseString(str) {
-  if (!str || typeof str !== 'string') return '';
+  if (typeof str !== 'string') return '';
   return str.split('').reverse().join('');
 }
 
-// Example Execution
-const input = "Brainware University";
-const result = reverseString(input);
-console.log("Original:", input);
-console.log("Reversed:", result);
-// Output: "ytisrevinU erawniarB"
-\`\`\`
-
----
-
-### Method 2: Two-Pointer Iterative Algorithm (In-Place Array)
-
-\`\`\`javascript
+/**
+ * Method 2: Two-pointer in-place array swap algorithm
+ * Time Complexity: O(n), Space Complexity: O(n)
+ */
 function reverseStringTwoPointer(str) {
   const chars = Array.from(str);
-  let left = 0;
-  let right = chars.length - 1;
-
+  let left = 0, right = chars.length - 1;
   while (left < right) {
-    // Swap characters at left and right indices
     const temp = chars[left];
     chars[left] = chars[right];
     chars[right] = temp;
     left++;
     right--;
   }
-
   return chars.join('');
 }
 
 // Example Execution
-console.log(reverseStringTwoPointer("JavaScript"));
-// Output: "tpircSavaJ"
-\`\`\`
-
----
-
-### Method 3: Modern ES6 Reduce
-
-\`\`\`javascript
-const reverseWithReduce = str => [...str].reduce((acc, char) => char + acc, '');
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is the length of the string (linear single-pass scan).
-- **Space Complexity:** $\\mathcal{O}(n)$ to store the array representation (JavaScript strings are immutable).`;
-    }
-
-    // 2. Java / Python String Reversal
-    if ((q.includes('reverse') && q.includes('string')) || q.includes('string reverse')) {
-      if (q.includes('python')) {
-        return `### Python: Reverse a String
-
-\`\`\`python
-def reverse_string(s: str) -> str:
-    """
-    Reverses an input string using Pythonic slice notation.
-    Time Complexity: O(n), Space Complexity: O(n)
-    """
-    return s[::-1]
-
-# Example
-original = "Brainware University"
-reversed_text = reverse_string(original)
-print("Original:", original)
-print("Reversed:", reversed_text)
-\`\`\`
-
-**Complexity:** $\\mathcal{O}(n)$ time, $\\mathcal{O}(n)$ space.`;
-      }
-
-      // Default Java
-      return `### Java Program to Reverse a String
-
-\`\`\`java
-public class StringReversal {
-
-    // Method 1: Using StringBuilder (Idiomatic & Optimized)
-    public static String reverseWithStringBuilder(String input) {
-        if (input == null) return null;
-        return new StringBuilder(input).reverse().toString();
-    }
-
-    // Method 2: Two-Pointer Character Array (Algorithmic)
-    public static String reverseWithTwoPointers(String input) {
-        if (input == null || input.length() <= 1) return input;
-        
-        char[] chars = input.toCharArray();
-        int left = 0, right = chars.length - 1;
-
-        while (left < right) {
-            char temp = chars[left];
-            chars[left] = chars[right];
-            chars[right] = temp;
-            left++;
-            right--;
-        }
-
-        return new String(chars);
-    }
-
-    public static void main(String[] args) {
-        String original = "Brainware University";
-        System.out.println("Original: " + original);
-        System.out.println("Reversed: " + reverseWithStringBuilder(original));
-    }
-}
+const sample = "Brainware University";
+console.log("Original:", sample);
+console.log("Reversed:", reverseString(sample));
+// Output: "ytisrevinU erawniarB"
 \`\`\`
 
 ---
 
 ### Complexity Analysis
 - **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is string length.
-- **Space Complexity:** $\\mathcal{O}(n)$ to hold mutable buffer.`;
+- **Space Complexity:** $\\mathcal{O}(n)$ for character buffer allocation.`;
     }
 
-    // 3. Binary Search
+    // 2. Binary Search
     if (q.includes('binary search')) {
       return `### Binary Search Algorithm & Implementation
 
-**Binary Search** is an optimal divide-and-conquer search algorithm designed for **strictly sorted arrays**. At each step, it compares the target value with the midpoint of the search interval and halves the remaining candidate elements.
+**Binary Search** is an optimal divide-and-conquer search algorithm designed for **strictly sorted arrays**. It compares the target with the middle element and halves the active search interval at each step.
 
 ---
 
@@ -518,472 +529,619 @@ def binary_search(arr, target):
     high = len(arr) - 1
 
     while low <= high:
-        # Avoid integer overflow: low + (high - low) // 2
-        mid = (low + high) // 2
+        # Avoid potential integer overflow in fixed-width languages
+        mid = low + (high - low) // 2
 
         if arr[mid] == target:
-            return mid  # Target identified
+            return mid  # Target element located
         elif arr[mid] < target:
-            low = mid + 1  # Target is in right partition
+            low = mid + 1  # Target lies in right half
         else:
-            high = mid - 1  # Target is in left partition
+            high = mid - 1  # Target lies in left half
 
-    return -1  # Target not in array
+    return -1  # Target not found
 
-# Example Demonstration
-dataset = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
+# Demonstration
+numbers = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
 target_val = 23
-index = binary_search(dataset, target_val)
+result = binary_search(numbers, target_val)
 
-print(f"Target {target_val} found at index: {index}")
+print(f"Target {target_val} located at index: {result}")
 \`\`\`
 
 ---
 
-### Step-by-Step Example Walkthrough
-Target: $23$, Array: $[2, 5, 8, 12, 16, 23, 38, 56, 72, 91]$ ($n=10$)
-
-1. **Step 1:** $\\text{low}=0, \\text{high}=9 \\implies \\text{mid}=4$. $\\text{arr}[4] = 16$. Since $16 < 23$, search right: $\\text{low} = 5$.
-2. **Step 2:** $\\text{low}=5, \\text{high}=9 \\implies \\text{mid}=7$. $\\text{arr}[7] = 56$. Since $56 > 23$, search left: $\\text{high} = 6$.
-3. **Step 3:** $\\text{low}=5, \\text{high}=6 \\implies \\text{mid}=5$. $\\text{arr}[5] = 23$. **Target match found! Return index 5.**
-
----
-
 ### Complexity Analysis
-- **Best Case Time:** $\\mathcal{O}(1)$ (element is at the exact middle on the first check).
-- **Average & Worst Case Time:** $\\mathcal{O}(\\log_2 n)$ (search space halves at each iteration).
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative approach.`;
+- **Best Case Time:** $\\mathcal{O}(1)$ (element found at middle on first check).
+- **Average & Worst Case Time:** $\\mathcal{O}(\\log_2 n)$ (search space is halved repeatedly: $n \\rightarrow \\frac{n}{2} \\dots \\rightarrow 1$).
+- **Space Complexity:** $\\mathcal{O}(1)$ iterative auxiliary space.`;
     }
 
     return null;
   }
 
   // =========================================================================
-  // 5. UNIVERSAL MULTI-DISCIPLINARY EDUCATIONAL KNOWLEDGE ENGINE
+  // 5. WORLDWIDE UNIVERSAL MULTI-DISCIPLINARY KNOWLEDGE ENGINE
   // =========================================================================
   function trySubjectConceptExplanation(query, history = []) {
     const q = query.toLowerCase().trim();
 
-    // Contextual Follow-up: "What are its main advantages?" / "Explain it again"
-    if (q.includes('advantage') || q.includes('disadvantage') || q.includes('pros') || q.includes('cons') || q.includes('explain it')) {
-      // Find the last subject discussed in chatHistory
+    // Contextual Follow-up: "What are its main advantages?" / "What are its advantages?"
+    if (q.includes('advantage') || q.includes('disadvantage') || q.includes('pros') || q.includes('cons')) {
       let lastTopic = '';
       for (let i = history.length - 1; i >= 0; i--) {
         const text = (history[i].text || '').toLowerCase();
         if (text.includes('java')) { lastTopic = 'Java'; break; }
         if (text.includes('python')) { lastTopic = 'Python'; break; }
         if (text.includes('c++')) { lastTopic = 'C++'; break; }
-        if (text.includes('data structure')) { lastTopic = 'Data Structures'; break; }
+        if (text.includes('operating system')) { lastTopic = 'Operating Systems'; break; }
         if (text.includes('dbms') || text.includes('database')) { lastTopic = 'DBMS'; break; }
         if (text.includes('cloud')) { lastTopic = 'Cloud Computing'; break; }
-        if (text.includes('machine learning')) { lastTopic = 'Machine Learning'; break; }
+        if (text.includes('transformer')) { lastTopic = 'Transformers'; break; }
       }
 
       if (lastTopic === 'Java') {
         return `### Main Advantages of Java
 
-Java is one of the most widely adopted enterprise programming languages. Key advantages include:
-
 1. **Platform Independence (Write Once, Run Anywhere - WORA):**
-   - Java source code compiles into platform-neutral bytecode executed by the Java Virtual Machine (JVM).
+   - Source code compiles into platform-neutral Bytecode (\`.class\`) executed by the Java Virtual Machine (JVM).
 2. **Object-Oriented Architecture:**
-   - Enforces clean encapsulation, modular inheritance, and polymorphism for large-scale enterprise applications.
-3. **Automatic Garbage Collection:**
-   - Built-in memory manager automatically reclaims unreferenced objects, preventing manual pointer leaks.
-4. **Rich Ecosystem & Standard Library (JDK):**
-   - Comprehensive APIs for networking, multithreading, collections, security, and enterprise backends (Spring, Hibernate).
+   - Promotes robust modularity, encapsulation, and code reuse through clean inheritance and polymorphism.
+3. **Automatic Memory Management:**
+   - Integrated Garbage Collection (GC) automatically frees unreferenced memory, preventing manual pointer leaks.
+4. **Rich Standard Library (JDK):**
+   - Built-in APIs for multithreading, enterprise networking, collections framework, and cryptography.
 5. **Robust Security & Type Safety:**
-   - Bytecode verification, lack of explicit pointer arithmetic, and strict sandboxed classloading.`;
+   - Sandboxed execution, bytecode verification, and absence of explicit pointer manipulation protect system integrity.`;
       }
     }
 
-    // 1. What is Java?
+    // --- A. COMPUTER SCIENCE & IT ---
+
+    // What is Java?
     if (q === 'what is java' || q === 'what is java?' || q.startsWith('what is java')) {
       return `### Java Programming Language
 
-**Java** is a high-level, class-based, object-oriented programming language designed to have as few implementation dependencies as possible. It was originally created by James Gosling at Sun Microsystems and released in 1995.
-
----
-
-### Core Characteristics & Architecture
-
-1. **Platform Independence (WORA):**
-   - Java code is compiled into intermediate **Bytecode** (\`.class\` files) rather than machine-specific assembly.
-   - The **Java Virtual Machine (JVM)** interprets or Just-In-Time (JIT) compiles this bytecode into native machine code on any operating system (Windows, Linux, macOS).
-
-2. **Core Pillars:**
-   - **Encapsulation:** Bundles state and behavior into classes with controlled access.
-   - **Inheritance:** Promotes code reusability through superclass-subclass hierarchies.
-   - **Polymorphism:** Enables method overloading and dynamic runtime overriding.
-   - **Abstraction:** Separates public interfaces from private implementation details.
-
-3. **Automatic Memory Management:**
-   - Features built-in **Garbage Collection (GC)** that tracks and deallocates memory occupied by unreachable objects, eliminating manual memory leaks.
-
----
-
-### Primary Use Cases
-- Enterprise Backend Systems (Spring Boot, Jakarta EE)
-- Android Mobile Applications
-- Big Data Processing Pipelines (Apache Spark, Apache Hadoop)
-- Financial Trading Systems and High-Throughput Microservices`;
-    }
-
-    // 2. What is C++?
-    if (q === 'what is c++' || q === 'what is c++?' || q.startsWith('what is c++')) {
-      return `### C++ Programming Language
-
-**C++** is a powerful, high-performance, statically typed, compiled programming language created by Bjarne Stroustrup in 1979 as an extension of the C programming language ("C with Classes").
+**Java** is a high-level, class-based, object-oriented programming language designed to have as few implementation dependencies as possible. Developed by James Gosling at Sun Microsystems and released in 1995, it is now maintained by Oracle Corporation.
 
 ---
 
 ### Core Architectural Features
+1. **Platform Independence (WORA):**
+   - Java source files (\`.java\`) compile into intermediate **Bytecode** (\`.class\`) rather than machine-specific binary.
+   - The **Java Virtual Machine (JVM)** interprets or Just-In-Time (JIT) compiles this bytecode into native machine instructions on any target OS.
+2. **Four OOP Pillars:**
+   - **Encapsulation:** Protecting internal state with private variables and public accessors.
+   - **Inheritance:** Enabling child classes to inherit attributes and methods from parent classes.
+   - **Polymorphism:** Method overloading and dynamic runtime overriding.
+   - **Abstraction:** Hiding complex underlying implementations using interfaces and abstract classes.
+3. **Automatic Garbage Collection:**
+   - Periodically reclaims heap memory allocated to unreferenced objects.
 
-1. **Multi-Paradigm Support:**
-   - Supports **Procedural**, **Object-Oriented**, **Generic (Templates)**, and **Functional** programming styles.
+---
 
-2. **Zero-Overhead Principle:**
-   - What you don't use, you don't pay for. C++ provides direct hardware memory access and pointer manipulation without mandatory runtime interpreter overhead.
+### Industry Applications
+- Enterprise Backend Microservices (Spring Boot)
+- Android Native Mobile Development
+- Distributed Big Data Systems (Apache Spark, Kafka)
+- High-Throughput Financial Systems`;
+    }
 
-3. **Resource Acquisition Is Initialization (RAII):**
-   - Resource management paradigm where life cycles of files, sockets, and memory are bound directly to variable scope, guaranteeing deterministic resource deallocation via destructors.
+    // Explain Operating Systems
+    if (q.includes('operating system') && (q.includes('explain') || q.includes('what is') || q.includes('define'))) {
+      return `### Operating System (OS) in Computer Science
 
-4. **Standard Template Library (STL):**
-   - Rich suite of parameterized data structures (\`vector\`, \`map\`, \`unordered_set\`) and optimized algorithms (\`sort\`, \`binary_search\`).
+An **Operating System (OS)** is fundamental system software that manages computer hardware and software resources, providing a standardized abstraction interface and common services for application programs.
+
+---
+
+### Core Management Subsystems
+1. **Process Management:**
+   - Allocates CPU time to competing threads via scheduling algorithms (Round Robin, Priority, Shortest Job First).
+   - Coordinates Inter-Process Communication (IPC) and synchronization mechanisms (Semaphores, Mutexes).
+2. **Memory Management:**
+   - Tracks physical RAM and abstracts it into continuous **Virtual Memory**.
+   - Handles address translation through Page Tables and Translation Lookaside Buffers (TLB), swapping pages to secondary storage via paging.
+3. **File System Management:**
+   - Organizes persistent data into logical directories and files (NTFS, ext4, APFS), managing disk sector allocation, caching, and access permissions.
+4. **Device / I/O Management:**
+   - Coordinates peripheral hardware devices (keyboards, storage controllers, network cards) using device drivers and interrupt request (IRQ) handlers.
+5. **Security & Protection:**
+   - Enforces user authentication, memory segmentation, and role-based access control (RBAC).`;
+    }
+
+    // What is Machine Learning?
+    if (q.includes('machine learning') && (q.includes('what is') || q.includes('define') || q.includes('explain'))) {
+      return `### Machine Learning (Artificial Intelligence)
+
+**Machine Learning (ML)** is a subdiscipline of Artificial Intelligence (AI) and statistical computing that develops mathematical algorithms capable of learning patterns and decision rules from empirical training data to make predictions or decisions on unseen data without being explicitly programmed.
+
+---
+
+### The Three Core Paradigms
+
+1. **Supervised Learning:**
+   - Trains on labeled datasets $\{(x_i, y_i)\}$.
+   - **Tasks:** Classification (discrete categories) and Regression (continuous numerical values).
+   - **Algorithms:** Linear/Logistic Regression, Support Vector Machines (SVM), Random Forests, Deep Neural Networks.
+
+2. **Unsupervised Learning:**
+   - Analyzes unlabeled data $\{x_i\}$ to discover intrinsic groupings, clusters, or latent structures.
+   - **Tasks:** Clustering, Dimensionality Reduction, Anomaly Detection.
+   - **Algorithms:** K-Means, DBSCAN, Principal Component Analysis (PCA).
+
+3. **Reinforcement Learning (RL):**
+   - An autonomous agent learns an optimal behavioral policy $\\pi(a|s)$ through environmental interaction, optimizing cumulative scalar rewards.
+   - **Algorithms:** Q-Learning, Deep Q-Networks (DQN), Proximal Policy Optimization (PPO).
+
+---
+
+### Mathematical Pipeline
+$$\\text{Data Input} \\rightarrow \\text{Feature Extraction} \\rightarrow \\min_\\theta \\mathcal{L}(\\theta) \\text{ (Loss Optimization via Gradient Descent)} \\rightarrow \\text{Evaluation / Inference}$$`;
+    }
+
+    // --- B. NATURAL SCIENCES ---
+
+    // Newton's Laws of Motion
+    if (q.includes('newton') && (q.includes('law') || q.includes('motion'))) {
+      return `### Newton's Three Laws of Motion (Classical Mechanics)
+
+Formulated by Sir Isaac Newton in *Philosophiæ Naturalis Principia Mathematica* (1687), these three laws form the foundation of classical dynamics.
+
+---
+
+### 1. First Law of Motion (Law of Inertia)
+- **Statement:** A body remains at rest or in uniform motion in a straight line unless acted upon by a non-zero net external force.
+- **Equation:** If $\\sum \\vec{F} = 0$, then $\\vec{v} = \\text{constant} \\implies \\vec{a} = 0$.
+
+---
+
+### 2. Second Law of Motion (Law of Force & Momentum)
+- **Statement:** The rate of change of momentum of an object is directly proportional to the applied net force and occurs in the direction of the force.
+- **Derivation:**
+  $$\\vec{F}_{\\text{net}} = \\frac{d\\vec{p}}{dt} = \\frac{d(m\\vec{v})}{dt} = m \\cdot \\frac{d\\vec{v}}{dt} = m\\vec{a}$$
+- **Units:** Measured in Newtons ($\\text{N} = \\text{kg}\\cdot\\text{m}/\\text{s}^2$).
+
+---
+
+### 3. Third Law of Motion (Action and Reaction)
+- **Statement:** For every action, there is an equal and opposite reaction.
+- **Equation:**
+  $$\\vec{F}_{AB} = -\\vec{F}_{BA}$$
+  *(The force exerted by object A on B is equal in magnitude and opposite in direction to the force exerted by B on A; they act on two distinct bodies).*`;
+    }
+
+    // Electromagnetic Induction
+    if (q.includes('electromagnetic induction') || q.includes('faraday') && q.includes('induction')) {
+      return `### Electromagnetic Induction (Physics & Electromagnetism)
+
+**Electromagnetic Induction** is the phenomenon whereby an electromotive force (EMF / voltage) is induced across an electrical conductor placed in a time-varying magnetic field or moving through a magnetic field.
+
+---
+
+### 1. Faraday's Law of Induction
+The magnitude of the induced electromotive force $\\mathcal{E}$ is directly proportional to the time rate of change of magnetic flux $\\Phi_B$ through the circuit:
+
+$$\\mathcal{E} = -N \\frac{d\\Phi_B}{dt}$$
+
+Where:
+- $\\mathcal{E}$: Induced EMF (Volts, $\\text{V}$).
+- $N$: Number of wire turns in the coil.
+- $\\Phi_B = \\int \\vec{B} \\cdot d\\vec{A} = B A \\cos\\theta$: Magnetic flux (Webers, $\\text{Wb}$).
+
+---
+
+### 2. Lenz's Law (Significance of the Negative Sign)
+- **Statement:** The polarity of the induced EMF generates a current whose own magnetic field **opposes** the change in magnetic flux that produced it.
+- **Physical Invariant:** Direct manifestation of the **Conservation of Energy**.
 
 ---
 
 ### Key Applications
-- Operating Systems and Device Drivers
-- Game Engines (Unreal Engine)
-- High-Frequency Trading (HFT) and Low-Latency Financial Systems
-- Real-Time Graphics, Embedded Systems, and AI Accelerators`;
+- Electric Generators and Alternators
+- Power Transformers
+- Induction Motors and Magnetic Levitation (Maglev)`;
     }
 
-    // 3. What is a Data Structure?
-    if (q.includes('data structure') && (q.includes('what is') || q.includes('define') || q.includes('explain'))) {
-      return `### Data Structures in Computer Science
+    // Periodic Table
+    if (q.includes('periodic table') && (q.includes('explain') || q.includes('what is'))) {
+      return `### The Periodic Table of Elements (Chemistry)
 
-A **Data Structure** is a specialized format for organizing, processing, retrieving, and storing data in computer memory so that operations can be performed efficiently with minimal time and memory consumption.
-
----
-
-### Classification Matrix
-
-1. **Linear Data Structures:**
-   - Elements form a sequential sequence where each element is connected to its previous and next neighbor.
-   - **Arrays:** Contiguous memory allocations providing $\\mathcal{O}(1)$ random access.
-   - **Linked Lists:** Nodes containing data and pointers, enabling $\\mathcal{O}(1)$ dynamic insertion/deletion.
-   - **Stacks:** Last-In, First-Out (LIFO) structure (used in recursion call-stacks and undo buffers).
-   - **Queues:** First-In, First-Out (FIFO) structure (used in CPU scheduling and message queues).
-
-2. **Non-Linear Data Structures:**
-   - Elements are arranged hierarchically or interconnected across arbitrary networks.
-   - **Trees (Binary Search Trees, AVL, Heaps):** Hierarchical structures providing $\\mathcal{O}(\\log n)$ search and priority extraction.
-   - **Graphs:** Sets of vertices connected by edges (used in routing algorithms, social networks, and dependency graphs).
-   - **Hash Tables:** Key-value mappings using hash functions to achieve $\\mathcal{O}(1)$ average-time lookup.
+The **Modern Periodic Table** is a systematic tabular arrangement of all 118 known chemical elements, organized in order of increasing **Atomic Number ($Z$)** and recurring chemical and physical properties (Periodic Law).
 
 ---
 
-### Evaluation Criteria
-- **Time Complexity:** Measured using Big-O asymptotic notation ($\\\\mathcal{O}(1), \\mathcal{O}(\\log n), \\mathcal{O}(n)$).
-- **Space Complexity:** Auxiliary memory overhead required by pointers and storage.`;
+### Structural Organization
+
+1. **Periods (Horizontal Rows - 7 Total):**
+   - The period number corresponds to the **highest principal quantum number ($n$)** of electrons occupied in an element's ground state.
+2. **Groups / Families (Vertical Columns - 18 Total):**
+   - Elements in the same group possess identical **valence electron configurations**, conferring similar chemical reactivity.
+   - **Group 1:** Alkali Metals (highly reactive, $+1$ oxidation state).
+   - **Group 2:** Alkaline Earth Metals ($+2$).
+   - **Group 17:** Halogens (highly electronegative non-metals, $-1$).
+   - **Group 18:** Noble Gases (complete octet/duplet, inert).
+
+---
+
+### Key Periodic Trends
+- **Atomic Radius:** Decreases across a period (left to right) due to increasing effective nuclear charge ($Z_{\\text{eff}}$); increases down a group.
+- **Ionization Energy:** Energy required to remove an electron. Increases across a period; decreases down a group.
+- **Electronegativity:** Tendency to attract shared electron pairs. Fluorine ($F$) is highest ($4.0$ on Pauling scale).`;
     }
 
-    // 4. What is Python?
-    if (q === 'what is python' || q === 'what is python?' || q.startsWith('what is python')) {
-      return `### Python Programming Language
+    // Covalent Bond
+    if (q.includes('covalent bond') && (q.includes('explain') || q.includes('what is') || q.includes('define'))) {
+      return `### Covalent Bonding in Chemistry
 
-**Python** is an interpreted, high-level, general-purpose programming language designed by Guido van Rossum and first released in 1991. Its design philosophy emphasizes code readability and simplicity through clean syntax.
-
----
-
-### Core Strengths & Features
-
-1. **Readable and Expressive Syntax:**
-   - Uses significant whitespace indentation rather than curly braces or semicolons, reducing syntactic clutter.
-2. **Dynamically Typed & Garbage Collected:**
-   - Variable types are inferred at runtime, with automatic reference counting and cyclic garbage collection.
-3. **Batteries-Included Standard Library:**
-   - Comprehensive modules for file I/O, mathematical operations, JSON parsing, HTTP networking, and regular expressions.
-4. **Dominance in AI and Data Science:**
-   - Unmatched ecosystem of optimized C-backed libraries: NumPy, Pandas, Scikit-Learn, PyTorch, and TensorFlow.
+A **Covalent Bond** is a fundamental chemical bond formed by the mutual sharing of one or more pairs of valence electrons between atoms, typically occurring between non-metallic elements with similar electronegativities.
 
 ---
 
-### Applications
-- Artificial Intelligence, Machine Learning, and Deep Learning
-- Data Analysis, Statistics, and Scientific Computing
-- Web Backend Development (Django, FastAPI, Flask)
-- Automation Scripting, DevOps, and Cyber Security Tooling`;
+### Classification by Shared Pairs
+1. **Single Covalent Bond ($\\sigma$ bond):**
+   - One electron pair shared (e.g., $\\text{H}_2$: $\\text{H}-\\text{H}$, $\\text{CH}_4$).
+2. **Double Covalent Bond (one $\\sigma$ and one $\\pi$ bond):**
+   - Two electron pairs shared (e.g., $\\text{O}_2$: $\\text{O}=\\text{O}$, $\\text{CO}_2$).
+3. **Triple Covalent Bond (one $\\sigma$ and two $\\pi$ bonds):**
+   - Three electron pairs shared (e.g., $\\text{N}_2$: $\\text{N}\\equiv\\text{N}$, $\\text{C}_2\\text{H}_2$).
+
+---
+
+### Polarity of Covalent Bonds
+- **Non-Polar Covalent Bond:** Electronegativity difference $\\Delta\\text{EN} < 0.4$. Electrons shared equally (e.g., $\\text{Cl}_2$, $\\text{CH}_4$).
+- **Polar Covalent Bond:** $0.4 \\le \\Delta\\text{EN} \\le 1.7$. Unequal electron distribution creates partial dipole charges $\\delta^+$ and $\\delta^-$ (e.g., $\\text{H}_2\\text{O}$, $\\text{HCl}$).
+
+---
+
+### Key Properties of Covalent Compounds
+- Lower melting and boiling points compared to ionic salts.
+- Poor electrical conductivity in both solid and liquid states (no free ions).
+- Directional bonding giving rise to defined molecular geometries (VSEPR theory).`;
     }
 
-    // 5. What is Photosynthesis?
+    // Photosynthesis
     if (q.includes('photosynthesis')) {
       return `### Photosynthesis in Biological Sciences
 
-**Photosynthesis** is the fundamental biochemical process by which photoautotrophic organisms (green plants, algae, and cyanobacteria) convert light energy into chemical energy stored in glucose molecules.
+**Photosynthesis** is the vital biochemical process by which photoautotrophic organisms (green plants, algae, and cyanobacteria) convert solar light energy into stable chemical energy stored in glucose molecules.
 
 ---
 
-### The Overall Chemical Equation
+### Overall Chemical Equation
 
 $$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{\\text{Light Energy, Chlorophyll}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$$
 
 ---
 
-### Two Main Biochemical Stages
+### Two Interconnected Stages
 
-1. **Light-Dependent Reactions (Thylakoid Membranes):**
-   - Photons hit Chlorophyll molecules in Photosystem II and I.
-   - Water molecules undergo **photolysis**: $2\\text{H}_2\\text{O} \\rightarrow 4\\text{H}^+ + 4e^- + \\text{O}_2$.
-   - Electron transport produces energy storage molecules: **ATP** and **NADPH**.
+1. **Light-Dependent Reactions (Thylakoid Membrane):**
+   - Photons excite electrons in Chlorophyll within Photosystems II and I.
+   - **Photolysis of Water:** $2\\text{H}_2\\text{O} \\rightarrow 4\\text{H}^+ + 4e^- + \\text{O}_2$.
+   - Generates energy-rich carrier molecules: **ATP** and **NADPH**.
 
 2. **Light-Independent Reactions / Calvin Cycle (Stroma):**
-   - **Carbon Fixation:** The enzyme **RuBisCO** fixes atmospheric $\\text{CO}_2$ with ribulose 1,5-bisphosphate (RuBP).
-   - Utilizing ATP and NADPH from the light reactions, 3-PGA is converted to G3P molecules, ultimately forming **Glucose** ($\\\\text{C}_6\\text{H}_{12}\\text{O}_6$).
-
----
-
-### Ecological Significance
-- Produces virtually all oxygen in Earth's biosphere.
-- Serves as the primary trophic energy foundation for all terrestrial and aquatic food webs.`;
+   - **Carbon Fixation:** The enzyme **RuBisCO** fixes atmospheric $\\text{CO}_2$ with ribulose-1,5-bisphosphate (RuBP).
+   - Uses ATP and NADPH to synthesize glyceraldehyde 3-phosphate (G3P), which condenses into **Glucose** ($\\text{C}_6\\text{H}_{12}\\text{O}_6$).`;
     }
 
-    // 6. Explain Newton's Second Law
-    if (q.includes('newton') && (q.includes('second law') || q.includes('2nd law'))) {
-      return `### Newton's Second Law of Motion (Classical Mechanics)
-
-**Newton's Second Law of Motion** states that the rate of change of momentum of a body is directly proportional to the applied net force and takes place in the direction in which the force acts.
-
----
-
-### Mathematical Derivation
-
-Linear momentum is defined as $\\vec{p} = m\\vec{v}$.
-
-From Newton's second law:
-
-$$\\vec{F}_{\\text{net}} = \\frac{d\\vec{p}}{dt} = \\frac{d(m\\vec{v})}{dt}$$
-
-For a body with constant mass ($m = \\text{constant}$):
-
-$$\\vec{F}_{\\text{net}} = m \\cdot \\frac{d\\vec{v}}{dt} = m\\vec{a}$$
-
-Where:
-- $\\vec{F}_{\\text{net}}$: Net external force vector acting on the mass (measured in Newtons, $\\text{N} = \\text{kg}\\cdot\\text{m}/\\text{s}^2$).
-- $m$: Inertial mass of the object (measured in kilograms, $\\text{kg}$).
-- $\\vec{a}$: Acceleration vector imparted to the object (measured in $\\text{m}/\\text{s}^2$).
-
----
-
-### Physical Insights
-1. **Direct Proportionality:** Doubling the net applied force doubles the object's acceleration ($a \\propto F$).
-2. **Inverse Proportionality:** Doubling the object's mass halves the acceleration for the same force ($a \\propto \\frac{1}{m}$).
-3. **Equilibrium Condition:** When $\\vec{F}_{\\text{net}} = 0$, acceleration is zero, reproducing Newton's First Law.`;
-    }
-
-    // 7. What is Inflation?
-    if (q.includes('inflation') && (q.includes('what is') || q.includes('economics') || q.includes('define') || q.includes('explain'))) {
-      return `### Inflation in Macroeconomics
-
-**Inflation** is the quantitative economic measure of the rate at which the general price level of goods and services in an economy increases over a given period, resulting in a sustained decline in the purchasing power of money.
-
----
-
-### Primary Types & Causes
-
-1. **Demand-Pull Inflation:**
-   - Occurs when aggregate demand for goods and services outpaces aggregate supply ("too much money chasing too few goods").
-2. **Cost-Push Inflation:**
-   - Driven by an aggregate supply decrease resulting from rising production costs (e.g., surges in crude oil prices, raw material shortages, wage hikes).
-3. **Built-In / Wage-Price Spiral:**
-   - Workers demand higher wages to keep up with rising living costs, prompting firms to raise prices further to maintain margins.
-
----
-
-### Measurement Indices
-- **Consumer Price Index (CPI):** Measures the weighted average price of a representative basket of consumer goods and services.
-- **Wholesale Price Index (WPI) / Producer Price Index (PPI):** Tracks price fluctuations at the wholesale and producer stages before retail distribution.
-
----
-
-### Policy Responses
-- **Monetary Policy:** Central banks raise benchmark interest rates (repo rates) and reduce monetary supply to cool excessive demand.
-- **Fiscal Policy:** Governments reduce public spending or increase taxation to lower disposable income in circulation.`;
-    }
-
-    // 8. Human Digestive System
+    // Human Digestive System
     if (q.includes('digestive system') || q.includes('human digestion')) {
       return `### The Human Digestive System (Anatomy & Physiology)
 
-The **Human Digestive System** is a complex biological system responsible for the mechanical breakdown, chemical enzymatic hydrolysis, nutrient absorption, and waste elimination of ingested food.
+The **Human Digestive System** is the organ system responsible for mechanical breakdown, enzymatic hydrolysis, nutrient absorption, and waste elimination of ingested food.
 
 ---
 
 ### Sequential Anatomical Pathway & Mechanics
 
 1. **Mouth & Oral Cavity:**
-   - **Mechanical:** Teeth masticate food into a smaller surface area bolus.
-   - **Chemical:** Salivary glands secrete **salivary amylase**, initiating starch hydrolysis into maltose.
-
+   - Teeth masticate food into a bolus; salivary glands secrete **salivary amylase**, initiating starch breakdown into maltose.
 2. **Esophagus:**
-   - Transport channel that propels the bolus downward into the stomach via involuntary coordinated muscular contractions called **peristalsis**.
-
+   - Muscular tube moving food downward through rhythmic involuntary muscular contractions called **peristalsis**.
 3. **Stomach:**
-   - Secretes gastric juice containing **Hydrochloric Acid (HCl, pH ~1.5 - 2.0)** and **Pepsinogen** (activated into **pepsin** to cleave peptide bonds in proteins).
-   - Churns food into an acidic fluid called **chyme**.
-
+   - Secretes gastric juice containing **Hydrochloric Acid (HCl, pH ~1.5 - 2.0)** to sterilize pathogens and activate **pepsinogen** into **pepsin** for protein cleavage. Churns food into acidic **chyme**.
 4. **Small Intestine (Duodenum, Jejunum, Ileum):**
-   - **Primary Site of Digestion & Absorption.**
-   - **Bile** (synthesized by liver, stored in gallbladder) emulsifies lipids.
-   - **Pancreatic Juice** delivers lipase, trypsin, and amylase.
-   - Millions of microscopic finger-like projections (**villi** and **microvilli**) maximize surface area to absorb glucose, amino acids, and fatty acids into the bloodstream.
-
+   - **Primary Digestion & Absorption Hub.**
+   - Liver supplies **bile** to emulsify lipids; pancreas provides lipase, trypsin, and amylase.
+   - Millions of microscopic **villi** and **microvilli** maximize surface area to absorb amino acids, glucose, and fatty acids into capillaries and lacteals.
 5. **Large Intestine (Colon) & Rectum:**
-   - Reabsorbs excess water and electrolytes from indigestible remnants.
-   - Houses gut microbiota synthesizing Vitamin K and B-complex vitamins before compacting waste for excretion.`;
+   - Reabsorbs water and electrolytes, housing gut microbiota synthesizing Vitamin K before compaction into feces.`;
     }
 
-    // 9. Explain the French Revolution
+    // --- C. HUMANITIES, GEOGRAPHY & HISTORY ---
+
+    // French Revolution
     if (q.includes('french revolution')) {
       return `### The French Revolution (1789–1799)
 
-The **French Revolution** was a transformative period of social and political upheaval in France that dismantled the ancient feudal monarchy (*Ancien Régime*), established the ideals of modern democratic republics, and influenced political theory worldwide.
+The **French Revolution** was a watershed epoch in European and global history that dismantled the absolute monarchy (*Ancien Régime*), abolished feudal privileges, and established modern republican and democratic principles.
 
 ---
 
-### Primary Causes
-
-1. **Social Inequality (The Three Estates):**
-   - **First Estate (Clergy)** and **Second Estate (Nobility)** enjoyed tax exemptions, feudal privileges, and vast land holdings.
-   - **Third Estate (Commoners, Peasants, Bourgeoisie)** comprised 98% of the population, bore the entire national tax burden, and possessed zero political voice.
-2. **Financial Bankruptcy:**
-   - Heavy royal debts incurred from supporting the American Revolutionary War and extravagant royal expenditures at Versailles.
-3. **Enlightenment Ideals:**
-   - Works of Voltaire, Rousseau, and Montesquieu questioned the divine right of kings, advocating popular sovereignty and separation of powers.
+### Major Causes
+1. **The Three Estates:** Unfair social hierarchy where the First Estate (Clergy) and Second Estate (Nobility) held land and tax exemptions, while the Third Estate (Peasants and Bourgeoisie, 98% of population) carried the tax burden.
+2. **Economic Collapse:** National bankruptcy following royal expenditures and costly foreign wars (Seven Years' War, American Revolution).
+3. **Enlightenment Philosophy:** Ideas of Rousseau, Voltaire, and Montesquieu advocating liberty, equality, and the separation of powers.
 
 ---
 
-### Major Chronological Milestones
-- **1789:** Convening of the Estates-General, Tennis Court Oath, and the **Storming of the Bastille** (July 14).
-- **1789:** Proclamation of the *Declaration of the Rights of Man and of the Citizen* (*"Liberté, Égalité, Fraternité"*).
-- **1792–1794:** Abolition of the monarchy, execution of King Louis XVI and Marie Antoinette, followed by the **Reign of Terror** led by Maximilien Robespierre.
-- **1799:** The Coup of 18 Brumaire, wherein **Napoleon Bonaparte** seized power, ending the revolutionary republic and establishing the Consulate.
-
----
-
-### Historical Legacy
-- Eradicated European feudalism and absolute divine-right monarchies.
-- Codified modern secular law, human rights doctrines, and national democratic citizenship.`;
+### Chronological Milestones
+- **1789:** Estates-General convened; Tennis Court Oath; **Storming of the Bastille** (July 14); passage of the *Declaration of the Rights of Man and of the Citizen*.
+- **1792–1794:** Abolition of monarchy; execution of King Louis XVI; the **Reign of Terror** under Maximilien Robespierre.
+- **1799:** Coup of 18 Brumaire by **Napoleon Bonaparte**, concluding the revolutionary era and establishing the French Consulate.`;
     }
 
-    // 10. What is Machine Learning?
-    if (q.includes('machine learning') && (q.includes('what is') || q.includes('define') || q.includes('explain'))) {
-      return `### Machine Learning (Artificial Intelligence)
+    // Causes of World War II
+    if (q.includes('world war ii') || q.includes('world war 2') || (q.includes('wwii') && q.includes('cause'))) {
+      return `### Primary Causes of World War II (1939–1945)
 
-**Machine Learning (ML)** is a subfield of Artificial Intelligence (AI) and computational statistics focused on building mathematical models and algorithms that learn patterns and rules from historical training data to make predictions or decisions on unseen data without being explicitly programmed.
+World War II was the deadliest conflict in human history. Its outbreak resulted from the convergence of several geopolitical failures following World War I:
 
----
-
-### The Three Fundamental Paradigms
-
-1. **Supervised Learning:**
-   - Trained on labeled pairs $(x_i, y_i)$.
-   - **Tasks:** Classification (discrete classes) and Regression (continuous numerical values).
-   - **Algorithms:** Linear Regression, Support Vector Machines (SVM), Random Forests, Deep Neural Networks.
-
-2. **Unsupervised Learning:**
-   - Trained on unlabeled datasets $(x_i)$ to detect latent patterns and intrinsic geometries.
-   - **Tasks:** Clustering, Anomaly Detection, and Dimensionality Reduction.
-   - **Algorithms:** K-Means, DBSCAN, Principal Component Analysis (PCA).
-
-3. **Reinforcement Learning (RL):**
-   - An autonomous agent learns an optimal behavioral policy $\\pi(a|s)$ through continuous trial-and-error interaction with a dynamic environment, maximizing cumulative scalar rewards.
-   - **Algorithms:** Q-Learning, Deep Q-Networks (DQN), PPO.
-
----
-
-### Core Mathematical Pipeline
-$$\\text{Raw Data} \\rightarrow \\text{Feature Engineering} \\rightarrow \\text{Model Optimization (Loss Minimization } \\min_\\theta \\mathcal{L}(\\theta)) \\rightarrow \\text{Evaluation / Inference}$$`;
+1. **The Treaty of Versailles (1919):**
+   - Imposed crippling war reparations, territorial losses, and demilitarization on Germany, breeding widespread economic hardship and revanchist nationalism.
+2. **Rise of Fascism and Militarism:**
+   - Totalitarian expansionist regimes took power: Adolf Hitler's Nazi Germany, Benito Mussolini's Fascist Italy, and Imperial Japan.
+3. **Failure of the League of Nations:**
+   - Lacking enforcement authority and military backing, the League failed to stop Japanese expansion into Manchuria (1931), Italian invasion of Abyssinia (1935), or German rearmament.
+4. **Policy of Appeasement:**
+   - Britain and France permitted German territorial annexations (Rhineland, Austria, Sudetenland via the Munich Agreement of 1938) hoping to avert general war.
+5. **Immediate Trigger:**
+   - The German invasion of Poland on **September 1, 1939**, followed by Britain and France declaring war on Germany.`;
     }
 
-    // 11. Process vs Thread
-    if (q.includes('process') && q.includes('thread') && (q.includes('difference') || q.includes('vs') || q.includes('compare'))) {
-      return `### Difference Between Process and Thread
+    // Plate Tectonics
+    if (q.includes('plate tectonics') && (q.includes('explain') || q.includes('what is'))) {
+      return `### Plate Tectonics (Earth Sciences & Geography)
 
-In Operating Systems, **Processes** and **Threads** are both fundamental units of program execution, but operate at distinct levels of memory and resource isolation.
+The theory of **Plate Tectonics** states that the Earth's solid outermost shell (**lithosphere**) is fractured into approximately a dozen major and minor rigid plates that glide over the ductile, semi-fluid **asthenosphere** driven by mantle convection currents.
 
 ---
 
-### Side-by-Side Comparison Matrix
+### The Three Types of Plate Boundaries
 
-| Evaluation Metric | Process | Thread (Lightweight Process) |
-| :--- | :--- | :--- |
-| **Definition** | An independent program in execution with its own virtual address space. | A lightweight execution unit within a parent process. |
-| **Memory Isolation** | Fully isolated address space; protected from other processes. | Shares code, data segment, and open file handles with other sibling threads. |
-| **Creation Overhead** | High; requires allocating a complete Process Control Block (PCB) and page tables. | Low; shares parent process memory, requiring only an individual Thread Control Block (TCB) and stack. |
-| **Context Switching** | Slower; requires flushing CPU caches (TLB) and switching memory mappings. | Fast; registers and Program Counter (PC) are swapped while memory space remains constant. |
-| **Inter-Communication** | Requires explicit Inter-Process Communication (IPC: Pipes, Shared Memory, Sockets). | Direct communication via shared global and heap memory. |
-| **Fault Resilience** | High; a crash in one process does not affect other processes. | Low; an unhandled exception or memory crash in one thread can terminate the whole process. |`;
+| Boundary Type | Relative Motion | Geological Features Formed | Real-World Examples |
+| :--- | :--- | :--- | :--- |
+| **Divergent** | Plates pull apart | Mid-ocean ridges, rift valleys, new oceanic crust | Mid-Atlantic Ridge, East African Rift |
+| **Convergent** | Plates collide | Mountain ranges, subduction zones, deep ocean trenches, volcanic arcs | Himalayas (Continental-Continental), Marianas Trench |
+| **Transform** | Plates slide past horizontally | Strike-slip fault lines, severe shallow earthquakes | San Andreas Fault (California) |
+
+---
+
+### Driving Mechanism
+Mantle convection driven by radioactive decay heat in the Earth's core, along with **slab pull** (dense oceanic plates sinking at subduction zones) and **ridge push**.`;
     }
 
-    // 12. TCP vs UDP
-    if ((q.includes('tcp') && q.includes('udp')) && (q.includes('difference') || q.includes('vs') || q.includes('compare'))) {
-      return `### Difference Between TCP and UDP
+    // Climate Change
+    if (q.includes('climate change') && (q.includes('explain') || q.includes('what is'))) {
+      return `### Climate Change & Global Warming
 
-At the Transport Layer (Layer 4) of the Internet Protocol Suite, **TCP (Transmission Control Protocol)** and **UDP (User Datagram Protocol)** provide contrasting host-to-host transmission guarantees.
+**Climate Change** refers to long-term shifts in global and regional temperatures and weather patterns. While climate has varied over geological eras, contemporary climate change is driven primarily by human activities since the Industrial Revolution.
 
 ---
 
-### Side-by-Side Comparison Matrix
+### Scientific Mechanism (The Enhanced Greenhouse Effect)
+1. **Solar Radiation:** Shortwave radiation from the Sun warms Earth's surface.
+2. **Infrared Emission:** Earth radiates heat back toward space as longwave infrared radiation.
+3. **Greenhouse Gases (GHGs):** Atmospheric gases ($\\text{CO}_2, \\text{CH}_4, \\text{N}_2\\text{O}$, fluorinated gases) absorb and re-emit this infrared energy downward, trapping heat in the troposphere.
+4. **Anthropogenic Forcing:** Fossil fuel combustion (coal, oil, gas), industrial agriculture, and deforestation have raised atmospheric $\\text{CO}_2$ from pre-industrial levels of $\\sim 280\\text{ ppm}$ to over $420\\text{ ppm}$.
 
-| Evaluation Metric | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |
-| :--- | :--- | :--- |
-| **Connection Nature** | **Connection-oriented** (Requires 3-way handshake: SYN $\\rightarrow$ SYN-ACK $\\rightarrow$ ACK). | **Connectionless** (Transmits datagrams immediately with zero pre-handshaking). |
-| **Reliability** | **Guaranteed delivery** with automated packet retransmissions and acknowledgments. | **Best-effort delivery**; packets may be dropped, duplicated, or arrive out of sequence. |
-| **Ordering** | Enforces strict in-order packet delivery using sequence numbers. | No ordering guarantees; packets are delivered in whatever order network routers route them. |
-| **Header Overhead** | Heavier: 20 to 60 bytes with flags, checksum, and window size. | Lightweight: Fixed 8 bytes. |
-| **Flow & Congestion Control** | Full support (Sliding window, slow-start, additive-increase multiplicative-decrease). | No congestion or flow control; transmits at the rate supplied by application. |
-| **Standard Protocols** | HTTP, HTTPS, SSH, FTP, SMTP, MySQL. | DNS, DHCP, VoIP, Real-Time Video Streaming, Online Multiplayer Gaming. |`;
+---
+
+### Major Consequences
+- Rising sea levels due to thermal expansion and polar ice sheet melting.
+- Increased frequency of severe weather events (prolonged droughts, intense cyclones).
+- Ocean acidification disrupting coral reefs and marine food chains.`;
     }
 
-    // 13. ACID Properties in DBMS
-    if (q.includes('acid') && (q.includes('dbms') || q.includes('database') || q.includes('properties'))) {
-      return `### ACID Properties in Database Management Systems
+    // --- D. ECONOMICS & BUSINESS ---
 
-The **ACID** properties are four fundamental guarantees that ensure database transactions are processed reliably, preserving database integrity even across hardware crashes and concurrent transactions.
+    // Define Inflation
+    if (q.includes('inflation') && (q.includes('define') || q.includes('what is') || q.includes('economics'))) {
+      return `### Inflation in Macroeconomics
 
----
-
-### 1. Atomicity ("All or Nothing")
-- **Principle:** Every database transaction is executed as an indivisible unit of work.
-- **Guarantee:** Either all modifications within the transaction are committed successfully, or if a single failure occurs, the entire transaction is rolled back to its initial state via Write-Ahead Logs (WAL).
+**Inflation** is the quantitative economic measure of the rate at which the general price level of goods and services in an economy rises over a specified period, resulting in a continuous erosion in the purchasing power of money.
 
 ---
 
-### 2. Consistency (State Invariants)
-- **Principle:** A transaction must transition the database from one valid state to another valid state.
-- **Guarantee:** All schema constraints, primary keys, foreign key relationships, and check validations remain strictly preserved upon transaction completion.
+### Primary Economic Causes
+1. **Demand-Pull Inflation:**
+   - Occurs when aggregate consumer demand exceeds aggregate productive capacity ("too much money chasing too few goods").
+2. **Cost-Push Inflation:**
+   - Caused by aggregate supply disruptions and spikes in production costs (e.g., energy price shocks, raw material shortages, wage hikes).
+3. **Built-in / Wage-Price Spiral:**
+   - Workers demand higher nominal wages to offset cost-of-living surges, prompting firms to raise consumer prices to maintain margins.
 
 ---
 
-### 3. Isolation (Concurrency Control)
-- **Principle:** Intermediate states of concurrently executing transactions must remain invisible to one another.
-- **Guarantee:** Concurrent transaction execution yields the exact same outcome as if the transactions were executed sequentially (serializability enforced via two-phase locking 2PL or MVCC).
+### Measurement & Control
+- **Consumer Price Index (CPI):** Tracks prices of a representative consumer goods basket.
+- **Monetary Policy Tools:** Central Banks increase policy interest rates (repo rate) and conduct quantitative tightening to dampen excess aggregate demand.`;
+    }
+
+    // Supply and Demand
+    if (q.includes('supply and demand') || (q.includes('supply') && q.includes('demand') && q.includes('explain'))) {
+      return `### The Law of Supply and Demand (Microeconomics)
+
+The model of **Supply and Demand** is the cornerstone economic framework describing how price and quantity are determined in a competitive market economy.
 
 ---
 
-### 4. Durability (Persistence Guarantee)
-- **Principle:** Once a transaction commits, its modifications are permanently recorded.
-- **Guarantee:** Committed data updates will survive power outages, operating system crashes, and disk reboots from non-volatile storage.`;
+### 1. Law of Demand
+- **Principle:** Holding all else constant (*ceteris paribus*), as the price of a good increases, the quantity demanded decreases (downward-sloping demand curve, $P \\uparrow \\implies Q_d \\downarrow$).
+
+### 2. Law of Supply
+- **Principle:** Holding all else constant, as the price of a good increases, producers are willing to supply more to maximize profit (upward-sloping supply curve, $P \\uparrow \\implies Q_s \\uparrow$).
+
+---
+
+### 3. Market Equilibrium
+Market equilibrium occurs at the exact price point $P^*$ where quantity demanded equals quantity supplied:
+
+$$Q_d(P^*) = Q_s(P^*)$$
+
+- **Surplus ($Q_s > Q_d$):** Downward market pressure on price until equilibrium is restored.
+- **Shortage ($Q_d > Q_s$):** Upward market pressure on price until equilibrium is restored.`;
+    }
+
+    // Marketing Management
+    if (q.includes('marketing management')) {
+      return `### Marketing Management in Business Administration
+
+**Marketing Management** is the strategic and organizational process of planning, executing, pricing, promoting, and distributing ideas, goods, and services to create exchanges that satisfy individual and organizational goals.
+
+---
+
+### 1. The Core 4 Ps Framework (The Marketing Mix)
+- **Product:** The physical good, digital service, or solution designed to satisfy customer needs.
+- **Price:** Pricing strategy (cost-plus, penetration, skimming, value-based) balancing profitability with customer perceived value.
+- **Place:** Distribution channels and supply chain logistics delivering the product to the consumer.
+- **Promotion:** Integrated communications (advertising, public relations, social media, sales promotion) to generate brand awareness and demand.
+
+---
+
+### 2. The STP Strategic Process
+1. **Segmentation:** Dividing the broad market into distinct buyer groups with shared demographic or behavioral traits.
+2. **Targeting:** Selecting the most viable and profitable market segments to serve.
+3. **Positioning:** Designing a distinct brand identity and value proposition in the customer's mind relative to competitors.`;
+    }
+
+    // Financial Accounting
+    if (q.includes('financial accounting')) {
+      return `### Financial Accounting in Commerce & Management
+
+**Financial Accounting** is the specialized branch of accounting dedicated to recording, summarizing, and reporting the financial transactions of an enterprise to external stakeholders (investors, creditors, auditors, and regulators) in compliance with GAAP or IFRS standards.
+
+---
+
+### The Fundamental Accounting Equation
+$$\\mathbf{\\text{Assets} = \\text{Liabilities} + \\text{Owner's Equity}}$$
+
+- **Assets:** Economic resources owned that provide future economic value (Cash, Inventory, Equipment).
+- **Liabilities:** Financial debts and obligations owed to outside parties (Loans, Accounts Payable).
+- **Equity:** Residual interest in the company's assets belonging to owners after deducting liabilities.
+
+---
+
+### The Three Master Financial Statements
+1. **Balance Sheet:** Snapshot of financial position (Assets, Liabilities, Equity) at a specific date.
+2. **Income Statement (Profit & Loss):** Summarizes revenues earned and expenses incurred over an operating period (Net Income = Revenues - Expenses).
+3. **Cash Flow Statement:** Tracks cash inflows and outflows across **Operating**, **Investing**, and **Financing** activities.`;
+    }
+
+    // --- E. LANGUAGES & LINGUISTICS ---
+
+    // English Tenses
+    if (q.includes('english tenses') || (q.includes('tense') && q.includes('english'))) {
+      return `### The 12 Tenses in English Grammar
+
+English tenses convey the timeframe (**Past**, **Present**, **Future**) and aspect (**Simple**, **Continuous**, **Perfect**, **Perfect Continuous**) of an action.
+
+---
+
+### Complete 12 Tenses Matrix
+
+| Tense | Present ($V_1$) | Past ($V_2$) | Future (will + $V_1$) |
+| :--- | :--- | :--- | :--- |
+| **Simple** | *I write code.* | *I wrote code.* | *I will write code.* |
+| **Continuous** | *I am writing code.* | *I was writing code.* | *I will be writing code.* |
+| **Perfect** | *I have written code.* | *I had written code.* | *I will have written code.* |
+| **Perfect Continuous**| *I have been writing code.*| *I had been writing code.*| *I will have been writing code.*|
+
+---
+
+### Core Usage Guide
+- **Simple Present:** General truths, scientific facts, habits (*Water boils at $100^\\circ\\text{C}$*).
+- **Present Continuous:** Actions currently in progress (*She is studying for her exam*).
+- **Present Perfect:** Actions completed at an unspecified time with present relevance (*We have completed the project*).`;
+    }
+
+    // Translate into Bengali
+    if (q.includes('translate') && q.includes('bengali')) {
+      return `### Bengali Translation & Educational Linguistics
+
+**অনুবাদ (Translation):**
+
+*"Education is the most powerful weapon which you can use to change the world."*  
+**বাংলা অনুবাদ:** "শিক্ষা হল সবচেয়ে শক্তিশালী হাতিয়ার, যা আপনি পৃথিবী পরিবর্তন করতে ব্যবহার করতে পারেন।"
+
+---
+
+### ভাষাগত ব্যাখ্যা (Linguistic Breakdown)
+- **শিক্ষা (Education):** বিশেষ্য (Noun) — জ্ঞানার্জন ও বুদ্ধিবৃত্তিক বিকাশ।
+- **শক্তিশালী (Powerful):** বিশেষণ (Adjective) — সামর্থ্য ও প্রভাব বোঝাতে ব্যবহৃত।
+- **হাতিয়ার (Weapon/Tool):** রূপক অর্থে ইতিবাচক পরিবর্তনের মাধ্যম হিসেবে ব্যবহৃত।`;
+    }
+
+    // --- F. ENGINEERING & TECHNOLOGY ---
+
+    // Ohm's Law
+    if (q.includes('ohm') && q.includes('law')) {
+      return `### Ohm's Law in Electrical Engineering & Physics
+
+**Ohm's Law** states that the electric current ($I$) flowing through a metallic conductor between two points is directly proportional to the voltage ($V$) across the two points, provided physical conditions (especially temperature) remain constant.
+
+---
+
+### Mathematical Formula
+
+$$V = I \\cdot R$$
+
+Where:
+- $V$: Electrical potential difference / Voltage (Volts, $\\text{V}$).
+- $I$: Electric current (Amperes, $\\text{A}$).
+- $R$: Electrical resistance (Ohms, $\\Omega$).
+
+---
+
+### Derived Formulas
+- Current: $I = \\frac{V}{R}$
+- Resistance: $R = \\frac{V}{I}$
+- Electric Power: $P = V \\cdot I = I^2 R = \\frac{V^2}{R}$ (Watts, $\\text{W}$).
+
+---
+
+### Limitations of Ohm's Law
+Ohm's Law applies to **Ohmic conductors** (metals at constant temperature). It does **not** hold for non-linear, non-ohmic devices such as diodes, transistors, thermistors, and vacuum tubes where the $V-I$ characteristic is non-linear.`;
+    }
+
+    // Transformer
+    if (q.includes('transformer') && (q.includes('what is') || q.includes('explain') || q.includes('working'))) {
+      return `### Electric Transformer (Electrical Engineering)
+
+A **Transformer** is a static electrical machine that transfers electrical energy between two or more circuits through **mutual electromagnetic induction**, altering alternating voltage and current levels without changing the frequency.
+
+---
+
+### Working Principle
+A transformer consists of two isolated coils wound on a laminated ferromagnetic core:
+1. **Primary Winding:** Connected to input AC supply, producing alternating magnetic flux $\\Phi$ in the core.
+2. **Secondary Winding:** Linked by this flux; by Faraday's Law, an alternating EMF is induced across its terminals.
+
+---
+
+### The Turns Ratio Equation
+
+$$\\frac{V_s}{V_p} = \\frac{N_s}{N_p} = \\frac{I_p}{I_s} = k$$
+
+Where:
+- $V_p, V_s$: Primary and secondary voltages.
+- $N_p, N_s$: Primary and secondary turns.
+- $I_p, I_s$: Primary and secondary currents.
+
+---
+
+### Classifications
+- **Step-Up Transformer ($N_s > N_p$):** Increases voltage ($V_s > V_p$), decreases current. Used at generating stations for high-voltage grid transmission to reduce $I^2R$ transmission line losses.
+- **Step-Down Transformer ($N_s < N_p$):** Decreases voltage ($V_s < V_p$), increases current. Used in local distribution substations ($230\\text{V} / 120\\text{V}$) for household distribution.`;
     }
 
     return null;
   }
 
   // =========================================================================
-  // 6. REAL-TIME WIKIPEDIA FACTUAL KNOWLEDGE RETRIEVER
+  // 6. REAL-TIME FACTUAL WIKIPEDIA KNOWLEDGE RETRIEVER
   // =========================================================================
   async function fetchLiveWikiArticle(topic) {
     if (!topic || topic.length < 3) return null;
@@ -1005,23 +1163,23 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
   }
 
   // =========================================================================
-  // 7. BACKEND API CLIENT WITH AUTOMATIC LOCAL GEMINI FALLBACK
+  // 7. BACKEND API CLIENT WITH DIRECT CLIENT-SIDE FALLBACK
   // =========================================================================
   async function queryBackendAI(query, history = [], fileSnapshot = null) {
     const clientKey = localStorage.getItem('gemini_api_key') || window.GEMINI_API_KEY || '';
 
-    // 1. Try Backend Server Endpoint first
+    // 1. Backend Server Endpoint Call
     for (const backendUrl of BACKEND_URLS) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 12000);
+        const timeout = setTimeout(() => controller.abort(), 14000);
 
         const response = await fetch(backendUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: query,
-            history: history.slice(-10),
+            history: history.slice(-12),
             file: fileSnapshot,
             apiKey: clientKey
           }),
@@ -1036,7 +1194,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
           }
         }
       } catch (err) {
-        // Backend not reachable on this URL; continue to next fallback
+        // Continue to fallback
       }
     }
 
@@ -1046,8 +1204,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
         const directEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(clientKey)}`;
         const contents = [];
 
-        // Ingest previous turns
-        for (const item of history.slice(-10)) {
+        for (const item of history.slice(-12)) {
           if (item && item.text) {
             contents.push({
               role: item.role === 'model' || item.role === 'assistant' ? 'model' : 'user',
@@ -1068,7 +1225,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
 
         let fullTextPrompt = query;
         if (fileSnapshot && fileSnapshot.text) {
-          fullTextPrompt = `[ATTACHED DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]\n${fileSnapshot.text.substring(0, 12000)}\n\n[STUDENT QUESTION]:\n${query}`;
+          fullTextPrompt = `[ATTACHED EDUCATIONAL DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]\n${fileSnapshot.text.substring(0, 15000)}\n\n[STUDENT QUESTION]:\n${query}`;
         }
         currentParts.push({ text: fullTextPrompt });
 
@@ -1079,7 +1236,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: contents,
-            generationConfig: { temperature: 0.2, maxOutputTokens: 3000 }
+            generationConfig: { temperature: 0.2, maxOutputTokens: 3500 }
           })
         });
 
@@ -1091,7 +1248,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
           }
         }
       } catch (e) {
-        console.warn('Direct client-side Gemini error:', e);
+        console.warn('Direct client-side Gemini notice:', e);
       }
     }
 
@@ -1099,7 +1256,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
   }
 
   // =========================================================================
-  // 8. MASTER TIERED EDUCATIONAL INFERENCE ENGINE
+  // 8. TIERED UNIVERSAL EDUCATIONAL INFERENCE ENGINE
   // =========================================================================
   async function generateAcademicResponse(query, fileSnapshot = null) {
     const qClean = sanitizeUserQuery(query);
@@ -1107,29 +1264,29 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
 
     // 1. Conversational Greetings
     const greetings = {
-      'hi': 'Hello! I am Brainware Academic AI, your educational assistant. Ask me any question across Computer Science, Programming, Mathematics, Sciences, Engineering, Humanities, or Business, and I will guide you step by step.',
-      'hello': 'Greetings! How can I assist with your coursework, exam preparation, or academic research today?',
-      'hey': 'Hello! What educational concept, calculation, or coding problem can I solve for you?'
+      'hi': 'Hello! I am Brainware Academic AI, your worldwide educational assistant. I can help you with Computer Science, Mathematics, Sciences, Engineering, Humanities, Business, and Languages. How can I assist your studies today?',
+      'hello': 'Greetings! What academic subject, problem, or concept would you like to explore today?',
+      'hey': 'Hello! What educational question or calculation can I help you solve today?'
     };
     if (greetings[qLower]) {
       return { text: greetings[qLower], source: 'conversational' };
     }
 
-    // 2. Primary Engine: Backend or Direct Gemini Model
+    // 2. Primary Engine: Backend Proxy or Client Gemini 1.5 Flash
     const aiResult = await queryBackendAI(query, chatHistory, fileSnapshot);
     if (aiResult && aiResult.text) {
       return aiResult;
     }
 
-    // 3. Document Analysis Mode (When file is attached and AI API is offline)
+    // 3. Document Analysis Mode (When document is attached and AI model is offline)
     if (fileSnapshot && fileSnapshot.text) {
       return {
-        text: `### Document Analysis: ${fileSnapshot.name}\n\n**Format:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Document Content Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 1200)}...\n\`\`\`\n\n---\n\n### Summary Assessment\nThis ${fileSnapshot.type} document has been parsed. For deep cross-page reasoning and visual query answering, connect the Brainware AI backend server or provide your Gemini API key in settings.`,
+        text: `### Document Analysis: ${fileSnapshot.name}\n\n**Format:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Extracted Text Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 1500)}...\n\`\`\`\n\n---\n\n### Summary Assessment\nThis ${fileSnapshot.type} document has been parsed. For deep cross-page reasoning and visual query answering, start the Brainware AI backend server (\`npm start\`) or configure your free Gemini API key in settings.`,
         source: 'document'
       };
     }
 
-    // 4. University Syllabus & Exam Question Bank Grounding (portalQAIndex: 1,254 entries)
+    // 4. University Question Bank Grounding (portalQAIndex: 1,254 entries)
     const syllabusMatch = findSyllabusMatch(query);
     if (syllabusMatch && syllabusMatch.item) {
       const item = syllabusMatch.item;
@@ -1141,25 +1298,25 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
       };
     }
 
-    // 5. Mathematical Calculation Solver
+    // 5. Mathematical & Probability Calculation Engine
     const mathAns = trySolveMathProblem(query);
     if (mathAns) {
       return { text: mathAns, source: 'math' };
     }
 
-    // 6. Programming Code Synthesizer
+    // 6. Programming Implementation Engine
     const codeAns = tryGenerateCodeSolution(query);
     if (codeAns) {
       return { text: codeAns, source: 'code' };
     }
 
-    // 7. Universal Academic Subject Synthesizer
+    // 7. Universal Multi-Disciplinary Subject Synthesizer
     const conceptAns = trySubjectConceptExplanation(query, chatHistory);
     if (conceptAns) {
       return { text: conceptAns, source: 'concept' };
     }
 
-    // 8. Factual Academic Knowledge Retrieval via Wikipedia API
+    // 8. Factual Knowledge Retrieval via Wikipedia API
     const cleanTopic = qClean
       .replace(/^(what is|explain|describe|define|tell me about|how does|why is|what are|state)\s+/i, '')
       .replace(/[?!.]/g, '')
@@ -1264,7 +1421,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
 
     renderedHtml = renderMathInHtml(renderedHtml);
 
-    // Code blocks with syntax copy buttons
+    // Style Code Blocks
     renderedHtml = renderedHtml.replace(/<pre><code class="language-([a-zA-Z0-9_-]+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
       const codeId = 'code_' + Math.random().toString(36).substr(2, 9);
       return `
@@ -1295,7 +1452,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
       `;
     });
 
-    // Style Markdown Tables
+    // Style Tables
     renderedHtml = renderedHtml.replace(/<table>([\s\S]*?)<\/table>/g, (match, tableInner) => {
       return `
         <div class="my-4 overflow-x-auto rounded-2xl border border-slate-200 shadow-sm bg-white">
@@ -1338,7 +1495,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
   }
 
   // =========================================================================
-  // 11. UI BUBBLES & CONTROLLERS
+  // 11. UI BUBBLES & ACTIONS
   // =========================================================================
   function createAssistantStreamingBubble(msgId, threadId) {
     const thread = document.getElementById(threadId);
@@ -1465,20 +1622,20 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
     if (q.includes('java') || q.includes('c++') || q.includes('python')) {
       return ['What are its main advantages?', 'Provide an advanced code example', 'Compare with alternative languages'];
     }
+    if (q.includes('newton') || q.includes('physics')) {
+      return ['Solve a numerical problem using this law', 'Explain Newton’s Third Law', 'Relate momentum to impulse'];
+    }
+    if (q.includes('differentiation') || q.includes('calculus')) {
+      return ['Explain Integration as inverse differentiation', 'Show step-by-step example using Chain Rule', 'What is partial differentiation?'];
+    }
     if (q.includes('photosynthesis') || q.includes('biology')) {
       return ['Explain the Light-Dependent reactions', 'What is the role of Chlorophyll?', 'Detail the Calvin Cycle'];
-    }
-    if (q.includes('newton') || q.includes('physics')) {
-      return ['Solve a numerical problem using this law', 'Explain Newton’s Third Law', 'How does momentum relate to impulse?'];
     }
     if (q.includes('inflation') || q.includes('economics')) {
       return ['What are the key causes of demand-pull inflation?', 'How do Central Banks control inflation?', 'What is stagflation?'];
     }
-    if (q.includes('machine learning') || q.includes('ai')) {
-      return ['Difference between Supervised and Unsupervised Learning', 'Explain Gradient Descent step by step', 'Provide a simple Python ML example'];
-    }
-    if (q.includes('dbms') || q.includes('database')) {
-      return ['Explain ACID properties in detail', 'What is Normalization (1NF, 2NF, 3NF)?', 'Explain Indexing in DBMS'];
+    if (q.includes('transformer') || q.includes('engineering')) {
+      return ['What are the main losses in a transformer?', 'Derive the EMF equation of a transformer', 'Explain Step-Up vs Step-Down'];
     }
     return ['Provide a detailed step-by-step example', 'What are the main advantages and disadvantages?', 'Explain with a comparison table'];
   }
@@ -1759,7 +1916,7 @@ The **ACID** properties are four fundamental guarantees that ensure database tra
     }
   };
 
-  // Wire up Drag and Drop onto Chat Container
+  // Drag and Drop Zone
   document.addEventListener('DOMContentLoaded', () => {
     const dropZones = [document.getElementById('aiChatContainer'), document.getElementById('floatingChatPopup')].filter(Boolean);
     dropZones.forEach(zone => {

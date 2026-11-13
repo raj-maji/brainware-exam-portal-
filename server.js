@@ -1,14 +1,15 @@
 /**
- * Brainware Academic AI - Secure Backend Server
+ * Brainware Academic AI - Worldwide Universal Educational Backend Server
+ * Version: 2.1.0 - Global Curriculum & Universal Disciplines
  * 
  * Capabilities:
- * 1. Secure API Proxy for Google Gemini 1.5 Flash
- * 2. Multi-Turn Conversation History Support
- * 3. In-Memory Rate Limiting (60 requests/min per IP)
- * 4. Input Validation & Structured Error Responses
- * 5. Document & Multimodal Vision Support (Base64 Images, PDF context)
- * 6. Zero-Dependency Standalone Mode (runs natively with pure Node.js)
- * 7. Built-in Static File Server for Local Portal Hosting
+ * 1. Secure API Proxy for Google Gemini 1.5 Flash (keeps API keys isolated on server)
+ * 2. Worldwide Educational System Prompt covering all disciplines, boards, and levels
+ * 3. Multi-Turn Conversation Memory with sliding-window context preservation
+ * 4. Multi-Format Document Ingestion (PDF.js, Mammoth, SheetJS, JSZip) & Multimodal Vision
+ * 5. In-Memory Rate Limiting (60 requests/min per IP) & Input Validation
+ * 6. Zero-Dependency Standalone Mode (runs natively with pure Node.js v18+)
+ * 7. Built-in Local Portal Static File Server with CORS support
  */
 
 const http = require('http');
@@ -68,28 +69,52 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Academic AI System Prompt
-const SYSTEM_INSTRUCTION = `You are Brainware Academic AI, an expert University Professor, Academic Tutor, Computer Science Specialist, Mathematics Instructor, and Research Mentor.
+// =========================================================================
+// WORLDWIDE UNIVERSAL EDUCATIONAL SYSTEM INSTRUCTION
+// =========================================================================
+const SYSTEM_INSTRUCTION = `You are Brainware Academic AI, a worldwide universal educational intelligence, expert university professor, school educator, research mentor, and multi-disciplinary tutor.
 
-You are capable of answering educational questions across all disciplines, including:
-- Computer Science, IT, Programming (Java, Python, C, C++, JavaScript, Web Development)
-- Data Structures, Algorithms, DBMS, Operating Systems, Networking
-- Artificial Intelligence, Machine Learning, Data Science
-- Mathematics, Calculus, Algebra, Statistics, Physics, Chemistry, Biology
-- Medical, Health Sciences, and Engineering
-- Business, Management, Economics, Finance
-- History, Geography, Political Science, Literature, Languages, Philosophy
-- Research Methodology and General Academic Studies
+You are designed to assist learners across virtually EVERY academic subject, country, education board, university, and educational level worldwide.
 
-Follow these strict educational standards:
-1. Answer only what is asked, directly, accurately, and with academic depth.
-2. Break down complex concepts into clear, logical, step-by-step explanations.
-3. For mathematics, provide step-by-step derivations using LaTeX ($...$ for inline and $$...$$ for block formulas).
-4. For programming, write robust, verified code with comments, time/space complexity, and expected outputs.
-5. Use clean Markdown tables when comparing or contrasting concepts.
-6. When reference material or uploaded documents are provided, prioritize the document's actual facts and cite them accurately.
-7. Understand follow-up questions contextually based on previous conversation history.
-8. If uncertain, acknowledge limitations honestly without inventing facts or citations.`;
+### 1. DISCIPLINES COVERED
+- Computer Science & IT: Programming (C, C++, Java, Python, JavaScript, Go, Rust, C#, PHP), DSA, DBMS, OS, Computer Networks, AI/ML, Deep Learning, Cloud Computing, Cyber Security, Web/Mobile Dev, System Design.
+- Mathematics & Statistics: Arithmetic, Algebra, Linear Algebra, Calculus, Differential Equations, Geometry, Trigonometry, Probability, Statistics, Discrete Math, Numerical Analysis.
+- Natural & Applied Sciences: Physics (Classical, Modern, Quantum, Electromagnetism), Chemistry (Organic, Inorganic, Physical, Biochemistry), Biology (Genetics, Microbiology, Ecology, Cellular Biology), Astronomy, Earth Science.
+- Engineering: Electrical, Electronics, Mechanical, Civil, Chemical, Aerospace, Robotics, Industrial.
+- Medical & Health Sciences: Anatomy, Physiology, Pharmacology, Pathology, Public Health, Nursing, Nutrition (Always provide educational explanations; note that this does not substitute for qualified clinical advice).
+- Business, Management & Economics: Microeconomics, Macroeconomics, Accounting, Corporate Finance, Marketing (4 Ps, STP), HR, Operations, International Business.
+- Humanities & Social Sciences: World History, Geography, Political Science, International Relations, Sociology, Psychology, Philosophy, Ethics.
+- Languages & Literature: English (Grammar, Tenses, Literature), Bengali, Hindi, Sanskrit, French, German, Spanish, and other world languages (Translation, Vocabulary, Linguistics).
+- Law & Governance: Constitutional Studies, International Law, Jurisprudence, Civil/Criminal Legal Concepts (Provide educational information; not jurisdiction-specific legal advice).
+- Other Fields: Education & Pedagogy, Research Methodology, Agriculture, Architecture, Fine Arts, Environmental Studies, General Knowledge.
+
+### 2. WORLDWIDE EDUCATION SYSTEMS & CURRICULA
+Understand and adapt to curricula from:
+- India: CBSE, ICSE, State Boards, UGC, AICTE, IIT JEE, NEET, GATE.
+- International: Cambridge (IGCSE, A-Levels), International Baccalaureate (IB DP/MYP).
+- United States: K-12, AP (Advanced Placement), College/University undergraduate & graduate.
+- United Kingdom, Canada, Australia, Europe, and other national educational frameworks.
+- Never assume all students follow one single syllabus. When a question is board-specific, identify the relevant context.
+
+### 3. ALL EDUCATIONAL LEVELS
+Adapt explanation depth appropriately:
+- Primary / Middle School: Intuitive analogies, clear everyday language, foundational clarity.
+- Secondary / High School: Systematic explanations with formal definitions and standard formulas.
+- Undergraduate / Postgraduate: Technically rigorous, formal notation, academic citations of laws/principles.
+- Research / Doctoral: Critical analysis, methodologies, mathematical rigor, limitations, and empirical frameworks.
+
+### 4. ACADEMIC FORMATTING STANDARDS
+- Definition Questions: Provide formal definition, conceptual breakdown, and clear example.
+- Mathematical Questions: State given values, required result, formula, step-by-step derivation using LaTeX ($...$ inline, $$...$$ block), and final verified answer.
+- Programming Questions: Explain algorithm approach, provide complete working code with syntax highlighting, display expected output, explain key lines, and state Time & Space Complexity using Big-O notation.
+- Comparison Questions: Use clean Markdown tables with distinct evaluation criteria columns.
+- Exam Answers by Marks:
+  - 2 Marks: Concise, point-focused (30-50 words).
+  - 5 Marks: Definition, 3-4 structured bullet points with formula/diagram outline (100-150 words).
+  - 10/15 Marks: Introduction, detailed architecture/mechanism, evaluation points, comparison table, and summary conclusion (250-400 words).
+- Multilingual: If the question is asked in Bengali, Hindi, French, Spanish, or another language, reply fluently and accurately in that language with correct academic terminology.
+- Follow-ups: Retain conversation memory contextually (e.g. "What are its advantages?" refers to the preceding topic).
+- Document Context: If an attached document or image is provided, prioritize its actual contents and never hallucinate outside the text.`;
 
 // MIME type map for static file serving
 const MIME_TYPES = {
@@ -127,8 +152,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'healthy',
-      service: 'Brainware Academic AI Backend',
-      version: '2.0.0',
+      service: 'Brainware Academic AI Worldwide Backend',
+      version: '2.1.0',
       geminiConfigured: !!(process.env.GEMINI_API_KEY || GEMINI_API_KEY),
       timestamp: new Date().toISOString()
     }));
@@ -137,7 +162,6 @@ const server = http.createServer(async (req, res) => {
 
   // --- SECURE CHAT API ENDPOINT ---
   if (req.method === 'POST' && pathname === '/api/chat') {
-    // 1. Rate Limiting Check
     if (!checkRateLimit(clientIp)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -147,13 +171,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // 2. Read Request Body
     let body = '';
     req.on('data', chunk => {
       body += chunk;
-      if (body.length > 20 * 1024 * 1024) { // 20MB limit (for base64 images)
+      if (body.length > 25 * 1024 * 1024) { // 25MB limit (for base64 documents/images)
         res.writeHead(413, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'Payload too large (max 20MB)' }));
+        res.end(JSON.stringify({ success: false, error: 'Payload too large (max 25MB)' }));
         req.destroy();
       }
     });
@@ -172,7 +195,6 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Active key priority: Server Environment Variable -> Client-provided Key
         const activeKey = process.env.GEMINI_API_KEY || GEMINI_API_KEY || clientApiKey;
 
         if (!activeKey) {
@@ -185,11 +207,8 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        // Format contents array for Gemini API
         const contents = [];
-
-        // Add history (sliding window of last 12 messages)
-        const recentHistory = history.slice(-12);
+        const recentHistory = history.slice(-14);
         for (const item of recentHistory) {
           if (item && item.text) {
             contents.push({
@@ -199,10 +218,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        // Prepare current user turn
         const currentParts = [];
-
-        // Multimodal image support
         if (file && file.base64 && file.base64.startsWith('data:image/')) {
           const base64Data = file.base64.split(',')[1];
           currentParts.push({
@@ -213,10 +229,9 @@ const server = http.createServer(async (req, res) => {
           });
         }
 
-        // Document text context
         let promptText = query;
         if (file && file.text) {
-          promptText = `[ATTACHED DOCUMENT: ${file.name} (${file.type || 'FILE'})]\n${file.text.substring(0, 15000)}\n\n[STUDENT QUESTION]:\n${query || 'Please explain and analyze this document thoroughly.'}`;
+          promptText = `[ATTACHED EDUCATIONAL DOCUMENT: ${file.name} (${file.type || 'FILE'})]\n${file.text.substring(0, 18000)}\n\n[STUDENT QUESTION]:\n${query || 'Please analyze this document thoroughly and answer all questions.'}`;
         }
 
         currentParts.push({ text: promptText });
@@ -225,7 +240,6 @@ const server = http.createServer(async (req, res) => {
           parts: currentParts
         });
 
-        // Gemini 1.5 Flash endpoint
         const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(activeKey)}`;
 
         const geminiRequestBody = {
@@ -236,12 +250,12 @@ const server = http.createServer(async (req, res) => {
           generationConfig: {
             temperature: 0.2,
             topP: 0.95,
-            maxOutputTokens: 3500
+            maxOutputTokens: 4000
           }
         };
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+        const timeout = setTimeout(() => controller.abort(), 28000);
 
         const apiResponse = await fetch(geminiEndpoint, {
           method: 'POST',
@@ -301,11 +315,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // --- STATIC FILE SERVING (Serves Portal Frontend Locally) ---
+  // --- STATIC FILE SERVING ---
   if (req.method === 'GET') {
     let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
 
-    // Prevent directory traversal attacks
     if (!filePath.startsWith(__dirname)) {
       res.writeHead(403);
       res.end('Access Denied');
@@ -334,7 +347,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`  Brainware Academic AI - Server Running`);
+  console.log(`  Brainware Academic AI - Universal Server Running`);
   console.log(`  URL: http://localhost:${PORT}`);
   console.log(`  Health Check: http://localhost:${PORT}/api/health`);
   console.log(`  API Endpoint: http://localhost:${PORT}/api/chat (POST)`);
@@ -342,7 +355,6 @@ server.listen(PORT, () => {
   console.log(`====================================================`);
 });
 
-// Graceful termination
 process.on('SIGINT', () => {
   console.log('\nShutting down Brainware Academic AI Server...');
   server.close(() => process.exit(0));
