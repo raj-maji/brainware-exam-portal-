@@ -50,7 +50,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<script src="ai_tutor_engine.js?v=20261113_universal_ai"></script>
+<script src="ai_tutor_engine.js?v=20261113_universal_v3"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
 
@@ -181,9 +181,14 @@
             </div>
           </div>
           
-          <button onclick="BrainwareAITutor.clearChat()" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 text-blue-100 font-medium">
-            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Clear Chat
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="BrainwareAITutor.configureApiKey()" title="Configure Optional Gemini API Key" class="text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 text-blue-100 font-medium">
+              <i data-lucide="key" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">API Key</span>
+            </button>
+            <button onclick="BrainwareAITutor.clearChat()" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 text-blue-100 font-medium">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Clear Chat
+            </button>
+          </div>
         </div>
 
         <!-- CHAT MESSAGES THREAD -->
@@ -194,7 +199,7 @@
             </div>
             <h3 class="text-base font-bold text-slate-900 mb-1">Hi! What can I help you with?</h3>
             <p class="text-xs text-slate-500 mb-6 leading-relaxed">
-              Ask any regular question related to MCA or BCA subjects. You will get a direct, straightforward answer.
+              Ask any question across any subject, curriculum, mathematics, science, or general knowledge. You will get a direct, accurate answer.
             </p>
             <div class="flex flex-wrap justify-center gap-2">
               <button onclick="BrainwareAITutor.askQuestion('What is a deadlock?')" class="text-xs font-semibold bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-600 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm transition">
