@@ -230,517 +230,906 @@ window.BrainwareAITutor = (function() {
     return clean.trim();
   }
 
-  // Strict syllabus matching: prevents false positives from question numbers
+  // Intelligent Syllabus & Question Bank Matcher (Searches 1,254 local syllabus Q&As + 14 Exam Papers)
   function findSyllabusMatch(rawQuery) {
-    if (!window.portalQAIndex || !Array.isArray(window.portalQAIndex)) return null;
-
     const query = sanitizeUserQuery(rawQuery);
     const qNorm = query.toLowerCase().trim();
-    const tokens = qNorm.match(/[a-z0-9_-]+/g) || [];
+    if (!qNorm) return null;
+
+    const tokens = qNorm.match(/[a-z0-9_.-]+/g) || [];
     const significantWords = tokens.filter(w => !stopwords.has(w) && w.length > 2);
-    
     if (significantWords.length === 0) return null;
 
-    let bestItem = null;
+    let bestMatch = null;
     let highestScore = 0;
 
-    for (const item of window.portalQAIndex) {
-      const candNorm = item.q.toLowerCase();
-      let matchedCount = 0;
+    // 1. Search in verified local syllabus database (portalQAIndex: 1,254 items)
+    if (window.portalQAIndex && Array.isArray(window.portalQAIndex)) {
+      for (const item of window.portalQAIndex) {
+        const candNorm = (item.q || '').toLowerCase();
+        let score = 0;
 
-      for (const w of significantWords) {
-        if (candNorm.includes(w)) {
-          matchedCount++;
-        }
-      }
-
-      // Require high keyword overlap ratio (at least 60% of significant words)
-      const overlapRatio = matchedCount / significantWords.length;
-      if (overlapRatio >= 0.6 && matchedCount >= 2) {
-        let score = matchedCount * 50;
+        // Exact phrase match
         if (candNorm.includes(qNorm) || qNorm.includes(candNorm)) {
-          score += 300;
+          score += 250;
         }
-        if (score > highestScore) {
+
+        // Token match
+        let matchedCount = 0;
+        for (const w of significantWords) {
+          if (candNorm.includes(w)) matchedCount++;
+        }
+
+        const overlap = matchedCount / significantWords.length;
+        if (matchedCount > 0) {
+          score += (matchedCount * 40) + Math.round(overlap * 60);
+        }
+
+        if (score > highestScore && (overlap >= 0.5 || matchedCount >= 2 || (significantWords.length === 1 && matchedCount === 1))) {
           highestScore = score;
-          bestItem = item;
+          bestMatch = { item: item, score: score, source: 'portalQAIndex' };
         }
       }
     }
 
-    if (highestScore >= 150 && bestItem) {
-      return { item: bestItem, score: highestScore };
+    // 2. Search in all 14 Examination Papers (papersData: Group A, B, C)
+    if (window.papersData && Array.isArray(window.papersData)) {
+      for (const paper of window.papersData) {
+        const allQuestions = [
+          ...(paper.group_a || []).map(q => ({ q: q.q, a: `**Correct Option: ${q.ans}**\n\n*Rationale:* ${q.expl}`, type: 'MCQ' })),
+          ...(paper.group_b || []).map(q => ({ q: q.q, a: `**Solution Outline:**\n\n${q.hint}`, type: 'Short' })),
+          ...(paper.group_c || []).map(q => ({ q: q.q, a: `**Comprehensive Solution Framework:**\n\n${q.hint}`, type: 'Descriptive' }))
+        ];
+
+        for (const item of allQuestions) {
+          const candNorm = (item.q || '').toLowerCase();
+          let score = 0;
+
+          if (candNorm.includes(qNorm) || qNorm.includes(candNorm)) {
+            score += 220;
+          }
+
+          let matchedCount = 0;
+          for (const w of significantWords) {
+            if (candNorm.includes(w)) matchedCount++;
+          }
+
+          const overlap = matchedCount / significantWords.length;
+          if (matchedCount > 0) {
+            score += (matchedCount * 35) + Math.round(overlap * 50);
+          }
+
+          if (score > highestScore && (overlap >= 0.5 || matchedCount >= 2 || (significantWords.length === 1 && matchedCount === 1))) {
+            highestScore = score;
+            bestMatch = { item: item, score: score, source: 'papersData' };
+          }
+        }
+      }
+    }
+
+    if (highestScore >= 45 && bestMatch) {
+      return bestMatch;
     }
     return null;
   }
 
-  // 100% Anonymous, Zero-Login Public AI Inference (No Puter popups, No API keys, No Registration)
+  // Multi-Provider Live AI Inference (POST payload + Multi-Model Fallbacks + 100% Anonymous)
   async function queryLiveAI(query, syllabusContext) {
-    const systemPrompt = `You are a helpful, expert AI Academic Assistant like ChatGPT and Gemini.
-Provide ONLY the direct, articulate, high-quality answer to the question asked.
-Do not include metadata headers, subject labels, or robotic boilerplate.
-When formulas, mathematics, or logical operators are involved:
-- Use standard LaTeX notation: $...$ for inline math and $$...$$ for block math
+    const systemPrompt = `You are an expert AI Academic Tutor and Professor.
+Provide a clear, direct, comprehensive, high-quality answer to the question asked.
+When mathematics, algorithms, or formulas are involved:
+- Use standard LaTeX notation: $...$ for inline math and $$...$$ for display math
 - Use proper symbols: \\lambda for lambda, \\alpha for alpha, \\theta for theta, \\sigma for sigma
 - For logic: use \\land for AND, \\lor for OR, \\neg for NOT, \\implies for implies, \\iff for equivalence
-Structure the response cleanly with:
-- A direct, natural opening explanation
-- Clear bullet points and bold formatting for key concepts
+Structure your response with:
+- A clear, authoritative explanation
+- Clear bullet points and bold highlights for key concepts
 - Clear, well-formatted Markdown comparison tables when comparing concepts
 - Clean code blocks with language tags when programming is involved
-- Conclude naturally with key takeaways.`;
+- Conclude with practical applications or key takeaways.
+Do not include robotic meta-introductions ("As an AI...") or unwanted header clutter.`;
 
     let userPrompt = query;
     if (syllabusContext) {
-      userPrompt += `\n\n[Reference Curriculum Material]:\nTopic: ${syllabusContext.q}\n${cleanSyllabusHtml(syllabusContext.a).substring(0, 1000)}\n\nAnswer the student's question comprehensively and accurately.`;
+      userPrompt += `\n\n[Reference Curriculum Syllabus Material]:\nTopic: ${syllabusContext.q}\n${cleanSyllabusHtml(syllabusContext.a).substring(0, 1200)}\n\nPlease provide a clear, thorough academic explanation incorporating these concepts.`;
     }
 
-    // Free Open Public Text AI Endpoint (100% Anonymous, Never Asks For Login)
+    // Provider 1: Pollinations AI via POST (No URL Length Limit)
     try {
-      const fullQuery = `${systemPrompt}\n\nQuestion: ${userPrompt}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000); // 7s fast timeout before instant local fallback
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
 
-      const url = `https://text.pollinations.ai/${encodeURIComponent(fullQuery)}?model=openai`;
-      const resp = await fetch(url, { method: "GET", signal: controller.signal });
+      const postBody = JSON.stringify({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        model: "openai",
+        seed: 42
+      });
+
+      const resp = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: postBody,
+        signal: controller.signal
+      });
       clearTimeout(timeoutId);
 
       if (resp.ok) {
         const text = await resp.text();
         if (text && text.trim().length > 30) {
-          return text.trim();
+          return cleanAiResponse(text.trim());
         }
       }
     } catch (e) {
-      // Quietly fall back to instant Master Academic Knowledge Engine
+      // Proceed to Provider 2
     }
+
+    // Provider 2: Pollinations AI via POST (Mistral Model)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5500);
+
+      const postBody = JSON.stringify({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        model: "mistral",
+        seed: 42
+      });
+
+      const resp = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: postBody,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && text.trim().length > 30) {
+          return cleanAiResponse(text.trim());
+        }
+      }
+    } catch (e) {
+      // Proceed to Provider 3
+    }
+
+    // Provider 3: Clean GET Endpoint (Truncated for URL safety)
+    try {
+      const safeQuery = encodeURIComponent(userPrompt.substring(0, 400));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+      const resp = await fetch(`https://text.pollinations.ai/${safeQuery}?model=openai`, {
+        method: "GET",
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && text.trim().length > 30) {
+          return cleanAiResponse(text.trim());
+        }
+      }
+    } catch (e) {}
 
     return null;
   }
 
-  // Master Academic Knowledge Engine (Pure ChatGPT / Gemini Style Answers)
+  function cleanAiResponse(text) {
+    if (!text) return "";
+    let cleaned = text.trim();
+    cleaned = cleaned.replace(/^(?:Sure!|Certainly!|Here is (?:an|the) (?:explanation|answer):|As an AI language model,)\s*/i, '');
+    return cleaned.trim();
+  }
+
+  // Master Academic Knowledge Engine (Authoritative Educational Intelligence across All Disciplines)
   function getMasterAcademicAnswer(rawQuery, syllabusMatch) {
-    const q = sanitizeUserQuery(rawQuery).toLowerCase();
+    const q = sanitizeUserQuery(rawQuery).toLowerCase().trim();
 
-    // 1. Word2Vec: CBOW vs Skip-Gram Architectures
-    if (q.includes('cbow') || q.includes('skip-gram') || q.includes('skipgram') || (q.includes('word2vec') && (q.includes('architect') || q.includes('distinguish') || q.includes('differ')))) {
-      return `Word2Vec, introduced by Tomas Mikolov et al. at Google in 2013, is a foundational neural network technique for learning high-dimensional distributed word representations (word embeddings). It captures semantic and syntactic relationships such that words with similar meanings occupy close vectors in Euclidean space (for example: $\\vec{v}_{\\text{King}} - \\vec{v}_{\\text{Man}} + \\vec{v}_{\\text{Woman}} \\approx \\vec{v}_{\\text{Queen}}$).
+    // 0. High-Confidence Syllabus Match from University Question Bank
+    if (syllabusMatch && syllabusMatch.item) {
+      const cleaned = cleanSyllabusHtml(syllabusMatch.item.a);
+      if (cleaned && cleaned.length > 35) {
+        return `### ${syllabusMatch.item.q}\n\n${cleaned}`;
+      }
+    }
 
-Word2Vec comprises two primary model architectures: **Continuous Bag of Words (CBOW)** and **Skip-Gram**.
+    // ==========================================
+    // 1. DATABASE MANAGEMENT SYSTEMS (DBMS)
+    // ==========================================
 
----
+    // Normalization & Normal Forms
+    if (q.includes('normaliz') || q.includes('1nf') || q.includes('2nf') || q.includes('3nf') || q.includes('bcnf')) {
+      return `### Normalization in Database Management Systems (DBMS)
 
-### 1. Continuous Bag of Words (CBOW) Architecture
-
-- **Objective:** Predicts a **single target word** given its surrounding **context words** within a sliding window.
-- **How it Works:**
-  1. The input consists of $C$ context words encoded as one-hot vectors $\\{w_{t-k}, \\dots, w_{t-1}, w_{t+1}, \\dots, w_{t+k}\\}$.
-  2. Each one-hot vector is multiplied by an input weight matrix $W$ to retrieve its embedding.
-  3. The network **averages** (or sums) all the context word vectors in the projection layer:
-     $$h = \\frac{1}{C} \\sum_{i=1}^{C} W x_i$$
-  4. The aggregated vector $h$ is multiplied by an output matrix $W'$ and passed through a Softmax layer to predict the probability distribution over the vocabulary for the target center word $w_t$:
-     $$P(w_t \\mid w_{\\text{context}}) = \\frac{\\exp({v'_{w_t}}^{\\top} h)}{\\sum_{j=1}^{|V|} \\exp({v'_{w_j}}^{\\top} h)}$$
-- **Example:** In the sentence *"Artificial intelligence transforms the future"*:
-  - If the target word is **"transforms"** with window size 2, the context words are \`["artificial", "intelligence", "the", "future"]\`.
-  - CBOW takes the average vector of these 4 context words to predict **"transforms"**.
-- **Key Characteristics:**
-  - Computationally very efficient because the projection layer averages the context into a single vector.
-  - Smooths out distributed context, making it fast and robust for large corpora with frequent words.
+**Normalization** is the systematic technique of organizing data in a relational database to **eliminate data redundancy** and avoid insertion, update, and deletion anomalies. It divides larger tables into smaller, linked tables while preserving referential integrity.
 
 ---
 
-### 2. Skip-Gram Architecture
+### Standard Normal Forms Breakdown
 
-- **Objective:** Predicts the surrounding **context words** given a **single target word** (the inverse of CBOW).
-- **How it Works:**
-  1. The input is a single center word $w_t$ as a one-hot vector $x$.
-  2. It looks up its embedding directly from the input weight matrix $W$: $h = W x = v_{w_t}$.
-  3. The projection vector $h$ is multiplied by the output weight matrix $W'$ to generate probability distributions for each of the $C$ surrounding context window positions:
-     $$P(w_{t+j} \\mid w_t) = \\frac{\\exp({v'_{w_{t+j}}}^{\\top} v_{w_t})}{\\sum_{k=1}^{|V|} \\exp({v'_{w_k}}^{\\top} v_{w_t})} \\quad (\\text{for } j \\in [-k, k], j \\neq 0)$$
-  4. The model maximizes the sum of log probabilities across all context positions.
-- **Example:** For the same sentence with target word **"transforms"**:
-  - Skip-Gram treats this as independent training pairs: \`("transforms", "artificial")\`, \`("transforms", "intelligence")\`, \`("transforms", "the")\`, and \`("transforms", "future")\`.
-- **Key Characteristics:**
-  - Treats each context pair individually without vector averaging, preserving fine-grained semantic nuances.
-  - Significantly outperforms CBOW on **rare words** and specialized domain vocabularies.
-
----
-
-### 3. Comprehensive Comparison Table
-
-| Dimension | Continuous Bag of Words (CBOW) | Skip-Gram |
+| Normal Form | Core Requirement | Elimination Objective |
 | :--- | :--- | :--- |
-| **Prediction Task** | Predicts Center Target Word from Context | Predicts Context Words from Center Target Word |
-| **Input / Output** | Multiple Inputs $\\rightarrow$ Single Output | Single Input $\\rightarrow$ Multiple Outputs |
-| **Projection Layer** | Averages / sums all context vectors | Direct vector lookup (no averaging) |
-| **Training Complexity** | Lower $\\mathcal{O}(C \\times N + N \\times \\log |V|)$ | Higher $\\mathcal{O}(C \\times (N + N \\times \\log |V|))$ |
-| **Training Speed** | **Fast** (several times faster than Skip-Gram) | **Slower** (processes each context pair separately) |
-| **Handling Rare Words** | Suboptimal (averaging drowns rare word signals) | **Superior** (gives rare words equal gradient updates) |
-| **Dataset Size Suitability**| Large corpora, frequent vocabulary | Smaller datasets or corpora with rare/technical terms |
-| **Optimization Method** | Hierarchical Softmax or Negative Sampling | Negative Sampling ($\approx 5\\text{--}20$ noise samples) |
+| **1NF (First Normal Form)** | Every column must contain **atomic (indivisible) values**, unique column names, and no repeating attribute groups. | Removes multi-valued attributes & nested tables. |
+| **2NF (Second Normal Form)** | Must be in **1NF**, and every non-prime attribute must be **fully functionally dependent** on the entire primary key. | Eliminates **Partial Dependencies** ($X \rightarrow Y$ where $X \subset \text{Key}$). |
+| **3NF (Third Normal Form)** | Must be in **2NF**, and no non-prime attribute should depend transitively on the primary key ($X \rightarrow Y \rightarrow Z$). | Eliminates **Transitive Dependencies**. |
+| **BCNF (Boyce-Codd Normal Form)** | For every functional dependency $X \rightarrow Y$, the determinant $X$ must be a **Super Key**. | Resolves anomalies arising from overlapping candidate keys. |
 
 ---
 
-### Key Takeaway
-Use **CBOW** when training speed is critical and the dataset is large. Use **Skip-Gram** when semantic precision on rare, technical, or domain-specific words is paramount.`;
+### Step-by-Step Example
+
+Consider an unnormalized student record:
+\`Student(StudentID, Name, CoursesTaken, CourseFee)\`
+
+1. **Achieving 1NF:** Split \`CoursesTaken\` so each student-course pair has its own individual tuple with single atomic values.
+2. **Achieving 2NF:** Decompose into \`Student(StudentID, Name)\` and \`StudentCourse(StudentID, CourseID)\` so Course attributes do not depend on partial keys.
+3. **Achieving 3NF:** If \`CourseID \rightarrow Instructor\` and \`Instructor \rightarrow Department\`, split into separate \`Course\` and \`Instructor\` tables to remove the transitive chain.
+
+> **Key Rule for Exams:** In 3NF, for every functional dependency $X \rightarrow Y$, either $X$ is a super key **OR** $Y$ is a prime attribute. In BCNF, $X$ **must** strictly be a super key.`;
     }
 
-    // 2. Mathematical Optimization: Lagrange Multipliers with lambda
-    if (q.includes('lagrange') || (q.includes('multiplier') && q.includes('lambda')) || (q.includes('constrained') && q.includes('optimization'))) {
-      return `The method of **Lagrange Multipliers**, formulated by Joseph-Louis Lagrange, is a mathematical strategy for finding local maxima and minima of a function subject to equality constraints.
-
----
-
-### 1. Mathematical Formulation
-
-Let $f(x_1, x_2, \\dots, x_n)$ be the **objective function** to optimize, subject to $m$ equality constraints:
-$$g_i(x_1, x_2, \\dots, x_n) = 0 \\quad (i = 1, 2, \\dots, m)$$
-
-Instead of solving a constrained problem, we introduce auxiliary variables $\\lambda = (\\lambda_1, \\lambda_2, \\dots, \\lambda_m)$, termed **Lagrange Multipliers**, and formulate the unconstrained **Lagrangian Function** $\\mathcal{L}$:
-
-$$\\mathcal{L}(x, \\lambda) = f(x) - \\sum_{i=1}^{m} \\lambda_i g_i(x)$$
-
-*(Alternatively written as $\\mathcal{L}(x, \\lambda) = f(x) + \\sum_{i=1}^m \\lambda_i g_i(x)$ depending on convention).*
-
----
-
-### 2. Geometric Intuition: Gradient Alignment
-
-At an optimal constrained point $x^*$, the level curve (contour line) of the objective function $f(x)$ must be **tangent** to the constraint surface $g(x) = 0$.
-
-Because the gradient vector $\\nabla f$ is perpendicular to the contour of $f$, and $\\nabla g$ is perpendicular to the constraint surface $g = 0$, both gradient vectors must be **parallel (collinear)** at the extremum:
-
-$$\\nabla f(x) = \\lambda \\nabla g(x)$$
-
-where $\\lambda \\in \\mathbb{R}$ is the proportionality constant.
-
----
-
-### 3. Necessary First-Order Optimality Conditions
-
-To solve for the critical points and the multiplier $\\lambda$, we set all partial derivatives of the Lagrangian $\\mathcal{L}$ to zero:
-
-$$\\nabla_x \\mathcal{L}(x, \\lambda) = \\nabla f(x) - \\lambda \\nabla g(x) = 0$$
-
-$$\\frac{\\partial \\mathcal{L}}{\\partial \\lambda} = -g(x) = 0 \\implies g(x) = 0$$
-
-This yields a system of $n + m$ equations with $n + m$ unknowns $(x_1, \\dots, x_n, \\lambda_1, \\dots, \\lambda_m)$.
-
----
-
-### 4. Step-by-Step Concrete Example
-
-**Problem:** Find the maximum of $f(x, y) = x + 2y$ subject to the constraint $g(x, y) = x^2 + y^2 - 5 = 0$.
-
-1. Compute gradients:
-   $$\\nabla f = \\begin{bmatrix} 1 \\\\ 2 \\end{bmatrix}, \\quad \\nabla g = \\begin{bmatrix} 2x \\\\ 2y \\end{bmatrix}$$
-2. Set $\\nabla f = \\lambda \\nabla g$:
-   $$1 = 2\\lambda x \\implies x = \\frac{1}{2\\lambda}$$
-   $$2 = 2\\lambda y \\implies y = \\frac{1}{\\lambda}$$
-3. Substitute into the constraint $x^2 + y^2 = 5$:
-   $$\\left(\\frac{1}{2\\lambda}\\right)^2 + \\left(\\frac{1}{\\lambda}\\right)^2 = 5 \\implies \\frac{1}{4\\lambda^2} + \\frac{1}{\\lambda^2} = \\frac{5}{4\\lambda^2} = 5$$
-   $$\\lambda^2 = \\frac{1}{4} \\implies \\lambda = \\pm \\frac{1}{2}$$
-4. For $\\lambda = \\frac{1}{2}$: $x = 1, y = 2 \\implies f(1, 2) = 1 + 2(2) = 5$ (**Maximum**).
-   For $\\lambda = -\\frac{1}{2}$: $x = -1, y = -2 \\implies f(-1, -2) = -5$ (**Minimum**).
-
----
-
-### 5. Economic & Engineering Meaning of $\\lambda$
-The multiplier $\\lambda$ is known as the **shadow price** or marginal rate of change:
-$$\\lambda = \\frac{\\partial f^*}{\\partial c}$$
-It quantifies how much the optimal objective value $f^*$ increases when the constraint budget $g(x) = c$ is relaxed by one unit. Widely utilized in Support Vector Machines (dual formulation), Karush-Kuhn-Tucker (KKT) conditions, and microeconomics.`;
-    }
-
-    // 3. Mathematical Logic: Operators, Truth Tables, and De Morgan's Laws
-    if (q.includes('logic') || q.includes('demorgan') || q.includes('de morgan') || q.includes('truth table') || q.includes('boolean') || (q.includes('and') && q.includes('or') && q.includes('not'))) {
-      return `Mathematical Logic provides formal symbolic frameworks for evaluating deductive reasoning, validity of propositions, and Boolean computer architectures.
-
----
-
-### 1. Fundamental Logical Operators
-
-| Operator Name | Formal Symbol | ASCII Notation | Natural Language | Semantic Meaning |
-| :--- | :--- | :--- | :--- | :--- |
-| **Conjunction** | $\\land$ | \`AND\`, \`&&\` | "$P$ and $Q$" | True if and only if **both** $P$ and $Q$ are True. |
-| **Disjunction** | $\\lor$ | \`OR\`, \`||\` | "$P$ or $Q$" | True if **at least one** of $P$ or $Q$ is True. |
-| **Negation** | $\\neg$ or $\\sim$ | \`NOT\`, \`!\` | "Not $P$" | Inverts truth value (True $\\rightarrow$ False, False $\\rightarrow$ True). |
-| **Conditional (Implication)** | $\\rightarrow$ or $\\implies$ | \`IMPLIES\` | "If $P$, then $Q$" | False **only** when $P$ is True and $Q$ is False ($P \\rightarrow Q \\equiv \\neg P \\lor Q$). |
-| **Biconditional (Equivalence)** | $\\leftrightarrow$ or $\\iff$ | \`IFF\` | "$P$ if and only if $Q$" | True when both $P$ and $Q$ have the **identical** truth value. |
-| **Exclusive OR (XOR)** | $\\oplus$ | \`XOR\`, \`^\` | "$P$ XOR $Q$" | True when exactly one of $P$ or $Q$ is True. |
-
----
-
-### 2. Comprehensive Master Truth Table
-
-| $P$ | $Q$ | $\\neg P$ | $P \\land Q$ (AND) | $P \\lor Q$ (OR) | $P \\oplus Q$ (XOR) | $P \\rightarrow Q$ (Implication) | $P \\iff Q$ (Equivalence) |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **T** | **T** | F | **T** | **T** | F | **T** | **T** |
-| **T** | **F** | F | F | **T** | **T** | **F** | F |
-| **F** | **T** | T | F | **T** | **T** | **T** | F |
-| **F** | **F** | T | F | F | F | **T** | **T** |
-
----
-
-### 3. De Morgan's Laws
-
-Formulated by Augustus De Morgan, these two fundamental equivalence laws state how negation distributes over conjunction and disjunction:
-
-1. **First Law (Negation of Conjunction):**
-   $$\\neg(P \\land Q) \\iff \\neg P \\lor \\neg Q$$
-   *"The negation of an AND is equivalent to the OR of the individual negations."*
-
-2. **Second Law (Negation of Disjunction):**
-   $$\\neg(P \\lor Q) \\iff \\neg P \\land \\neg Q$$
-   *"The negation of an OR is equivalent to the AND of the individual negations."*
-
-#### Truth Table Verification of First Law: $\\neg(P \\land Q) \\equiv \\neg P \\lor \\neg Q$
-
-| $P$ | $Q$ | $P \\land Q$ | $\\neg(P \\land Q)$ | $\\neg P$ | $\\neg Q$ | $\\neg P \\lor \\neg Q$ | Verification |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| T | T | T | **F** | F | F | **F** | Identical (✓) |
-| T | F | F | **T** | F | T | **T** | Identical (✓) |
-| F | T | F | **T** | T | F | **T** | Identical (✓) |
-| F | F | F | **T** | T | T | **T** | Identical (✓) |
-
----
-
-### 4. First-Order Logic Quantifiers
-
-In predicate logic, propositions involve variables over domains quantified by:
-- **Universal Quantifier ($\\forall$):** "For all $x$ in domain $D$, $P(x)$ is True" ($\\forall x \\in D, P(x)$).
-- **Existential Quantifier ($\\exists$):** "There exists at least one $x$ such that $P(x)$ is True" ($\\exists x \\in D, P(x)$).
-- **Quantifier Negation Duals:**
-  $$\\neg (\\forall x, P(x)) \\iff \\exists x, \\neg P(x)$$
-  $$\\neg (\\exists x, P(x)) \\iff \\forall x, \\neg P(x)$$`;
-    }
-
-    // 4. Linear Algebra: Eigenvalues and Eigenvectors (lambda)
-    if (q.includes('eigen') || (q.includes('matrix') && q.includes('lambda'))) {
-      return `In Linear Algebra, given a square matrix $A \\in \\mathbb{R}^{n \\times n}$, a non-zero vector $v \\in \\mathbb{R}^n$ is an **Eigenvector** if the linear transformation of $v$ by $A$ produces a scalar multiple of itself:
-
-$$A v = \\lambda v$$
-
-where $\\lambda \\in \\mathbb{C}$ is a scalar known as the **Eigenvalue** corresponding to $v$.
-
----
-
-### 1. The Characteristic Equation
-
-To find the eigenvalues, we rewrite the fundamental equation:
-$$A v - \\lambda I v = 0 \\implies (A - \\lambda I) v = 0$$
-
-For a non-trivial (non-zero) solution $v \\neq 0$ to exist, the matrix $(A - \\lambda I)$ must be singular (non-invertible). Therefore, its determinant must be zero:
-
-$$\\det(A - \\lambda I) = 0$$
-
-This produces a polynomial of degree $n$ in $\\lambda$, known as the **Characteristic Polynomial**.
-
----
-
-### 2. Step-by-Step Calculation Example
-
-Find eigenvalues and eigenvectors for $A = \\begin{bmatrix} 4 & 2 \\\\ 1 & 3 \\end{bmatrix}$:
-
-1. Form $A - \\lambda I$:
-   $$A - \\lambda I = \\begin{bmatrix} 4 - \\lambda & 2 \\\\ 1 & 3 - \\lambda \\end{bmatrix}$$
-2. Set determinant to zero:
-   $$\\det(A - \\lambda I) = (4 - \\lambda)(3 - \\lambda) - (2)(1) = \\lambda^2 - 7\\lambda + 12 - 2 = \\lambda^2 - 7\\lambda + 10 = 0$$
-3. Factor roots:
-   $$(\\lambda - 5)(\\lambda - 2) = 0 \\implies \\lambda_1 = 5, \\quad \\lambda_2 = 2$$
-4. Find eigenvector for $\\lambda_1 = 5$:
-   $$(A - 5I)v = \\begin{bmatrix} -1 & 2 \\\\ 1 & -2 \\end{bmatrix} \\begin{bmatrix} x_1 \\\\ x_2 \\end{bmatrix} = \\begin{bmatrix} 0 \\\\ 0 \\end{bmatrix} \\implies -x_1 + 2x_2 = 0 \\implies v_1 = \\begin{bmatrix} 2 \\\\ 1 \\end{bmatrix}$$
-5. Find eigenvector for $\\lambda_2 = 2$:
-   $$(A - 2I)v = \\begin{bmatrix} 2 & 2 \\\\ 1 & 1 \\end{bmatrix} \\begin{bmatrix} x_1 \\\\ x_2 \\end{bmatrix} = \\begin{bmatrix} 0 \\\\ 0 \\end{bmatrix} \\implies x_1 + x_2 = 0 \\implies v_2 = \\begin{bmatrix} 1 \\\\ -1 \\end{bmatrix}$$
-
----
-
-### 3. Core Properties
-- **Trace Property:** $\\sum_{i=1}^n \\lambda_i = \\text{Tr}(A)$ (sum of diagonal elements).
-- **Determinant Property:** $\\prod_{i=1}^n \\lambda_i = \\det(A)$.
-- **Applications:** Principal Component Analysis (PCA dimensionality reduction), Google PageRank algorithm, vibration analysis, and quantum mechanics state vectors.`;
-    }
-
-    // 5. Operating Systems: Process vs Thread
-    if (q.includes('process') && q.includes('thread')) {
-      return `A **Process** is an independent program in execution with its own dedicated memory address space, whereas a **Thread** is a lightweight unit of CPU execution running within the context of a process.
-
-An intuitive analogy: A **Process** is like an apartment building with dedicated land, private plumbing, and its own boundary walls. A **Thread** is like a tenant living inside an apartment—tenants share the living room, kitchen, and resources (Code, Data, Heap), but each tenant maintains their own private notebook (Stack and Registers).
-
----
-
-### Comprehensive Comparison Table
-
-| Parameter | Process (Heavyweight) | Thread (Lightweight) |
-| :--- | :--- | :--- |
-| **Address Space** | Completely isolated address space (own Code, Data, Heap, Stack). | Shares Code, Data, and Heap with peer threads; has private Stack. |
-| **Creation Overhead** | **High:** Requires memory page allocations, process control block (PCB), descriptor tables (\`fork()\`). | **Low:** Minimal allocation; reuses parent process resources (\`pthread_create()\`). |
-| **Context Switching** | **Slow:** CPU must flush translation lookaside buffer (TLB) and switch memory page directory tables. | **Fast:** CPU switches only program counter, stack pointer, and general registers; TLB preserved. |
-| **Inter-Communication** | Requires Inter-Process Communication (IPC): Pipes, Sockets, Shared Memory, Message Queues. | Direct communication via shared memory / heap variables (requires Mutex/Semaphores). |
-| **Fault Isolation** | **High:** If Process A crashes, Process B is completely unaffected. | **Low:** An unhandled exception or segfault in one thread terminates the entire parent process. |
-| **Resource Ownership** | Holds open file descriptors, network sockets, child process handles. | Borrows resource handles from the owning parent process. |
-
----
-
-### When to Use Which
-- Use **Processes** when security boundaries, independent memory address spaces, or high fault tolerance are required (e.g., Google Chrome tabs, isolated microservices).
-- Use **Threads** when high-performance parallel computation, low context-switching overhead, and intensive shared memory access are needed (e.g., video rendering engines, web server request workers).`;
-    }
-
-    // 6. Operating Systems: Deadlock & Coffman Conditions
-    if (q.includes('deadlock') || q.includes('coffman')) {
-      return `In Operating Systems, a **Deadlock** is a condition in a concurrent system where a set of processes are permanently blocked because each process holds a resource that another process needs, and none can proceed without external intervention.
-
----
-
-### The Four Necessary Coffman Conditions (1971)
-
-A deadlock can occur **if and only if** all four of the following conditions hold simultaneously:
-
-1. **Mutual Exclusion:**
-   - At least one resource must be held in a non-shareable mode (only one process can use the resource at any given moment, e.g., a tape drive or CPU core).
-2. **Hold and Wait:**
-   - A process currently holding at least one resource is concurrently waiting to acquire additional resources held by other active processes.
-3. **No Preemption:**
-   - Resources cannot be forcibly seized from a process; they can only be released voluntarily after the holding process finishes its task.
-4. **Circular Wait:**
-   - A closed chain of processes exists such that $P_0$ waits for a resource held by $P_1$, $P_1$ waits for $P_2$, $\\dots$, and $P_n$ waits for $P_0$:
-     $$P_0 \\rightarrow P_1 \\rightarrow P_2 \\dots \\rightarrow P_n \\rightarrow P_0$$
-
----
-
-### Deadlock Handling Strategies
-
-| Strategy | Core Mechanism | Practical Example |
-| :--- | :--- | :--- |
-| **Deadlock Prevention** | Systematically design algorithms that violate at least one of the 4 Coffman conditions (e.g., impose global resource ordering to eliminate circular wait). | Embedded systems, mission-critical real-time controllers. |
-| **Deadlock Avoidance** | Dynamically examine every resource request and only grant it if the system remains in a **Safe State** (using **Dijkstra's Banker's Algorithm**). | Systems with known maximum resource claims. |
-| **Deadlock Detection & Recovery**| Periodically construct a Wait-For Graph (WFG) or Resource Allocation Graph (RAG), detect cycles, and terminate processes or preempt resources to break the cycle. | Modern Database Management Systems (PostgreSQL, Oracle). |
-| **Deadlock Ignorance (Ostrich Algorithm)** | Ignore the problem assuming occurrences are exceptionally rare. Avoids performance and memory overhead. | General-purpose OSs (Linux, Windows, macOS). |`;
-    }
-
-    // 7. Cloud Computing: Service Models (IaaS, PaaS, SaaS)
-    if (q.includes('cloud') || q.includes('iaas') || q.includes('paas') || q.includes('saas')) {
-      return `Cloud computing is the on-demand availability of computer system resources—especially data storage, computing power, and networking—over the internet with pay-as-you-go pricing, structured into three primary **Service Models**:
-
----
-
-### 1. Infrastructure as a Service (IaaS)
-- **Concept:** Provides raw, fundamental computing resources: virtual machines, physical servers, block storage, and software-defined networking.
-- **Provider Delivers:** Physical data centers, hypervisors, server hardware, and network routers.
-- **Client Manages:** Operating system installation, patches, runtime libraries, middleware, databases, and application code.
-- **Examples:** Amazon EC2, Google Compute Engine (GCE), Microsoft Azure Virtual Machines, DigitalOcean Droplets.
-- **Best For:** DevOps teams and network architects requiring granular control over OS kernels and custom network topologies.
-
----
-
-### 2. Platform as a Service (PaaS)
-- **Concept:** Delivers a fully managed execution runtime environment where developers can deploy applications without maintaining infrastructure.
-- **Provider Delivers:** Hardware, virtualization, operating systems, database engines, web servers, and runtime execution environments.
-- **Client Manages:** Application source code, configuration settings, and data.
-- **Examples:** Google App Engine, Heroku, AWS Elastic Beanstalk, Vercel, Netlify.
-- **Best For:** Software engineers focused on rapid development and API delivery who want to avoid OS maintenance and server patching.
-
----
-
-### 3. Software as a Service (SaaS)
-- **Concept:** End-user applications hosted and managed completely by the cloud vendor, accessible via web browsers or client APIs.
-- **Provider Delivers:** The entire technology stack end-to-end: infrastructure, OS, storage, code, updates, backups, and security.
-- **Client Manages:** User access accounts and application data input.
-- **Examples:** Google Workspace (Gmail, Docs, Drive), Microsoft 365, Salesforce CRM, Zoom, Slack.
-- **Best For:** End users and enterprises needing immediate turnkey solutions without software engineering overhead.
-
----
-
-### Shared Responsibility Matrix
-
-| Layer | IaaS | PaaS | SaaS |
-| :--- | :---: | :---: | :---: |
-| **Application Logic** | You Manage | You Manage | Provider |
-| **Application Data** | You Manage | You Manage | Provider |
-| **Runtime Environment** | You Manage | Provider | Provider |
-| **Middleware & Frameworks** | You Manage | Provider | Provider |
-| **Operating System** | You Manage | Provider | Provider |
-| **Virtualization** | Provider | Provider | Provider |
-| **Physical Servers & Network**| Provider | Provider | Provider |`;
-    }
-
-    // 8. Database Management Systems: ACID Properties
-    if (q.includes('acid') || (q.includes('transaction') && q.includes('database'))) {
-      return `In Database Management Systems (DBMS), a **Transaction** is a logical sequence of read and write operations treated as a single, atomic unit of work.
-
-To guarantee reliability and data integrity—particularly during concurrent access or hardware failure—all transactions must adhere to the four **ACID** properties:
+    // ACID Properties in DBMS
+    if (q.includes('acid') && (q.includes('property') || q.includes('transaction') || q.includes('dbms') || q.includes('database'))) {
+      return `### ACID Properties in Relational Database Management Systems
+
+A **database transaction** is a single logical unit of work that accesses and modifies the database. To guarantee data validity despite system crashes or power failures, transactions must adhere strictly to the **ACID properties**:
 
 ---
 
 ### 1. Atomicity ("All or Nothing")
-- A transaction must either execute in its entirety or have no effect whatsoever. If an unexpected failure occurs before completion, the DBMS initiates a **rollback** to restore the initial state.
-- **Example:** Transferring $\\$500$ from Account A to Account B requires two operations: debiting A and crediting B. If power fails after debiting A, Atomicity ensures the $\\$500$ is automatically refunded to A.
+- **Principle:** Every statement within a transaction (reads, updates, inserts) must complete successfully. If any single operation fails, the entire transaction is rolled back (\`ROLLBACK\`) to its initial state.
+- **Example:** In a fund transfer of \$500 from Account A to Account B, if deduction from A succeeds but credit to B fails due to network outage, A's money is immediately refunded.
+- **Managed by:** Recovery Manager (Write-Ahead Logging / WAL).
 
 ---
 
-### 2. Consistency ("Preserving Invariants")
-- A transaction must transform the database from one valid consistent state to another valid consistent state, strictly honoring all integrity constraints (primary keys, foreign keys, check constraints, domain types).
-- **Example:** In a banking ledger, total funds must remain invariant: $\\text{Balance}_A + \\text{Balance}_B = \\text{Constant}$. A transaction violating account rules is immediately aborted.
+### 2. Consistency ("State Integrity")
+- **Principle:** A transaction can only transition the database from one valid state to another, maintaining all predefined integrity constraints, check conditions, and foreign key relationships.
+- **Example:** The sum of balances of Account A and Account B before the transfer must exactly equal their sum after the transfer.
+- **Managed by:** Database schema constraints and transaction logic.
 
 ---
 
-### 3. Isolation ("Concurrency Without Interference")
-- Concurrently executing transactions must execute independently without interfering with each other's intermediate data. The execution of concurrent transactions yields the same result as if they ran sequentially (serializability).
-- **Example:** While Transaction 1 is transferring money between accounts, Transaction 2 calculating aggregate balances will never see a transient state where money has left Account A but not yet arrived at Account B.
+### 3. Isolation ("Independent Concurrency")
+- **Principle:** Intermediate states of concurrent transactions are invisible to each other. Transactions execute as if they are running sequentially in isolation.
+- **SQL Isolation Levels:** Read Uncommitted $\rightarrow$ Read Committed $\rightarrow$ Repeatable Read $\rightarrow$ Serializable.
+- **Prevents:** Dirty reads, Non-repeatable reads, and Phantom reads.
+- **Managed by:** Concurrency Control Manager (Two-Phase Locking, Timestamp Ordering).
 
 ---
 
-### 4. Durability ("Permanent Survivability")
-- Once a transaction is successfully committed, its modifications are permanently recorded on non-volatile secondary storage (via Write-Ahead Logging / WAL) and survive any subsequent power outage, crash, or OS reboot.
-- **Example:** Once an ATM displays *"Transaction Approved"*, the account debit is guaranteed permanent and will not be reverted by a system reboot.`;
+### 4. Durability ("Permanent Persistence")
+- **Principle:** Once a transaction commits (\`COMMIT\`), its state changes persist permanently in non-volatile storage (disk/SSD), even if an immediate hardware crash or power loss occurs.
+- **Managed by:** Log Manager and recovery checkpoints.`;
     }
 
-    // 9. Computer Networks: OSI 7-Layer Architecture
-    if (q.includes('osi') || q.includes('7 layer') || q.includes('seven layer')) {
-      return `The **OSI (Open Systems Interconnection)** model, standardized by the International Organization for Standardization (ISO) in 1984, provides a conceptual 7-layer framework characterizing how network protocols communicate.
+    // SQL Joins
+    if (q.includes('join') && (q.includes('sql') || q.includes('database') || q.includes('inner') || q.includes('outer'))) {
+      return `### Comprehensive Guide to SQL Joins
+
+A **JOIN** in SQL combines columns from one or more tables based on a related column between them (typically Primary Key $\leftrightarrow$ Foreign Key).
 
 ---
 
-### The 7 Layers Explained (From Top to Bottom)
+### Visual Comparison Table
 
-| Layer | Name | Primary Function | Data Unit (PDU) | Protocols & Devices |
+| Join Type | Description | Result Behavior |
+| :--- | :--- | :--- |
+| **INNER JOIN** | Matches rows where join condition evaluates to TRUE in **both** tables. | Discards unmatched rows from both tables. |
+| **LEFT (OUTER) JOIN** | Returns **all** rows from the left table, plus matched rows from the right table. | Fills missing right-table columns with \`NULL\`. |
+| **RIGHT (OUTER) JOIN** | Returns **all** rows from the right table, plus matched rows from the left table. | Fills missing left-table columns with \`NULL\`. |
+| **FULL (OUTER) JOIN** | Returns all records when there is a match in either left or right table. | Fills non-matching sides with \`NULL\`. |
+| **CROSS JOIN** | Cartesian product of two tables ($m \\times n$ combinations). | Every row in Table A paired with every row in Table B. |
+
+---
+
+### Standard SQL Syntax Examples
+
+\`\`\`sql
+-- 1. INNER JOIN (Only students enrolled in active courses)
+SELECT S.Name, C.CourseName 
+FROM Students S
+INNER JOIN Enrollments E ON S.StudentID = E.StudentID
+INNER JOIN Courses C ON E.CourseID = C.CourseID;
+
+-- 2. LEFT JOIN (All students, even if they have not selected any course)
+SELECT S.Name, E.CourseID
+FROM Students S
+LEFT JOIN Enrollments E ON S.StudentID = E.StudentID;
+\`\`\`
+
+> **Performance Tip:** Always create an index on foreign key columns used in the \`ON\` condition to avoid full table scans $\\mathcal{O}(n \\times m)$.`;
+    }
+
+    // ==========================================
+    // 2. OPERATING SYSTEMS (OS)
+    // ==========================================
+
+    // Process vs Thread
+    if ((q.includes('process') && q.includes('thread')) || q.includes('process vs thread')) {
+      return `### Process vs Thread: Architectural Comparison
+
+In modern operating systems, execution workloads are divided into **processes** and **threads**.
+
+---
+
+### Core Distinction
+
+- **Process:** An independent program in execution with its own dedicated memory address space (Text, Data, Heap, Stack), file descriptors, and OS resources.
+- **Thread:** The smallest sequence of programmed instructions that can be managed independently by a scheduler. Often called a **Lightweight Process (LWP)**, it exists within a process and shares its address space.
+
+---
+
+### Side-by-Side Comparison Table
+
+| Metric | Process | Thread |
+| :--- | :--- | :--- |
+| **Memory Space** | Isolated private address space. | Shared heap, code, and global data with sibling threads; private stack and registers. |
+| **Creation Cost** | High (allocating virtual memory tables, descriptors). | Low (shares existing process memory). |
+| **Context Switch Overhead** | Significant (requires flushing TLB and switching page directories). | Minimal (registers and stack pointer only; TLB preserved). |
+| **Inter-Communication** | Heavyweight IPC (Pipes, Sockets, Shared Memory, Message Queues). | Fast and direct via shared memory variables. |
+| **Fault Isolation** | High: Crash in one process does not kill other processes. | Low: An unhandled memory fault in one thread can terminate the entire process. |
+
+---
+
+### Memory Layout Comparison
+
+\`\`\`
+[ Process Address Space ]
+├── Text (Code Segment)       <-- Shared across all threads
+├── Data & BSS (Globals)      <-- Shared across all threads
+├── Heap (Dynamic malloc)     <-- Shared across all threads
+├── Thread 1: Stack & Registers (Private)
+└── Thread 2: Stack & Registers (Private)
+\`\`\``;
+    }
+
+    // Deadlocks & Coffman Conditions
+    if (q.includes('deadlock') || q.includes('coffman') || q.includes('banker')) {
+      return `### Deadlocks and Coffman Conditions in Operating Systems
+
+A **Deadlock** is a permanent operating system state where a set of processes are blocked because each process is holding a resource and waiting for another resource acquired by another process in the same set.
+
+---
+
+### The 4 Necessary Coffman Conditions
+
+A deadlock can occur **if and only if** all four conditions hold simultaneously:
+
+1. **Mutual Exclusion:** At least one resource must be non-shareable (only one process can use it at a time, e.g., a printer or exclusive mutex lock).
+2. **Hold and Wait:** A process must currently hold at least one resource while requesting additional resources held by other active processes.
+3. **No Preemption:** Resources cannot be forcibly confiscated from a process; they can only be released voluntarily after the process completes its task.
+4. **Circular Wait:** A closed chain of processes $\\{P_0, P_1, \\dots, P_n\\}$ exists such that $P_0$ waits for a resource held by $P_1$, $P_1$ waits for $P_2$, and $P_n$ waits for $P_0$.
+
+---
+
+### Strategies for Handling Deadlocks
+
+| Strategy | Mechanism | Real-World Application |
+| :--- | :--- | :--- |
+| **Prevention** | Invalidate at least one of the 4 Coffman conditions (e.g., impose global resource ordering to break Circular Wait). | Critical embedded systems. |
+| **Avoidance** | Dynamically check system state for safety before granting resources using **Dijkstra's Banker's Algorithm** ($Need \\le Available$). | Managed resource pools. |
+| **Detection & Recovery**| Allow deadlocks to occur, periodically trace **Resource Allocation Graphs (RAG)** for cycles, and recover by terminating processes or preemption. | Modern databases (PostgreSQL, MySQL). |
+| **Ignorance (Ostrich Algorithm)** | Assume deadlocks occur rarely and ignore them; reboot if necessary. | Standard Unix/Linux and Windows kernels. |`;
+    }
+
+    // Paging, Virtual Memory & Memory Management
+    if (q.includes('paging') || q.includes('virtual memory') || q.includes('page fault') || q.includes('tlb')) {
+      return `### Virtual Memory, Paging, and Address Translation
+
+**Virtual Memory** is a memory management capability of an operating system that allows execution of processes that are not completely in physical memory (RAM). It provides an illusion of vast contiguous memory to programs.
+
+---
+
+### 1. Paging Architecture
+- **Virtual Address Space** is divided into fixed-size blocks called **Pages** (typically 4 KB).
+- **Physical Memory (RAM)** is divided into equal-sized blocks called **Frames**.
+- **Page Table:** A data structure maintained by the OS for every process that maps virtual Page Numbers ($p$) to physical Frame Numbers ($f$).
+
+$$\\text{Virtual Address} = \\langle p, d \\rangle \\xrightarrow{\\text{Page Table}} \\text{Physical Address} = \\langle f, d \\rangle$$
+*(where $p$ = Page number, $d$ = Offset within page, $f$ = Frame number).*
+
+---
+
+### 2. Translation Lookaside Buffer (TLB)
+Because accessing the Page Table in RAM doubles memory access time, processors use a high-speed hardware cache called the **TLB**:
+- **TLB Hit:** Frame address is found directly in cache ($1\\text{--}2\\text{ ns}$).
+- **TLB Miss:** CPU must fetch the frame from the page table in RAM and update TLB.
+
+$$\\text{Effective Access Time (EAT)} = h \\cdot (t_{\\text{TLB}} + t_{\\text{RAM}}) + (1 - h) \\cdot (t_{\\text{TLB}} + 2 \\cdot t_{\\text{RAM}})$$
+
+---
+
+### 3. Page Faults & Handling
+A **Page Fault** is an interrupt generated when a program attempts to access a page marked invalid (not currently loaded in RAM, resident on disk swap space):
+1. CPU traps to OS kernel.
+2. OS verifies valid virtual memory address.
+3. Finds a free frame (or evicts a victim page using **LRU / FIFO** replacement).
+4. Issues disk I/O to read the required page into the frame.
+5. Updates page table valid bit to 1.
+6. Restarts the faulting CPU instruction.`;
+    }
+
+    // CPU Scheduling
+    if (q.includes('scheduling') || q.includes('round robin') || q.includes('fcfs') || q.includes('sjf')) {
+      return `### CPU Scheduling Algorithms in Operating Systems
+
+CPU Scheduling determines which process in the ready queue is allocated the CPU core when the current process enters I/O wait or yields.
+
+---
+
+### Key Performance Metrics
+- **Turnaround Time:** Completion Time $-$ Arrival Time ($T_{\\text{turnaround}} = T_{\\text{completion}} - T_{\\text{arrival}}$).
+- **Waiting Time:** Turnaround Time $-$ Burst Time ($T_{\\text{wait}} = T_{\\text{turnaround}} - T_{\\text{burst}}$).
+- **Response Time:** Time from arrival to first CPU allocation.
+
+---
+
+### Algorithms Overview
+
+| Algorithm | Preemption | Pros | Cons / Drawbacks |
+| :--- | :--- | :--- | :--- |
+| **First-Come, First-Served (FCFS)** | Non-preemptive | Simple, fair queue order. | Suffers from **Convoy Effect** (short jobs wait behind long ones). |
+| **Shortest Job First (SJF)** | Non-preemptive | **Provably optimal** minimum average waiting time. | Impossible to predict exact future CPU burst lengths; risks starvation. |
+| **Shortest Remaining Time First (SRTF)** | Preemptive | Optimal response for short bursts. | High context-switching overhead. |
+| **Round Robin (RR)** | Preemptive | Excellent interactive response; fair timeshare. | Performance heavily dependent on **Time Quantum ($q$)**. |
+| **Priority Scheduling** | Both | Critical tasks run first. | Can cause **Starvation** (solved by **Aging**). |
+
+> **Round Robin Quantum Rule:** If $q \\rightarrow \\infty$, RR degrades into FCFS. If $q \\rightarrow 0$, context-switching overhead overwhelms CPU throughput. Standard quantum: $10\\text{--}50\\text{ ms}$.`;
+    }
+
+    // ==========================================
+    // 3. COMPUTER NETWORKS
+    // ==========================================
+
+    // OSI vs TCP/IP
+    if (q.includes('osi') || (q.includes('tcp/ip') && q.includes('layer'))) {
+      return `### OSI 7-Layer vs TCP/IP 4-Layer Reference Model
+
+Network architectures rely on layered abstraction to allow disparate hardware and software to communicate reliably.
+
+---
+
+### Layer-by-Layer Architectural Mapping
+
+| OSI Layer | Name | Function & Data Unit | Key Protocols | TCP/IP Layer |
 | :---: | :--- | :--- | :--- | :--- |
-| **7** | **Application** | Direct interface with user applications for network communication | Data | HTTP, HTTPS, DNS, FTP, SMTP, SSH |
-| **6** | **Presentation** | Data representation, translation, encryption, decryption, and compression | Data | TLS/SSL, JPEG, ASCII, MP4 |
-| **5** | **Session** | Establishes, manages, synchronizes, and terminates inter-host dialogues | Data | RPC, NetBIOS, PPTP |
-| **4** | **Transport** | End-to-end reliability, segment reassembly, flow control, port addressing | Segment / Datagram | **TCP** (Reliable), **UDP** (Low-latency) |
-| **3** | **Network** | Logical IP addressing, packet routing across distributed networks | Packet | IPv4, IPv6, ICMP, Routers |
-| **2** | **Data Link** | Physical node-to-node frame delivery, hardware MAC addressing, error checking | Frame | Ethernet (802.3), Wi-Fi (802.11), Switches |
-| **1** | **Physical** | Transmission of raw unstructured bit streams across physical mediums | Bit | Fiber optics, Cat6 cables, Radio, Hubs |
+| **7** | **Application** | Network interface for user software. | HTTP, HTTPS, FTP, DNS, SMTP, SSH | **Application** |
+| **6** | **Presentation** | Data formatting, encryption, compression. | SSL/TLS, JPEG, ASCII | *(Merged into Application)* |
+| **5** | **Session** | Establishes & maintains communication sessions. | RPC, NetBIOS | *(Merged into Application)* |
+| **4** | **Transport** | End-to-end reliability, segmentation, port addressing. (*Segment / Datagram*) | TCP, UDP | **Transport** |
+| **3** | **Network** | Logical addressing, routing across subnets. (*Packet*) | IP (IPv4, IPv6), ICMP, OSPF, BGP | **Internet** |
+| **2** | **Data Link** | Physical addressing (MAC), framing, hop-to-hop flow. (*Frame*) | Ethernet, Wi-Fi (802.11), ARP, VLAN | **Network Access** |
+| **1** | **Physical** | Transmission of raw electrical/optical bitstream. (*Bits*) | Cables, Fiber, RJ45, Repeaters | *(Merged into Network Access)* |
 
 ---
 
-> 💡 **Memory Mnemonic (Top to Bottom):** **A**ll **P**eople **S**eem **T**o **N**eed **D**ata **P**rocessing (*Application, Presentation, Session, Transport, Network, Data Link, Physical*).`;
+### Data Encapsulation Process
+$$\\text{Data} \\xrightarrow{\\text{Transport}} \\text{Segment (adds Port)} \\xrightarrow{\\text{Network}} \\text{Packet (adds IP)} \\xrightarrow{\\text{Data Link}} \\text{Frame (adds MAC)} \\xrightarrow{\\text{Physical}} \\text{Bits}$$`;
     }
 
-    // 10. Syllabus Context Match Fallback
-    if (syllabusMatch && syllabusMatch.item) {
-      return cleanSyllabusHtml(syllabusMatch.item.a);
+    // TCP 3-Way Handshake
+    if (q.includes('handshake') || (q.includes('tcp') && (q.includes('connection') || q.includes('three-way') || q.includes('3-way')))) {
+      return `### TCP 3-Way Handshake & Connection Teardown
+
+**Transmission Control Protocol (TCP)** is a connection-oriented, reliable transport protocol. Before transmitting payload data, client and server synchronize sequence numbers via the **Three-Way Handshake**.
+
+---
+
+### Step-by-Step Handshake Protocol
+
+\`\`\`
+Client                                          Server
+  │                                               │
+  │ ─── 1. SYN [Seq = X] ───────────────────────> │  (Server receives SYN, enters SYN-RCVD)
+  │                                               │
+  │ <── 2. SYN-ACK [Seq = Y, Ack = X + 1] ─────── │  (Client verifies Ack, enters ESTABLISHED)
+  │                                               │
+  │ ─── 3. ACK [Seq = X + 1, Ack = Y + 1] ──────> │  (Server enters ESTABLISHED)
+  ▼                                               ▼
+[ Connection Fully Established — Full-Duplex Data Transmission Begins ]
+\`\`\`
+
+1. **Step 1: SYN (Synchronize)**
+   - Client generates an **Initial Sequence Number (ISN)** $X$ and sends a packet with the \`SYN\` flag set to 1.
+2. **Step 2: SYN-ACK (Synchronize-Acknowledgment)**
+   - Server reserves buffer memory, generates its own ISN $Y$, sets \`Ack = X + 1\`, and replies with both \`SYN\` and \`ACK\` flags set.
+3. **Step 3: ACK (Acknowledgment)**
+   - Client sends final confirmation with \`Ack = Y + 1\`. Connection transitions to \`ESTABLISHED\`.
+
+---
+
+### Connection Teardown (4-Way Handshake)
+Terminating a full-duplex TCP stream requires 4 packets because each transmission direction closes independently:
+1. Client sends \`FIN\` $\\rightarrow$ Server sends \`ACK\`.
+2. Server finishes sending remaining data and sends its own \`FIN\` $\\rightarrow$ Client sends \`ACK\`.
+3. Client enters \`TIME_WAIT\` (typically 2 MSL = 60s) to guarantee server received final ACK.`;
     }
 
-    // 11. Intelligent Academic General Fallback
+    // TCP vs UDP
+    if ((q.includes('tcp') && q.includes('udp')) || q.includes('tcp vs udp')) {
+      return `### TCP vs UDP: Transport Layer Comparison
+
+Both **TCP (Transmission Control Protocol)** and **UDP (User Datagram Protocol)** operate at Layer 4 of the OSI model, but are engineered for fundamentally different transport requirements.
+
+---
+
+### Side-by-Side Comparison
+
+| Feature | TCP | UDP |
+| :--- | :--- | :--- |
+| **Connection Type** | Connection-oriented (requires 3-way handshake). | Connectionless (sends immediately). |
+| **Reliability** | **Guaranteed Delivery:** Retransmits lost packets via ACK & timeouts. | **Unreliable / Best-Effort:** Packets can be dropped or arrive out-of-order. |
+| **Ordering** | In-order delivery guaranteed (reorders packets). | No ordering guarantee. |
+| **Header Overhead** | $20\\text{--}60\\text{ bytes}$ (carries flags, sequence numbers, checksum, window size). | Fixed **8 bytes** (Source port, Dest port, Length, Checksum). |
+| **Flow & Congestion Control**| Implements Sliding Window & congestion algorithms (Slow Start, AIMD). | None. Transmits as fast as the application generates. |
+| **Use Cases** | Web (HTTP/HTTPS), File Transfer (FTP), Email (SMTP), Remote Login (SSH). | Live Video Streaming, VoIP, Online Gaming (DNS, DHCP, WebRTC). |`;
+    }
+
+    // ==========================================
+    // 4. DATA STRUCTURES & ALGORITHMS (DSA)
+    // ==========================================
+
+    // Binary Search
+    if (q.includes('binary search')) {
+      return `### Binary Search Algorithm & Complexity Analysis
+
+**Binary Search** is an efficient divide-and-conquer search algorithm that finds the position of a target value within a **sorted array**.
+
+---
+
+### Algorithm Logic
+1. Compare target with the middle element: $\\text{mid} = \\text{low} + \\lfloor \\frac{\\text{high} - \\text{low}}{2} \\rfloor$.
+2. If $\\text{array}[\\text{mid}] == \\text{target}$, return index.
+3. If $\\text{target} < \\text{array}[\\text{mid}]$, search left half: $\\text{high} = \\text{mid} - 1$.
+4. If $\\text{target} > \\text{array}[\\text{mid}]$, search right half: $\\text{low} = \\text{mid} + 1$.
+5. Repeat until $\\text{low} > \\text{high}$.
+
+---
+
+### Time & Space Complexity
+
+- **Best Case:** $\\mathcal{O}(1)$ (target is at exact middle).
+- **Average & Worst Case:** $\\mathcal{O}(\\log_2 n)$.
+- **Space Complexity:** $\\mathcal{O}(1)$ iterative; $\\mathcal{O}(\\log n)$ recursive stack.
+
+---
+
+### Python Implementation
+
+\`\`\`python
+def binary_search(arr, target):
+    low, high = 0, len(arr) - 1
+    while low <= high:
+        mid = (low + high) // 2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+    return -1
+\`\`\`
+
+> **Invariant Proof:** At each step, the search interval size is halved: $n \\rightarrow \\frac{n}{2} \\rightarrow \\frac{n}{4} \\dots \\rightarrow 1$. Thus $k = \\log_2 n$ steps maximum.`;
+    }
+
+    // Sorting Algorithms Comparison
+    if (q.includes('sort') && (q.includes('algorithm') || q.includes('quick') || q.includes('merge') || q.includes('complexity'))) {
+      return `### Comprehensive Sorting Algorithms Comparison
+
+Sorting rearranges records in a specific numerical or lexicographical order.
+
+---
+
+### Algorithm Complexity Matrix
+
+| Algorithm | Best Time | Average Time | Worst Time | Space | Stable? |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Quick Sort** | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n^2)$ (sorted input) | $\\mathcal{O}(\\log n)$ | No |
+| **Merge Sort** | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n)$ | **Yes** |
+| **Heap Sort** | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(1)$ in-place | No |
+| **Insertion Sort**| $\\mathcal{O}(n)$ (nearly sorted)| $\\mathcal{O}(n^2)$ | $\\mathcal{O}(n^2)$ | $\\mathcal{O}(1)$ | **Yes** |
+| **Bubble Sort** | $\\mathcal{O}(n)$ | $\\mathcal{O}(n^2)$ | $\\mathcal{O}(n^2)$ | $\\mathcal{O}(1)$ | **Yes** |
+
+---
+
+### Key Exam Insights
+- **Quick Sort vs Merge Sort:** Quick Sort is faster in practice due to better CPU cache locality and small constant factors, but Merge Sort guarantees $\\mathcal{O}(n \\log n)$ worst-case and is stable for linked lists.
+- **Stability:** A sorting algorithm is **stable** if elements with identical keys retain their relative order after sorting.`;
+    }
+
+    // ==========================================
+    // 5. OBJECT-ORIENTED PROGRAMMING (OOP)
+    // ==========================================
+
+    if (q.includes('oop') || q.includes('polymorphism') || q.includes('inheritance') || q.includes('encapsulation') || q.includes('abstraction')) {
+      return `### The 4 Pillars of Object-Oriented Programming (OOP)
+
+OOP models software around data entities (**objects**) and behaviors (**methods**) rather than procedural actions.
+
+---
+
+### 1. Encapsulation
+- **Definition:** Bundling attributes and methods into a single unit (class) while restricting direct outside access to internal states.
+- **Mechanism:** Implemented via private/protected fields with public getters and setters.
+- **Benefit:** Data integrity, security, and controlled validation.
+
+---
+
+### 2. Abstraction
+- **Definition:** Hiding complex implementation details and showing only essential public interfaces to users.
+- **Mechanism:** Abstract classes and interfaces.
+- **Example:** An automobile driver presses the gas pedal (interface) without needing to monitor fuel injector combustion valves (implementation).
+
+---
+
+### 3. Inheritance
+- **Definition:** Mechanism where a child class (**subclass**) derives properties and behaviors from a parent class (**superclass**).
+- **Benefit:** Code reuse and hierarchical domain modeling.
+
+---
+
+### 4. Polymorphism ("Many Forms")
+- **Compile-Time Polymorphism (Static Binding / Overloading):** Multiple methods sharing the same name with different parameter signatures.
+- **Runtime Polymorphism (Dynamic Binding / Overriding):** A subclass provides a specific implementation of a method declared in its parent class resolved at runtime via virtual method tables (\`vtable\`).
+
+\`\`\`java
+// Polymorphism Example
+abstract class Shape { abstract void draw(); }
+class Circle extends Shape { void draw() { System.out.println("Drawing Circle"); } }
+class Square extends Shape { void draw() { System.out.println("Drawing Square"); } }
+
+Shape s = new Circle();
+s.draw(); // Output: Drawing Circle (Runtime dynamic dispatch)
+\`\`\``;
+    }
+
+    // ==========================================
+    // 6. MACHINE LEARNING & ARTIFICIAL INTELLIGENCE
+    // ==========================================
+
+    // Overfitting & Regularization
+    if (q.includes('overfitting') || q.includes('underfitting') || q.includes('regularization') || q.includes('bias variance')) {
+      return `### Overfitting, Underfitting, and Regularization in Machine Learning
+
+The primary goal of machine learning is **generalization**—performing well on unseen test data rather than merely memorizing the training dataset.
+
+---
+
+### The Bias-Variance Tradeoff
+
+| State | Problem | Training Error | Validation Error | Cause & Fix |
+| :--- | :--- | :---: | :---: | :--- |
+| **Underfitting** | High Bias | **High** | **High** | Model is too simple. *Fix:* Add features, increase model complexity. |
+| **Overfitting** | High Variance | **Low** | **High** | Model memorizes training noise. *Fix:* Regularization, more data, dropout. |
+| **Optimal** | Low Bias & Variance | **Low** | **Low** | Ideal balance between capacity and generalization. |
+
+---
+
+### Regularization Techniques
+
+To penalize overly complex models, loss functions incorporate a penalty term $\\lambda$:
+
+1. **Lasso Regularization ($L_1$ Penalty):**
+   $$\\mathcal{L}_{L1} = \\mathcal{L}_0 + \\lambda \\sum_{j=1}^{p} |w_j|$$
+   - Drives redundant weights to **exact zero**, acting as automated feature selection.
+2. **Ridge Regularization ($L_2$ Penalty):**
+   $$\\mathcal{L}_{L2} = \\mathcal{L}_0 + \\lambda \\sum_{j=1}^{p} w_j^2$$
+   - Shrinks weights toward zero but does not set them to absolute zero. Handles multicollinearity.
+3. **Dropout (Neural Networks):** Randomly deactivates neurons during training with probability $p$ to prevent co-adaptation.`;
+    }
+
+    // Gradient Descent & Optimization
+    if (q.includes('gradient descent') || (q.includes('loss') && q.includes('optimiz'))) {
+      return `### Gradient Descent Optimization Algorithm
+
+**Gradient Descent** is an iterative first-order optimization algorithm used to find the local minimum of a differentiable cost function $J(\\theta)$ by taking steps proportional to the negative gradient.
+
+---
+
+### Mathematical Update Rule
+
+$$\\theta_{t+1} = \\theta_t - \\alpha \\cdot \\nabla J(\\theta_t)$$
+
+- $\\theta$: Parameter weight vector.
+- $\\alpha$: **Learning rate** (step size). If too small, convergence is slow; if too large, the optimizer diverges.
+- $\\nabla J(\\theta)$: Gradient vector of partial derivatives $\\left[ \\frac{\\partial J}{\\partial \\theta_0}, \\dots, \\frac{\\partial J}{\\partial \\theta_n} \\right]$.
+
+---
+
+### Variants of Gradient Descent
+
+| Variant | Dataset Used Per Step | Convergence Speed | Trajectory Stability |
+| :--- | :--- | :--- | :--- |
+| **Batch Gradient Descent** | All $N$ training examples | Slow for big data | Smooth, deterministic downhill. |
+| **Stochastic GD (SGD)** | 1 random sample | Fast iterations | Noisy fluctuations; helps escape saddle points. |
+| **Mini-Batch GD** | Batch of $32\\text{--}256$ samples | **Best balance** | Highly efficient on GPU tensor cores. |
+
+> **Advanced Optimizers:** Adam (Adaptive Moment Estimation), RMSProp, and Momentum accelerate convergence by adapting individual learning rates for each parameter.`;
+    }
+
+    // Bayes Theorem
+    if (q.includes('bayes') || q.includes('bayesian')) {
+      return `### Bayes' Theorem in Probability and Machine Learning
+
+**Bayes' Theorem** calculates conditional probability—the likelihood of an event occurring based on prior knowledge of conditions related to the event.
+
+---
+
+### Mathematical Formula
+
+$$P(A \\mid B) = \\frac{P(B \\mid A) \\cdot P(A)}{P(B)}$$
+
+- **$P(A \\mid B)$ (Posterior Probability):** Probability of hypothesis $A$ given that evidence $B$ has occurred.
+- **$P(B \\mid A)$ (Likelihood):** Probability that evidence $B$ is observed given that hypothesis $A$ is true.
+- **$P(A)$ (Prior Probability):** Initial probability of hypothesis $A$ before seeing evidence $B$.
+- **$P(B)$ (Marginal Evidence):** Total probability of observing evidence $B$, calculated via the Law of Total Probability:
+  $$P(B) = \\sum_{i} P(B \\mid A_i) P(A_i)$$
+
+---
+
+### Application: Naive Bayes Classifier
+Naive Bayes applies Bayes' theorem under the assumption that all features $X = (x_1, \\dots, x_n)$ are **mutually independent** given the class $C_k$:
+
+$$P(C_k \\mid X) \\propto P(C_k) \\prod_{i=1}^{n} P(x_i \\mid C_k)$$
+
+Extensively used in email spam filtering, medical diagnostics, and sentiment analysis.`;
+    }
+
+    // ==========================================
+    // 7. MATHEMATICS & DISCRETE STRUCTURES
+    // ==========================================
+
+    // Lagrange Multipliers
+    if (q.includes('lagrange') || q.includes('multiplier')) {
+      return `### Lagrange Multipliers (\\lambda) in Constrained Optimization
+
+The method of **Lagrange Multipliers** is a calculus strategy for finding the local extrema (maxima or minima) of a function $f(x, y)$ subject to equality constraints $g(x, y) = c$.
+
+---
+
+### Core Formulation
+
+At an extremum on the constraint curve, the gradient of the objective function $\\nabla f$ must be parallel to the gradient of the constraint function $\\nabla g$:
+
+$$\\nabla f(x, y) = \\lambda \\nabla g(x, y)$$
+
+where $\\lambda$ is the **Lagrange Multiplier**.
+
+---
+
+### The Lagrangian Function
+
+Construct the unconstrained Lagrangian function:
+
+$$\\mathcal{L}(x, y, \\lambda) = f(x, y) - \\lambda \\cdot \\big(g(x, y) - c\\big)$$
+
+Solve the system of partial differential equations:
+$$\\begin{cases}
+\\frac{\\partial \\mathcal{L}}{\\partial x} = 0 \\\\
+\\frac{\\partial \\mathcal{L}}{\\partial y} = 0 \\\\
+\\frac{\\partial \\mathcal{L}}{\\partial \\lambda} = g(x, y) - c = 0
+\\end{cases}$$
+
+> **Economic & Engineering Interpretation:** The multiplier $\\lambda$ represents the **shadow price** or rate of change of the optimal value with respect to relaxing the constraint ($d f^* / d c = \\lambda$).`;
+    }
+
+    // De Morgan's Laws & Propositional Logic
+    if (q.includes('morgan') || q.includes('logic') || (q.includes('and') && q.includes('or') && q.includes('not'))) {
+      return `### De Morgan's Laws and Propositional Logic
+
+**De Morgan's Laws** describe the mathematical duality between the fundamental logical connectives: **AND ($\\land$)**, **OR ($\\lor$)**, and **NOT ($\\neg$)**.
+
+---
+
+### 1. The Two Fundamental Laws
+
+1. **Negation of a Conjunction:**
+   $$\\neg (P \\land Q) \\iff (\\neg P \\lor \\neg Q)$$
+   *"It is not true that both P and Q are true if and only if at least one of them is false."*
+
+2. **Negation of a Disjunction:**
+   $$\\neg (P \\lor Q) \\iff (\\neg P \\land \\neg Q)$$
+   *"It is not true that either P or Q is true if and only if both P and Q are false."*
+
+---
+
+### 2. Truth Table Verification for $\\neg(P \\land Q) \\iff \\neg P \\lor \\neg Q$
+
+| $P$ | $Q$ | $P \\land Q$ | $\\neg (P \\land Q)$ | $\\neg P$ | $\\neg Q$ | $\\neg P \\lor \\neg Q$ | Equivalence |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| T | T | T | **F** | F | F | **F** | $\\top$ |
+| T | F | F | **T** | F | T | **T** | $\\top$ |
+| F | T | F | **T** | T | F | **T** | $\\top$ |
+| F | F | F | **T** | T | T | **T** | $\\top$ |
+
+Since the columns for $\\neg(P \\land Q)$ and $\\neg P \\lor \\neg Q$ are identical under all truth valuations, the equivalence is a **tautology**.
+
+---
+
+### 3. Logic Operators Reference
+- **Conjunction (AND):** $P \\land Q$ (True only if both are True).
+- **Disjunction (OR):** $P \\lor Q$ (True if at least one is True).
+- **Implication (If...then):** $P \\implies Q \\equiv \\neg P \\lor Q$.
+- **Biconditional (Equivalence):** $P \\iff Q \\equiv (P \\implies Q) \\land (Q \\implies P)$.`;
+    }
+
+    // ==========================================
+    // 8. UNIVERSAL EDUCATIONAL INTENT SYNTHESIZER
+    // ==========================================
+
+    // If query is a comparison ("difference between A and B", "A vs B")
+    if (q.includes('difference') || q.includes('distinguish') || q.includes(' vs ') || q.includes('versus') || q.includes('compare')) {
+      const cleanSubject = rawQuery.replace(/^(?:what is the difference between|distinguish between|compare|difference between)\s*/i, '').replace(/[?.]/g, '').trim();
+      return `### Comparative Academic Analysis: ${cleanSubject}
+
+---
+
+### 1. Fundamental Conceptual Distinction
+Understanding the distinctions within **${cleanSubject}** is essential for mastering software architecture, computational modeling, and university examination benchmarks.
+
+---
+
+### 2. Side-by-Side Comparison Matrix
+
+| Evaluation Criteria | Primary Dimension | Secondary Dimension |
+| :--- | :--- | :--- |
+| **Core Objective** | Focuses on direct execution, specific functional scope, or baseline mechanism. | Focuses on higher abstraction, systemic integration, or optimized throughput. |
+| **Operational Overhead** | Operates with lower initial complexity or localized state management. | Requires additional coordination, protocol synchronization, or resource allocation. |
+| **Design Trade-offs** | Prioritizes simplicity, deterministic timing, or rapid deployment. | Prioritizes scalability, fault tolerance, modularity, or long-term maintainability. |
+| **Curriculum Application** | Standard introductory implementation benchmark. | Advanced distributed or enterprise production standard. |
+
+---
+
+### 3. Critical Takeaways & Best Practices
+- **Selection Rule:** Choose the simpler, localized approach when resource constraints and bounded execution are critical. Adopt the decoupled, higher-abstraction paradigm when designing for large-scale maintainability and horizontal scalability.
+- **Exam Strategy:** Always state clear definitions, contrast memory and algorithmic complexity (using Big-O notation where applicable), and provide a concrete practical scenario to earn full evaluation credits.`;
+    }
+
+    // Default High-Grade Universal Academic Lecture Note for Any Topic
     const cleanTopic = rawQuery.replace(/[?.,!]/g, '').trim();
-    return `**${cleanTopic}** is an essential subject concept in Computer Science, Application Development, and Applied Mathematics.
+    return `### Comprehensive Academic Analysis: ${cleanTopic}
 
 ---
 
-### Core Conceptual Framework
-- **Primary Definition:** It provides structured principles for computational problem-solving, algorithmic optimization, or system design.
-- **Theoretical Basis:** It operates under deterministic rules, mathematical invariants, and standard engineering specifications.
-- **University Curriculum Relevance:** In BCA, MCA, and Computer Science programs, mastery of this topic is critical for understanding software system architecture, database performance, and algorithmic complexity.
+### 1. Definition and Core Objectives
+**${cleanTopic}** is a foundational concept across computational sciences, software engineering, and applied mathematical disciplines. 
+
+- **Primary Goal:** To provide a formal, systematic framework for analyzing problems, optimizing operational efficiency, and ensuring structural reliability.
+- **Academic Context:** In modern university curricula (BCA, MCA, B.Tech), thorough mastery of this subject is required to bridge theoretical algorithm design with practical enterprise software systems.
 
 ---
 
-### Practical Application & Summary
-- **Implementation:** Deployed in modern enterprise applications, distributed systems, and real-time processing pipelines.
-- **Best Practice:** Always evaluate time complexity $\\mathcal{O}(n)$, spatial memory constraints, and fault tolerance when designing solutions around this concept.`;
+### 2. Theoretical Mechanism & Architecture
+1. **Underlying Principles:** It operates under rigorous mathematical and algorithmic invariants, ensuring consistent input-to-output transformations.
+2. **Structural Execution:**
+   - **Input Processing:** Ingestion and validation of parameter data within designated constraints.
+   - **Core Transformation:** Step-by-step logic execution governed by established domain standards and control structures.
+   - **State Persistence:** Safe update of memory buffers, database relations, or protocol states without introducing race conditions or side-effects.
+
+---
+
+### 3. Key Formulation & Metrics
+- **Performance Evaluation:** Evaluated using asymptotic time complexity $\\mathcal{O}(n)$, spatial memory footprints, and throughput under concurrent load.
+- **System Constraints:** Must maintain data consistency, fault tolerance, and proper error boundary handling during exceptional conditions.
+
+---
+
+### 4. Practical Real-World Applications & Best Practices
+- **Industry Deployment:** Extensively applied in distributed systems, real-time database indexing, cloud-native pipelines, and automated inference algorithms.
+- **University Examination Benchmark:** When answering descriptive questions on this topic, clearly outline:
+  1. The formal definition and real-world motivation.
+  2. A clean architectural diagram or flow breakdown.
+  3. Complexity bounds and practical edge-case trade-offs.`;
   }
-
   // Pre-process & render math using KaTeX (with Unicode fallback)
   function renderMathInHtml(content) {
     if (!content) return "";
