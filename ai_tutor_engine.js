@@ -75,6 +75,125 @@ window.BrainwareAITutor = (function() {
   }
 
   // Sanitize user query: strip leading question numbers like "Q12.", "12.", "Question 12:"
+  // Multi-Format File Parser supporting Word, Excel, PowerPoint, PDF, Code & Text
+  async function parseUploadedDocument(file) {
+    const fileName = file.name || "uploaded_file";
+    const fileSize = (file.size / 1024).toFixed(1) + " KB";
+    const ext = fileName.split('.').pop().toLowerCase();
+    let extractedText = "";
+
+    try {
+      // 1. Excel Spreadsheets (.xlsx, .xls, .csv)
+      if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+        if (typeof XLSX !== 'undefined') {
+          const arrayBuf = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuf, { type: 'array' });
+          const sheetsOutput = [];
+          workbook.SheetNames.forEach(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            const csv = XLSX.utils.sheet_to_csv(worksheet);
+            if (csv && csv.trim()) {
+              sheetsOutput.push(`--- Sheet: ${sheetName} ---\n` + csv.trim());
+            }
+          });
+          extractedText = sheetsOutput.join('\n\n');
+        } else {
+          extractedText = await file.text();
+        }
+
+      // 2. Word Documents (.docx)
+      } else if (ext === 'docx') {
+        if (typeof mammoth !== 'undefined') {
+          const arrayBuf = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer: arrayBuf });
+          extractedText = result.value || '';
+        } else {
+          extractedText = `[Word Document: ${fileName}, size: ${fileSize}]`;
+        }
+
+      // 3. PowerPoint Presentations (.pptx)
+      } else if (ext === 'pptx') {
+        if (typeof JSZip !== 'undefined') {
+          const arrayBuf = await file.arrayBuffer();
+          const zip = await JSZip.loadAsync(arrayBuf);
+          const slideFiles = Object.keys(zip.files).filter(p => p.startsWith('ppt/slides/slide') && p.endsWith('.xml'));
+          slideFiles.sort((a, b) => {
+            const numA = parseInt((a.match(/slide(\d+)\.xml/) || [0, 0])[1]);
+            const numB = parseInt((b.match(/slide(\d+)\.xml/) || [0, 0])[1]);
+            return numA - numB;
+          });
+
+          const slidesOutput = [];
+          for (let i = 0; i < slideFiles.length; i++) {
+            const xml = await zip.files[slideFiles[i]].async('text');
+            const textMatches = [];
+            const regex = /<a:t[^>]*>([\s\S]*?)<\/a:t>/g;
+            let m;
+            while ((m = regex.exec(xml)) !== null) {
+              if (m[1].trim()) textMatches.push(m[1].trim());
+            }
+            if (textMatches.length) {
+              slidesOutput.push(`[Slide ${i+1}]: ` + textMatches.join(' '));
+            }
+          }
+          extractedText = slidesOutput.join('\n\n');
+        } else {
+          extractedText = `[PowerPoint Presentation: ${fileName}, size: ${fileSize}]`;
+        }
+
+      // 4. Source Code and Plain Text Files
+      } else if (['txt', 'md', 'json', 'py', 'js', 'html', 'css', 'java', 'c', 'cpp', 'sql', 'xml', 'log'].includes(ext)) {
+        extractedText = await file.text();
+
+      // 5. PDF Files
+      } else if (ext === 'pdf') {
+        try {
+          const buf = await file.arrayBuffer();
+          const uint8 = new Uint8Array(buf);
+          let rawStr = '';
+          for (let i = 0; i < Math.min(uint8.length, 40000); i++) {
+            if (uint8[i] >= 32 && uint8[i] <= 126) rawStr += String.fromCharCode(uint8[i]);
+            else if (uint8[i] === 10 || uint8[i] === 13) rawStr += ' ';
+          }
+          const words = rawStr.match(/[A-Za-z0-9_.,;:?!-]{3,}/g);
+          if (words && words.length > 20) {
+            extractedText = `[PDF Document Text Content: ${fileName}]:\n` + words.slice(0, 800).join(' ');
+          } else {
+            extractedText = `[Attached PDF Document: ${fileName}, size: ${fileSize}]`;
+          }
+        } catch(e) {
+          extractedText = `[Attached PDF Document: ${fileName}, size: ${fileSize}]`;
+        }
+
+      // 6. Image Files (.png, .jpg, .jpeg, .webp)
+      } else if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'].includes(ext)) {
+        extractedText = `[Attached Image: ${fileName}, type: ${file.type || ext}, size: ${fileSize}]`;
+
+      // 7. General Fallback
+      } else {
+        try {
+          extractedText = await file.text();
+        } catch(e) {
+          extractedText = `[Attached Document: ${fileName}, size: ${fileSize}]`;
+        }
+      }
+    } catch(err) {
+      console.warn('Document parsing error:', err);
+      extractedText = `[Attached Document: ${fileName}, size: ${fileSize}]`;
+    }
+
+    if (!extractedText || !extractedText.trim()) {
+      extractedText = `[Attached Document: ${fileName}, type: ${ext.toUpperCase()}, size: ${fileSize}]`;
+    }
+
+    return {
+      name: fileName,
+      size: fileSize,
+      type: ext.toUpperCase(),
+      text: extractedText.trim()
+    };
+  }
+
   function sanitizeUserQuery(raw) {
     if (!raw) return "";
     let cleaned = raw.trim();
@@ -845,11 +964,13 @@ To guarantee reliability and data integrity—particularly during concurrent acc
         nameEl.innerText = file.name;
         if (sizeEl) sizeEl.innerText = '(Reading...)';
         prevEl.classList.remove('hidden');
+        prevEl.style.removeProperty('display');
+        prevEl.style.display = 'flex';
       }
 
       try {
         attachedFileData = await parseUploadedDocument(file);
-        if (sizeEl) sizeEl.innerText = '(' + attachedFileData.size + ')';
+        if (sizeEl && attachedFileData) sizeEl.innerText = '(' + attachedFileData.size + ')';
         if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
         }
@@ -868,7 +989,10 @@ To guarantee reliability and data integrity—particularly during concurrent acc
       if (inputEl) inputEl.value = '';
 
       const prevEl = document.getElementById(previewId);
-      if (prevEl) prevEl.classList.add('hidden');
+      if (prevEl) {
+        prevEl.classList.add('hidden');
+        prevEl.style.display = 'none';
+      }
     },
 
     askQuestion: async function(customQuery, isPopup = false) {
