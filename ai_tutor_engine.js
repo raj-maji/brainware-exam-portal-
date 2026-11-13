@@ -314,13 +314,455 @@ window.BrainwareAITutor = (function() {
   }
 
     // =========================================================================
-  // UNIVERSAL LIVE AI & KNOWLEDGE ENGINE (Zero-Login, Zero-Auth, 100% Free)
-  // Combines:
-  // 1. Google Gemini 1.5 Flash (if custom API key configured in localStorage)
-  // 2. Real-Time Educational Knowledge Engine (CORS-enabled Wikipedia REST API)
-  // 3. Algorithmic Code & Formula Synthesis Engine
+  // CHATGPT & GEMINI TAILORED REASONING ENGINE
+  // Adapts response format specifically to the nature of each question:
+  // - Math/Calculus/Derivation -> Step-by-step rigorous proof & calculation
+  // - Code/DSA/Algorithms       -> Intuition, clean code, complexity table, edge cases
+  // - Comparison/Contrast      -> Executive summary, comprehensive Markdown table, decision matrix
+  // - Conceptual/Scientific    -> Crisp definition, intuitive real-world analogy, mechanisms, use cases
+  // - Document Analysis        -> Deep grounded extraction from attached Excel, Word, PPT, PDF
   // =========================================================================
 
+  // Conversational Context Memory (ChatGPT & Gemini continuity)
+  function resolveConversationalTopic(query, lastTopic) {
+    if (!lastTopic) return query;
+    const q = query.toLowerCase().trim();
+    const pronouns = ['it', 'that', 'this', 'these', 'those', 'above', 'same'];
+    const words = q.split(/\s+/);
+    const hasPronoun = words.some(w => pronouns.includes(w.replace(/[?!.,]/g, '')));
+    const isContinuation = q.startsWith('can you explain') || q.startsWith('give an example') || 
+                           q.startsWith('how to implement') || q.startsWith('write code for') || 
+                           q.startsWith('show code') || q.startsWith('what about') || q.startsWith('why is that');
+
+    if (hasPronoun || isContinuation) {
+      return `${query} (in context of ${lastTopic})`;
+    }
+    return query;
+  }
+
+  // Classify Question Nature (Dynamic Persona Adaptation)
+  function classifyQuestionNature(query, hasFile) {
+    if (hasFile) return 'DOCUMENT_ANALYSIS';
+    const q = query.toLowerCase().trim();
+
+    // 1. Comparison
+    if (/(?:difference between|distinguish between|compare|contrast)\s+(.+?)\s+(?:and|with|to)\s+(.+?)/i.test(q) ||
+        /\b(?:vs\.?|versus)\b/i.test(q)) {
+      return 'COMPARISON';
+    }
+
+    // 2. Code / Programming
+    if (/\b(?:write|code|program|implement|function|script|algorithm|syntax|query|debug|sql)\b/i.test(q) &&
+        /\b(?:python|java|c\+\+|javascript|sql|c#|rust|php|html|css|r|bash|dsa|sort|search|tree|graph|list|array|stack|queue|hash|recursion|dp)\b/i.test(q)) {
+      return 'CODE_IMPLEMENTATION';
+    }
+
+    // 3. Math / Derivation / Calculation
+    if (/\b(?:solve|calculate|derive|evaluate|integral|derivative|eigenvalue|matrix|limit|equation|probability|formula|lagrange|multiplier|theorem|proof|arithmetic)\b/i.test(q) ||
+        /[0-9]+\s*[\+\-\*\/=x]\s*[0-9]+/.test(q)) {
+      return 'MATH_DERIVATION';
+    }
+
+    // 4. Default: Conceptual / Theoretical
+    return 'CONCEPTUAL_THEORY';
+  }
+
+  // Dynamic Contextual Follow-Up Suggestions (Signature Gemini/ChatGPT feature)
+  function generateFollowUpSuggestions(nature, topic) {
+    const t = topic || 'this topic';
+    if (nature === 'MATH_DERIVATION') {
+      return [
+        `Show another step-by-step example of ${t}`,
+        `What are the boundary conditions and edge cases?`,
+        `How is ${t} used in practical engineering?`
+      ];
+    } else if (nature === 'CODE_IMPLEMENTATION') {
+      return [
+        `Optimize this code for lower memory usage`,
+        `Show unit test cases and boundary checks`,
+        `Explain the step-by-step trace of this algorithm`
+      ];
+    } else if (nature === 'COMPARISON') {
+      return [
+        `Which one has higher performance and throughput?`,
+        `Show a practical code example comparing both`,
+        `Provide an industry architecture case study`
+      ];
+    } else {
+      return [
+        `Explain ${t} with an intuitive everyday analogy`,
+        `What are practical real-world applications of ${t}?`,
+        `What are standard university exam questions on ${t}?`
+      ];
+    }
+  }
+
+  // 1. Math Derivation & Step-by-Step Solver
+  function tryGenerateTailoredMathSolution(query) {
+    const q = query.toLowerCase().trim();
+
+    // Linear Equation: e.g. "solve 2x + 5 = 15" or "solve 4x - 12 = 28"
+    const linearMatch = q.match(/(\d+)\s*x\s*([\+\-])\s*(\d+)\s*=\s*(\d+)/i);
+    if (linearMatch) {
+      const a = parseInt(linearMatch[1], 10);
+      const sign = linearMatch[2];
+      const b = parseInt(linearMatch[3], 10);
+      const c = parseInt(linearMatch[4], 10);
+      
+      const rhs = sign === '+' ? (c - b) : (c + b);
+      const xVal = rhs / a;
+      const xFormatted = Number.isInteger(xVal) ? xVal : xVal.toFixed(2);
+
+      return `### Step-by-Step Mathematical Solution
+
+We are tasked with solving the linear algebraic equation:
+
+$$${a}x ${sign} ${b} = ${c}$$
+
+---
+
+### Step 1: Isolate the Variable Term
+Subtract/add the constant term $${b}$ on both sides of the equation:
+
+$$${a}x = ${c} ${sign === '+' ? '-' : '+'} ${b}$$
+$$${a}x = ${rhs}$$
+
+---
+
+### Step 2: Solve for $x$
+Divide both sides by the coefficient $${a}$:
+
+$$x = \\frac{${rhs}}{${a}}$$
+$$x = ${xFormatted}$$
+
+---
+
+### Step 3: Verification & Sanity Check
+Substitute $x = ${xFormatted}$ back into the original left-hand side:
+
+$$\\text{LHS} = ${a}(${xFormatted}) ${sign} ${b} = ${a * xVal} ${sign} ${b} = ${c} = \\text{RHS} \\quad \\checkmark$$
+
+---
+
+### Final Evaluated Result
+$$\\mathbf{x = ${xFormatted}}$$`;
+    }
+
+    // Lagrange Multipliers
+    if (q.includes('lagrange') && (q.includes('multiplier') || q.includes('optimization') || q.includes('lambda'))) {
+      return `### Mathematical Formulation & Derivation: Lagrange Multipliers
+
+In mathematical optimization, the **method of Lagrange multipliers** is a rigorous strategy for finding the local maxima and minima of a differentiable function subject to equality constraints.
+
+---
+
+### 1. Mathematical Formulation
+
+Let $f(\\mathbf{x})$ be the objective function to be maximized or minimized, subject to $k$ equality constraints:
+
+$$g_i(\\mathbf{x}) = 0, \\quad i = 1, 2, \\dots, k$$
+
+The **Lagrangian function** $\\mathcal{L}$ is defined by introducing Lagrange multipliers $\\lambda_i$:
+
+$$\\mathcal{L}(\\mathbf{x}, \\boldsymbol{\\lambda}) = f(\\mathbf{x}) - \\sum_{i=1}^k \\lambda_i \\, g_i(\\mathbf{x})$$
+
+---
+
+### 2. Stationary Condition & Gradient Alignment
+
+At any local extremum, the gradient of the objective function must be a linear combination of the gradients of the constraint surfaces. Setting the gradient of the Lagrangian to zero yields:
+
+$$\\nabla_{\\mathbf{x}, \\boldsymbol{\\lambda}} \\mathcal{L}(\\mathbf{x}, \\boldsymbol{\\lambda}) = \\mathbf{0}$$
+
+This expands into the fundamental stationary system:
+
+$$\\begin{cases}
+\\nabla f(\\mathbf{x}) = \\sum_{i=1}^k \\lambda_i \\, \\nabla g_i(\\mathbf{x}) & \\text{(Gradient Alignment)} \\\\[6pt]
+g_i(\\mathbf{x}) = 0, \\quad i = 1, \\dots, k & \\text{(Constraint Satisfaction)}
+\\end{cases}$$
+
+---
+
+### 3. Geometric Intuition
+At an optimal point subject to a constraint $g(x, y) = c$, the contour curve of $f(x, y)$ and the constraint curve $g(x, y) = c$ are **tangent** to each other. Because their tangent lines coincide, their normal gradient vectors $\\nabla f$ and $\\nabla g$ must point in the same (or opposite) direction, scaled by the multiplier $\\lambda$:
+
+$$\\nabla f = \\lambda \\nabla g$$
+
+---
+
+### 4. Step-by-Step Concrete Example
+**Problem:** Maximize $f(x, y) = x \\cdot y$ subject to the perimeter constraint $g(x, y) = x + y - 10 = 0$.
+
+1. **Formulate Lagrangian:**
+   $$\\mathcal{L}(x, y, \\lambda) = xy - \\lambda(x + y - 10)$$
+2. **Compute Partial Derivatives:**
+   $$\\frac{\\partial \\mathcal{L}}{\\partial x} = y - \\lambda = 0 \\implies y = \\lambda$$
+   $$\\frac{\\partial \\mathcal{L}}{\\partial y} = x - \\lambda = 0 \\implies x = \\lambda$$
+   $$\\frac{\\partial \\mathcal{L}}{\\partial \\lambda} = -(x + y - 10) = 0 \\implies x + y = 10$$
+3. **Solve the System:**
+   $$x = y = \\lambda \\implies x + x = 10 \\implies 2x = 10 \\implies x = 5, \\; y = 5$$
+4. **Optimal Value:**
+   $$f_{\\max}(5, 5) = 5 \\times 5 = \\mathbf{25} \\quad (\\text{with } \\lambda = 5)$$`;
+    }
+
+    // Calculus Derivative Product Rule
+    if (q.includes('derivative') || q.includes('differentiate')) {
+      return `### Mathematical Derivation: Differential Calculus
+
+In differential calculus, the **derivative** represents the infinitesimal rate of change of a function with respect to its independent variable:
+
+$$f'(x) = \\frac{df}{dx} = \\lim_{h \\to 0} \\frac{f(x + h) - f(x)}{h}$$
+
+---
+
+### Fundamental Differentiation Rules
+| Rule Name | Formulation | Operational Invariant |
+| :--- | :--- | :--- |
+| **Power Rule** | $\\frac{d}{dx} [x^n] = n x^{n-1}$ | Decrements exponent by 1 |
+| **Product Rule** | $\\frac{d}{dx} [u \\cdot v] = u'v + uv'$ | Differentiates factors alternately |
+| **Quotient Rule** | $\\frac{d}{dx} \\left[\\frac{u}{v}\\right] = \\frac{u'v - uv'}{v^2}$ | Denominator squared in base |
+| **Chain Rule** | $\\frac{d}{dx} [f(g(x))] = f'(g(x)) \\cdot g'(x)$ | Outer derivative times inner derivative |
+
+---
+
+### Step-by-Step Application: $\\frac{d}{dx} [x^3 \\sin(x)]$
+1. Let $u(x) = x^3$ and $v(x) = \\sin(x)$.
+2. Compute individual derivatives:
+   $$u'(x) = 3x^2, \\quad v'(x) = \\cos(x)$$
+3. Apply the Product Rule:
+   $$\\frac{d}{dx} [u \\cdot v] = u'v + uv' = (3x^2)(\\sin(x)) + (x^3)(\\cos(x))$$
+4. Factor common terms for the clean final form:
+   $$\\mathbf{f'(x) = x^2 \\left(3 \\sin(x) + x \\cos(x)\\right)}$$`;
+    }
+
+    return null;
+  }
+
+  // 2. Code Implementation & Algorithmic Solutions
+  function tryGenerateTailoredCodeSolution(query) {
+    const q = query.toLowerCase();
+
+    // Merge Sort
+    if (q.includes('merge sort') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
+      return `### Merge Sort Algorithm Implementation (Divide and Conquer)
+
+**Merge Sort** is an asymptotically optimal divide-and-conquer sorting algorithm that recursively splits an array into two halves, sorts each half, and merges the sorted sub-arrays.
+
+\`\`\`python
+def merge_sort(arr):
+    """
+    Sorts an array in ascending order using Merge Sort.
+    Time Complexity: O(n log n) across all cases.
+    Space Complexity: O(n) auxiliary memory.
+    """
+    if len(arr) <= 1:
+        return arr
+
+    # Step 1: Divide the array at the midpoint
+    mid = len(arr) // 2
+    left_half = merge_sort(arr[:mid])
+    right_half = merge_sort(arr[mid:])
+
+    # Step 2: Merge the two sorted halves
+    return merge(left_half, right_half)
+
+
+def merge(left, right):
+    """Merges two sorted lists into a single sorted list."""
+    sorted_result = []
+    i = j = 0
+
+    # Compare elements from left and right and append the smaller one
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            sorted_result.append(left[i])
+            i += 1
+        else:
+            sorted_result.append(right[j])
+            j += 1
+
+    # Append any remaining elements
+    sorted_result.extend(left[i:])
+    sorted_result.extend(right[j:])
+    return sorted_result
+
+
+# --- Example Execution ---
+if __name__ == "__main__":
+    sample_data = [38, 27, 43, 3, 9, 82, 10]
+    print("Original List:", sample_data)
+    sorted_data = merge_sort(sample_data)
+    print("Sorted List:  ", sorted_data)
+\`\`\`
+
+---
+
+### Step-by-Step Logic Walkthrough
+1. **Divide:** Halves the array until each sub-array contains only 1 element (base case).
+2. **Conquer:** Recursively sorts both halves.
+3. **Combine:** Uses two pointers $i$ and $j$ to merge the sorted sub-arrays in linear time $\\mathcal{O}(n)$.
+
+---
+
+### Complexity & Performance Analysis
+| Metric | Complexity | Rationale |
+| :--- | :--- | :--- |
+| **Best-Case Time** | $\\mathcal{O}(n \\log n)$ | Always divides array in half $\\log_2 n$ times and merges in $n$ steps. |
+| **Average-Case Time**| $\\mathcal{O}(n \\log n)$ | Consistently balanced recurrence: $T(n) = 2T(n/2) + \\mathcal{O}(n)$. |
+| **Worst-Case Time** | $\\mathcal{O}(n \\log n)$ | Guaranteed upper bound, unaffected by original input distribution. |
+| **Auxiliary Space** | $\\mathcal{O}(n)$ | Requires temporary buffer arrays during the merge operation. |
+| **Stability** | **Stable** | Preserves relative order of duplicate elements ($left[i] \\le right[j]$). |`;
+    }
+
+    // Binary Search
+    if (q.includes('binary search') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
+      return `### Binary Search Algorithm Implementation
+
+**Binary Search** is an optimal search algorithm on sorted collections that repeatedly cuts the search space in half.
+
+\`\`\`python
+def binary_search(arr, target):
+    """
+    Searches for target in a strictly sorted list arr.
+    Returns the zero-based index if found; otherwise returns -1.
+    Time Complexity: O(log n), Space Complexity: O(1)
+    """
+    low = 0
+    high = len(arr) - 1
+
+    while low <= high:
+        # Avoid potential integer overflow in languages with fixed-width integers
+        mid = low + (high - low) // 2
+        mid_val = arr[mid]
+
+        if mid_val == target:
+            return mid  # Target identified
+        elif mid_val < target:
+            low = mid + 1  # Target is in the right half
+        else:
+            high = mid - 1  # Target is in the left half
+
+    return -1  # Target does not exist in array
+
+# --- Example Execution ---
+dataset = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
+target = 23
+idx = binary_search(dataset, target)
+print(f"Element {target} found at index: {idx}")
+\`\`\`
+
+---
+
+### Complexity Analysis
+- **Time Complexity:**
+  - Best Case: $\\mathcal{O}(1)$ (Target located at exact midpoint on initial probe)
+  - Average & Worst Case: $\\mathcal{O}(\\log n)$ (Halves search space each iteration)
+- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative approach.
+- **Mandatory Requirement:** The input array **must be sorted**.`;
+    }
+
+    // Quick Sort
+    if (q.includes('quick sort') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
+      return `### Quick Sort Algorithm Implementation
+
+**Quick Sort** is an in-place divide-and-conquer algorithm that selects a 'pivot' element and partitions elements around it.
+
+\`\`\`python
+def quick_sort(arr):
+    """
+    Sorts a list in ascending order using Quick Sort.
+    Average Time: O(n log n), Worst Time: O(n^2), Space: O(log n)
+    """
+    if len(arr) <= 1:
+        return arr
+
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+
+    return quick_sort(left) + middle + quick_sort(right)
+
+# Example Execution
+numbers = [38, 27, 43, 3, 9, 82, 10]
+print("Sorted Array:", quick_sort(numbers))
+\`\`\`
+
+---
+
+### Complexity Analysis
+- **Average Time:** $\\mathcal{O}(n \\log n)$
+- **Worst-Case Time:** $\\mathcal{O}(n^2)$ (occurs when pivot is consistently the smallest or largest element)
+- **Auxiliary Space:** $\\mathcal{O}(\\log n)$ call stack frames.`;
+    }
+
+    // Fibonacci
+    if (q.includes('fibonacci') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
+      return `### Fibonacci Series Implementation (Iterative Dynamic Programming)
+
+The Fibonacci sequence is defined by the recurrence relation:
+
+$$F(0) = 0, \\quad F(1) = 1, \\quad F(n) = F(n-1) + F(n-2) \\quad \\text{for } n \\ge 2$$
+
+\`\`\`python
+def fibonacci(n):
+    """
+    Computes the first n Fibonacci numbers with O(n) time and O(1) space.
+    """
+    if n <= 0:
+        return []
+    if n == 1:
+        return [0]
+
+    series = [0, 1]
+    a, b = 0, 1
+    for _ in range(2, n):
+        a, b = b, a + b
+        series.append(b)
+    return series
+
+print("First 10 Fibonacci terms:", fibonacci(10))
+\`\`\`
+
+---
+
+### Complexity Analysis
+- **Time Complexity:** $\\mathcal{O}(n)$
+- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space.`;
+    }
+
+    // SQL Second Highest Salary
+    if ((q.includes('highest salary') || q.includes('second highest')) && (q.includes('sql') || q.includes('query'))) {
+      return `### SQL Query: Second Highest Salary
+
+\`\`\`sql
+-- Approach 1: Universal Subquery (ANSI SQL compatible across MySQL, Oracle, PostgreSQL, SQL Server)
+SELECT MAX(salary) AS SecondHighestSalary
+FROM Employee
+WHERE salary < (
+    SELECT MAX(salary)
+    FROM Employee
+);
+
+-- Approach 2: Using LIMIT / OFFSET (MySQL / PostgreSQL / SQLite)
+SELECT DISTINCT salary AS SecondHighestSalary
+FROM Employee
+ORDER BY salary DESC
+LIMIT 1 OFFSET 1;
+\`\`\`
+
+---
+
+### Explanation
+1. \`MAX(salary)\` extracts the highest salary.
+2. The outer query finds the maximum salary strictly smaller than the highest, returning the true second highest.
+3. \`DISTINCT\` guarantees duplicate top salaries are handled correctly without ties.`;
+    }
+
+    return null;
+  }
+
+  // 3. Live Universal Knowledge Retriever & Concept Synthesizer
   async function fetchLiveWikiArticle(term) {
     try {
       const cleanTerm = term.trim();
@@ -336,7 +778,7 @@ window.BrainwareAITutor = (function() {
 
       const topTitle = results[0].title;
 
-      // Summary endpoint (Instant, high-speed, zero preflight issue)
+      // Summary endpoint
       const sumUrl = 'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(topTitle);
       const sumResp = await fetch(sumUrl, { headers: { 'User-Agent': 'BrainwareAcademicAI/1.0' } });
       if (!sumResp.ok) return null;
@@ -352,216 +794,26 @@ window.BrainwareAITutor = (function() {
     }
   }
 
-  // Code generator for common programming and DSA requests
-  function tryGenerateCodeSolution(query) {
-    const q = query.toLowerCase();
-    
-    // Binary Search
-    if (q.includes('binary search') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Binary Search Algorithm Implementation
-
-**Binary Search** is an efficient divide-and-conquer search algorithm on a sorted collection that repeatedly divides the search interval in half.
-
-\`\`\`python
-def binary_search(arr, target):
-    """
-    Searches for target in a sorted list arr.
-    Returns the index if found, otherwise returns -1.
-    Time Complexity: O(log n), Space Complexity: O(1)
-    """
-    low = 0
-    high = len(arr) - 1
-
-    while low <= high:
-        mid = (low + high) // 2
-        mid_val = arr[mid]
-
-        if mid_val == target:
-            return mid  # Element found at index mid
-        elif mid_val < target:
-            low = mid + 1  # Search right half
-        else:
-            high = mid - 1  # Search left half
-
-    return -1  # Element not present
-
-# Example Execution
-numbers = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
-target_val = 23
-result = binary_search(numbers, target_val)
-
-if result != -1:
-    print(f"Element {target_val} found at index: {result}")
-else:
-    print(f"Element {target_val} is not in the array.")
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:**
-  - Best Case: $\\mathcal{O}(1)$ (target is at the midpoint on the first check)
-  - Average & Worst Case: $\\mathcal{O}(\\log n)$ (halves the search space each step)
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative approach ($\\mathcal{O}(\\log n)$ call-stack for recursive approach).
-- **Prerequisite:** The input dataset **must be strictly sorted**.`;
-    }
-
-    // Bubble Sort
-    if (q.includes('bubble sort') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Bubble Sort Algorithm Implementation
-
-**Bubble Sort** is a comparison-based sorting algorithm that repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order.
-
-\`\`\`python
-def bubble_sort(arr):
-    """
-    Sorts a list in ascending order using optimized Bubble Sort.
-    Time Complexity: O(n^2), Space Complexity: O(1)
-    """
-    n = len(arr)
-    for i in range(n):
-        swapped = False
-        # Last i elements are already sorted in place
-        for j in range(0, n - i - 1):
-            if arr[j] > arr[j + 1]:
-                arr[j], arr[j + 1] = arr[j + 1], arr[j]
-                swapped = True
-        # If no two elements were swapped in inner loop, array is sorted
-        if not swapped:
-            break
-    return arr
-
-# Example Execution
-data = [64, 34, 25, 12, 22, 11, 90]
-sorted_data = bubble_sort(data)
-print("Sorted Array:", sorted_data)
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:**
-  - Best Case: $\\mathcal{O}(n)$ (when array is already sorted, with \`swapped\` flag check)
-  - Worst Case: $\\mathcal{O}(n^2)$ (when array is sorted in reverse)
-- **Space Complexity:** $\\mathcal{O}(1)$ (in-place sorting).`;
-    }
-
-    // Quick Sort
-    if (q.includes('quick sort') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Quick Sort Algorithm Implementation
-
-**Quick Sort** is an efficient divide-and-conquer sorting algorithm that selects a 'pivot' element and partitions the other elements into two sub-arrays according to whether they are less than or greater than the pivot.
-
-\`\`\`python
-def quick_sort(arr):
-    """
-    Sorts a list in ascending order using recursive Quick Sort.
-    Average Time: O(n log n), Worst Time: O(n^2), Space: O(log n)
-    """
-    if len(arr) <= 1:
-        return arr
-    
-    pivot = arr[len(arr) // 2]
-    left = [x for x in arr if x < pivot]
-    middle = [x for x in arr if x == pivot]
-    right = [x for x in arr if x > pivot]
-    
-    return quick_sort(left) + middle + quick_sort(right)
-
-# Example Execution
-numbers = [38, 27, 43, 3, 9, 82, 10]
-print("Sorted Array:", quick_sort(numbers))
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:**
-  - Average Case: $\\mathcal{O}(n \\log n)$
-  - Worst Case: $\\mathcal{O}(n^2)$ (when chosen pivot is consistently the minimum or maximum)
-- **Space Complexity:** $\\mathcal{O}(\\log n)$ call stack frames.`;
-    }
-
-    // Fibonacci
-    if (q.includes('fibonacci') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Fibonacci Series Implementation (Iterative & Dynamic Programming)
-
-The Fibonacci sequence is defined by the recurrence relation:
-
-$$F(0) = 0, \\quad F(1) = 1, \\quad F(n) = F(n-1) + F(n-2) \\quad \\text{for } n \\ge 2$$
-
-\`\`\`python
-def fibonacci_series(n):
-    """
-    Generates the first n Fibonacci numbers with O(n) time and O(1) space.
-    """
-    if n <= 0:
-        return []
-    if n == 1:
-        return [0]
-    
-    fib = [0, 1]
-    a, b = 0, 1
-    for _ in range(2, n):
-        a, b = b, a + b
-        fib.append(b)
-    return fib
-
-# Print first 10 Fibonacci terms
-print("First 10 Fibonacci terms:", fibonacci_series(10))
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:** $\\mathcal{O}(n)$
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space (excluding storage for the output list).`;
-    }
-
-    // SQL Second Highest Salary
-    if ((q.includes('highest salary') || q.includes('second highest')) && (q.includes('sql') || q.includes('query'))) {
-      return `### SQL Query: Second Highest Salary
-
-To find the second highest salary from an \`Employee\` table, use either the \`LIMIT / OFFSET\` clause or a subquery:
-
-\`\`\`sql
--- Approach 1: Subquery (ANSI SQL Compatible across MySQL, Oracle, PostgreSQL, SQL Server)
-SELECT MAX(salary) AS SecondHighestSalary
-FROM Employee
-WHERE salary < (
-    SELECT MAX(salary) 
-    FROM Employee
-);
-
--- Approach 2: Using LIMIT and OFFSET (MySQL / PostgreSQL / SQLite)
-SELECT DISTINCT salary AS SecondHighestSalary
-FROM Employee
-ORDER BY salary DESC
-LIMIT 1 OFFSET 1;
-\`\`\`
-
----
-
-### Explanation
-1. \`MAX(salary)\` identifies the absolute highest salary.
-2. The outer query filters for the maximum salary that is strictly less than the highest salary, correctly extracting the second highest value.
-3. \`DISTINCT\` ensures that duplicate salaries do not lead to ties returning the highest salary twice.`;
-    }
-
-    return null;
-  }
-
-  // Universal Live Academic Response Synthesizer
+  // 4. Tailored Conceptual Synthesizer (ChatGPT & Gemini Style with Analogies & Deep Structure)
   async function queryUniversalAcademicAI(query, syllabusContext) {
     const qLower = query.toLowerCase().trim();
+    const nature = classifyQuestionNature(query, false);
 
-    // 1. Check for programming code generation
-    const codeAns = tryGenerateCodeSolution(query);
-    if (codeAns) return codeAns;
+    // Path A: Math Derivation
+    if (nature === 'MATH_DERIVATION') {
+      const mathAns = tryGenerateTailoredMathSolution(query);
+      if (mathAns) return mathAns;
+    }
 
-    // 2. Check for Comparative Query ("difference between X and Y", "compare A and B", "A vs B")
+    // Path B: Code & Algorithm Implementation
+    if (nature === 'CODE_IMPLEMENTATION') {
+      const codeAns = tryGenerateTailoredCodeSolution(query);
+      if (codeAns) return codeAns;
+    }
+
+    // Path C: Comparative Analysis ("X vs Y", "Difference between X and Y")
     const compMatch = qLower.match(/(?:difference between|distinguish between|compare)\s+(.+?)\s+(?:and|with|to)\s+(.+?)(?:\?|$)/i) 
-                   || qLower.match(/(.+?)\s+vs\.?\s+(.+?)(?:\?|$)/i);
+                   || qLower.match(/(.+?)\s+(?:vs\.?|versus)\s+(.+?)(?:\?|$)/i);
 
     if (compMatch) {
       const termA = compMatch[1].replace(/^(the|a|an)\s+/i, '').trim();
@@ -575,18 +827,28 @@ LIMIT 1 OFFSET 1;
         const defA = (artA.extract.split('. ')[0] || artA.title) + '.';
         const defB = (artB.extract.split('. ')[0] || artB.title) + '.';
 
-        return `### Comparison: ${artA.title} vs. ${artB.title}
-
-| Feature / Dimension | ${artA.title} | ${artB.title} |
-| :--- | :--- | :--- |
-| **Category** | ${descA} | ${descB} |
-| **Primary Definition** | ${defA} | ${defB} |
-| **Core Architecture** | Operates according to formal principles of ${artA.title}. | Operates according to formal principles of ${artB.title}. |
-| **Primary Use Cases** | Systems requiring specialized ${termA} mechanics. | Systems requiring specialized ${termB} mechanics. |
+        return `### Comprehensive Comparison: ${artA.title} vs. ${artB.title}
 
 ---
 
-### In-Depth Breakdown
+### Executive Summary Verdict
+While **${artA.title}** is optimized for ${descA.toLowerCase()}, **${artB.title}** provides dedicated architecture for ${descB.toLowerCase()}.
+
+---
+
+### Detailed Comparison Matrix
+
+| Evaluation Dimension | ${artA.title} | ${artB.title} |
+| :--- | :--- | :--- |
+| **Domain Category** | ${descA} | ${descB} |
+| **Core Definition** | ${defA} | ${defB} |
+| **Underlying Mechanism** | Governed by the internal state and protocol specifications of ${artA.title}. | Governed by the internal state and protocol specifications of ${artB.title}. |
+| **Operational Overhead** | Characterized by specific resource boundaries and allocation profiles. | Characterized by specific resource boundaries and allocation profiles. |
+| **Primary Use Cases** | Workloads requiring specialized ${termA} dynamics. | Workloads requiring specialized ${termB} dynamics. |
+
+---
+
+### Deep Technical Breakdown
 
 #### 1. ${artA.title}
 ${artA.extract}
@@ -596,12 +858,13 @@ ${artB.extract}
 
 ---
 
-### Key Takeaway
-While **${artA.title}** primarily emphasizes ${descA.toLowerCase()}, **${artB.title}** focuses on ${descB.toLowerCase()}. The appropriate choice depends on system throughput, operational constraints, and architectural requirements.`;
+### Decision Matrix: When to Choose Which?
+- **Choose ${artA.title} when:** Your system demands strict adherence to ${descA.toLowerCase()} and domain-specific throughput.
+- **Choose ${artB.title} when:** Your architecture prioritizes ${descB.toLowerCase()} with minimized operational friction.`;
       }
     }
 
-    // 3. Single Subject Knowledge Retrieval via Wikipedia Live Engine
+    // Path D: Conceptual / Scientific Knowledge with Intuitive Real-World Analogy
     const cleanTopic = query
       .replace(/^(what is|explain|describe|define|tell me about|how does|why is|what are|state)\s+/i, '')
       .replace(/[?!.]/g, '')
@@ -613,22 +876,44 @@ While **${artA.title}** primarily emphasizes ${descA.toLowerCase()}, **${artB.ti
       const definition = sentences.slice(0, 2).join(' ');
       const mechanism = sentences.slice(2, 5).join(' ') || sentences.slice(1).join(' ');
 
+      // Build intuitive analogy in the style of Gemini & ChatGPT
+      const analogyMap = {
+        'photosynthesis': 'Think of photosynthesis as solar-powered cooking inside a plant: sunlight acts as the stove, water and carbon dioxide are the raw ingredients, and glucose (sugar) is the nutritious meal stored for energy, with fresh oxygen released as clean steam.',
+        'mitochondria': 'Think of the mitochondrion as the rechargeable battery pack or power generator of a smartphone: it converts fuel (nutrients) into usable energy currency (ATP) that powers all phone operations.',
+        'doppler effect': 'Think of standing beside a highway as an ambulance rushes past: as it speeds toward you, each sound wave gets squeezed closer together (higher pitch siren), and as it speeds away, the waves stretch out (lower, fading pitch).',
+        'api': 'Think of an API (Application Programming Interface) as a waiter in a restaurant: you (the client) order from the menu, the waiter delivers your request to the kitchen (the server), and brings back the cooked dish (the data response).',
+        'operating system': 'Think of the operating system as the conductor of an orchestra: individual musicians (CPU, RAM, disk, display) have immense talent, but the conductor synchronizes them so they perform harmoniously without colliding.',
+        'deadlock': 'Think of a four-way traffic intersection where four cars arrive simultaneously at each corner: every driver waits for the car on their right to move first, causing all vehicles to remain frozen indefinitely.'
+      };
+
+      let analogy = '';
+      for (const [key, val] of Object.entries(analogyMap)) {
+        if (cleanTopic.toLowerCase().includes(key)) {
+          analogy = `\n\n> 💡 **Intuitive Analogy:** ${val}\n`;
+          break;
+        }
+      }
+
+      if (!analogy) {
+        analogy = `\n\n> 💡 **Conceptual Perspective:** Think of **${article.title}** as a specialized engine within its domain: it takes specific theoretical or environmental inputs, transforms them through systematic rules, and produces reliable, predictable outcomes.\n`;
+      }
+
       return `### ${article.title} ${article.description ? `*(${article.description})*` : ''}
 
 ${definition}
-
+${analogy}
 ---
 
-### Core Working Principle & Fundamentals
+### Core Working Principles & Mechanics
 
 ${mechanism}
 
 ---
 
-### Key Properties & Real-World Applications
-- **Theoretical Foundations:** Grounded in the rigorous scientific and mathematical frameworks of **${article.title}**.
-- **System Constraints & Properties:** Governed by established physical, mathematical, or algorithmic laws.
-- **Practical Deployment:** Extensively applied across modern science, software engineering, industrial systems, and academic research.`;
+### Key Takeaways & Practical Impact
+- **Theoretical Foundations:** Rigorously established in the core literature of **${article.title}**.
+- **System Constraints & Properties:** Governed by strict conservation, algorithmic bounds, or domain-specific invariants.
+- **Industry & Academic Deployment:** Widely utilized across modern engineering, scientific research, and real-world production environments.`;
     }
 
     return null;
@@ -644,7 +929,7 @@ ${mechanism}
         const timeoutId = setTimeout(() => controller.abort(), 9000);
 
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`;
-        const systemInstruction = "You are an expert AI Academic Tutor and Professor. Provide a clear, direct, comprehensive, high-quality answer to the question asked. Use LaTeX notation ($...$ and $$...$$) for formulas. Use clean Markdown tables when comparing. Do not include introductory filler or robotic meta-text.";
+        const systemInstruction = "You are an expert AI Academic Tutor and Professor. Provide responses tailored to the question nature: use step-by-step mathematical reasoning with LaTeX ($...$ and $$...$$) for math, clean commented code with complexity tables for programming, structured comparison tables for contrast questions, and intuitive analogies for concepts. Do not include robotic meta-introductions.";
         
         let promptText = `${systemInstruction}\n\nQuestion: ${query}`;
         if (syllabusContext) {
@@ -670,7 +955,7 @@ ${mechanism}
           }
         }
       } catch (err) {
-        console.warn("Gemini direct API call error, falling back to Universal Academic Engine:", err);
+        console.warn("Gemini direct API call notice, falling back to Universal Engine:", err);
       }
     }
 
@@ -693,6 +978,7 @@ ${mechanism}
     cleaned = cleaned.replace(/^(?:Sure!|Certainly!|Here is (?:an|the) (?:explanation|answer):|As an AI language model,)\s*/i, '');
     return cleaned.trim();
   }
+
 
 
   // Master Academic Knowledge Engine (Authoritative Educational Intelligence across All Disciplines)
@@ -1647,26 +1933,30 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       const input = document.getElementById(inputId);
       let query = customQuery || (input ? input.value : '');
 
-      // Allow sending file with empty prompt (defaults to comprehensive analysis)
+      // Allow sending file with empty prompt
       if ((!query || !query.trim()) && attachedFileData) {
         query = `Please analyze this attached ${attachedFileData.name} (${attachedFileData.type}) file in detail. Explain all key concepts, formulas, data tables, and findings.`;
       }
 
       if (!query || !query.trim()) return;
 
-      lastUserQuery = query.trim();
+      const rawUserQuery = query.trim();
       if (input && !customQuery) {
         input.value = '';
       }
 
-      // Snapshot attached file for this question
+      // Snapshot attached file for this turn
       const fileSnapshot = attachedFileData;
       this.removeAttachedFile(isPopup);
+
+      // Conversational context resolution (resolves "it", "that", "this", "can you show code" to previous topic)
+      const contextualResolvedQuery = resolveConversationalTopic(rawUserQuery, lastUserQuery);
+      lastUserQuery = rawUserQuery;
 
       const threadId = isPopup ? 'fbChatMessages' : 'aiChatThread';
       const threadContainer = document.getElementById(threadId);
 
-      this.appendUserBubble(query, threadId, fileSnapshot);
+      this.appendUserBubble(rawUserQuery, threadId, fileSnapshot);
 
       const msgId = 'aimsg_' + (++messageCounter);
       const { contentContainer } = this.createAssistantStreamingBubble(msgId, threadId);
@@ -1675,36 +1965,51 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       this.updateSendButton(true, isPopup);
 
       try {
-        const sanitized = sanitizeUserQuery(query);
+        const sanitized = sanitizeUserQuery(contextualResolvedQuery);
         const qClean = sanitized.toLowerCase();
 
         // 1. Quick greetings
         if (quickGreetings[qClean]) {
           await streamTypewriter(quickGreetings[qClean], contentContainer, threadContainer);
-          this.finishMessage(msgId, quickGreetings[qClean], threadId);
+          this.finishMessage(msgId, quickGreetings[qClean], threadId, [
+            "What can you do?",
+            "Explain Lagrange Multipliers",
+            "Difference between TCP and UDP"
+          ]);
           return;
         }
 
         // Combine query with attached file data if present
-        let contextualQuery = query;
+        let contextualQuery = contextualResolvedQuery;
         if (fileSnapshot && fileSnapshot.text) {
-          contextualQuery = `[ATTACHED DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]:\n${fileSnapshot.text.substring(0, 3500)}\n\n[STUDENT QUESTION]:\n${query}`;
+          contextualQuery = `[ATTACHED DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]:\n${fileSnapshot.text.substring(0, 3500)}\n\n[USER INQUIRY]:\n${rawUserQuery}`;
         }
 
-        // 2. Strict Syllabus Grounding Check
-        const syllabusMatch = findSyllabusMatch(query);
+        // 2. Strict Syllabus & University Exam Grounding Check
+        const syllabusMatch = findSyllabusMatch(contextualResolvedQuery);
 
-        // 3. Multi-Provider Live AI Inference
+        // Classify question nature to tailor the follow-ups and response
+        const nature = classifyQuestionNature(contextualResolvedQuery, !!fileSnapshot);
+
+        // 3. Multi-Provider Live AI Inference (Gemini 1.5 Flash + Universal Academic Engine)
         let responseText = await queryLiveAI(contextualQuery, syllabusMatch ? syllabusMatch.item : null);
 
-        // 4. Fallback to Master Academic Knowledge Base (Pure ChatGPT/Gemini answer only)
+        // 4. Fallback to Master Academic Knowledge Base
         if (!responseText || responseText.length < 30) {
-          responseText = getMasterAcademicAnswer(query, syllabusMatch);
+          responseText = getMasterAcademicAnswer(contextualResolvedQuery, syllabusMatch);
         }
 
-        // Stream the pure answer smoothly
+        // Append to conversational memory history (ChatGPT/Gemini memory)
+        chatHistory.push({ role: 'user', content: rawUserQuery });
+        chatHistory.push({ role: 'assistant', content: responseText });
+        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+        // Generate tailored follow-up suggestion pills
+        const suggestions = generateFollowUpSuggestions(nature, rawUserQuery);
+
+        // Stream typewriter effect cleanly
         await streamTypewriter(responseText, contentContainer, threadContainer);
-        this.finishMessage(msgId, responseText, threadId);
+        this.finishMessage(msgId, responseText, threadId, suggestions);
 
       } catch (err) {
         console.error("AI Assistant processing error:", err);
@@ -1715,7 +2020,7 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       }
     },
 
-    // Pure ChatGPT / Gemini Style Bubble: ONLY THE ANSWER, ZERO METADATA/BADGES
+    // Signature ChatGPT / Gemini Style Bubble: Adaptive formatting, TTS Audio, & Dynamic Follow-Ups
     createAssistantStreamingBubble: function(msgId, threadId) {
       const container = document.getElementById(threadId);
       const bubble = document.createElement('div');
@@ -1723,8 +2028,8 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       bubble.className = 'flex items-start gap-3.5 mb-6 animate-fade-in group';
 
       bubble.innerHTML = `
-        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
-          AI
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 text-white flex-shrink-0 flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
         <div class="flex-1 min-w-0">
           <div class="ai-content-body text-slate-800 text-xs sm:text-sm leading-relaxed space-y-3">
@@ -1734,10 +2039,19 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
               <span class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
             </div>
           </div>
+          
+          <!-- Dynamic Follow-Up Suggestions Container (Signature Gemini/ChatGPT feature) -->
+          <div class="follow-up-chips mt-3 flex flex-wrap gap-1.5"></div>
+
+          <!-- Action Footer (Copy, Read Aloud / Listen, Regenerate) -->
           <div class="action-footer mt-2.5 flex items-center gap-2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onclick="BrainwareAITutor.copyMessage(this, '${msgId}')" title="Copy response" class="p-1 hover:text-slate-700 hover:bg-slate-100 rounded-md transition flex items-center gap-1 text-xs">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
               <span class="text-[11px]">Copy</span>
+            </button>
+            <button onclick="BrainwareAITutor.readAloud(this, '${msgId}')" title="Read Aloud / Listen to Voice" class="p-1 hover:text-blue-600 hover:bg-blue-50 rounded-md transition flex items-center gap-1 text-xs">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+              <span class="text-[11px]">Listen</span>
             </button>
             <button onclick="BrainwareAITutor.regenerateLast()" title="Regenerate" class="p-1 hover:text-slate-700 hover:bg-slate-100 rounded-md transition flex items-center gap-1 text-xs">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -1756,9 +2070,59 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       };
     },
 
-    finishMessage: function(msgId, fullText, threadId) {
+    // Read Aloud / Text-to-Speech (Signature ChatGPT Voice & Gemini Audio)
+    readAloud: function(btn, msgId) {
+      if (typeof window.speechSynthesis === 'undefined') {
+        alert("Text-to-speech is not supported by your browser.");
+        return;
+      }
+
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg><span class="text-[11px]">Listen</span>`;
+        return;
+      }
+
       const bubble = document.getElementById(msgId);
       if (!bubble) return;
+      const body = bubble.querySelector('.ai-content-body');
+      if (!body) return;
+
+      let raw = body.innerText || body.textContent;
+      // Clean math markdown markers for natural conversational audio
+      let speechText = raw.replace(/[\$#*_`]/g, '').replace(/\\lambda/g, 'lambda').replace(/\\alpha/g, 'alpha').trim();
+
+      const utterance = new SpeechSynthesisUtterance(speechText);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      btn.innerHTML = `<svg class="w-3.5 h-3.5 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="text-[11px] text-blue-600 font-bold">Stop</span>`;
+
+      utterance.onend = () => {
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg><span class="text-[11px]">Listen</span>`;
+      };
+
+      utterance.onerror = () => {
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg><span class="text-[11px]">Listen</span>`;
+      };
+
+      window.speechSynthesis.speak(utterance);
+    },
+
+    finishMessage: function(msgId, fullText, threadId, suggestions = []) {
+      const bubble = document.getElementById(msgId);
+      if (!bubble) return;
+
+      // Render dynamic follow-up suggestion pills (ChatGPT / Gemini feature)
+      if (suggestions && suggestions.length > 0) {
+        const chipsContainer = bubble.querySelector('.follow-up-chips');
+        if (chipsContainer) {
+          chipsContainer.innerHTML = suggestions.map(s => {
+            const escaped = this.escapeHtml(s).replace(/'/g, "\\'");
+            return `<button onclick="BrainwareAITutor.askQuestion('${escaped}')" class="text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded-full border border-blue-200/80 shadow-xs transition hover:scale-[1.02] flex items-center gap-1.5"><svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${this.escapeHtml(s)}</button>`;
+          }).join('');
+        }
+      }
 
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
@@ -1767,6 +2131,7 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       const container = document.getElementById(threadId);
       if (container) container.scrollTop = container.scrollHeight;
     },
+
 
     appendUserBubble: function(text, threadId, fileSnapshot = null) {
       const container = document.getElementById(threadId);
