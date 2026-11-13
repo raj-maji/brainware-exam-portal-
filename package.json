@@ -1,0 +1,22 @@
+{
+  "name": "brainware-academic-ai",
+  "version": "2.0.0",
+  "description": "Brainware University - Open Academic AI Agent & Educational Assistant",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "academic-ai",
+    "gemini",
+    "education",
+    "brainware-university",
+    "tutor"
+  ],
+  "author": "Brainware University AI Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

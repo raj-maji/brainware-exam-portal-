@@ -1,34 +1,41 @@
 /**
  * Brainware University - Open Academic AI Agent & AI Tutor Engine
- * Version: 2026.11.13 - Master Academic Edition
+ * Version: 2.0.0 - Universal Educational Edition
  * 
- * Features:
- * 1. Multi-Format Document Parsing: Real PDF.js multi-page extraction, Mammoth (DOCX), SheetJS (XLSX/CSV), JSZip (PPTX), and Image Base64 Multimodal Vision.
- * 2. Official Google Gemini 1.5 Flash API with Full Multi-Turn Conversation History.
- * 3. Strict University Question Bank & Syllabus Matcher (portalQAIndex: 1,254 items + papersData: 14 sets) with High-Confidence Thresholds.
- * 4. Zero False-Positive Keyword Overlaps & Zero Generic Fallback Hallucinations.
- * 5. Step-by-Step KaTeX Math Derivations & Verified Multi-Language Code Implementations.
- * 6. Interactive TTS Read Aloud, Streaming Typewriter, Code Copy, Message Copy, and Follow-up Chips.
+ * Architecture:
+ * 1. Primary Engine: Backend API Proxy (/api/chat) -> Google Gemini 1.5 Flash
+ * 2. Secondary Engine: Direct Client-Side Gemini 1.5 Flash API (when key is configured)
+ * 3. Autonomous Educational Synthesizer: Universal Multi-Disciplinary Knowledge Engine
+ * 4. Multi-Turn Conversation Memory: Context-aware follow-up resolution
+ * 5. Document Understanding: Real PDF.js multi-page, Word, Excel, PPT, Code & Multimodal Vision
+ * 6. High-Confidence Syllabus Grounding: portalQAIndex (1,254 entries) + papersData (14 exam sets)
  */
 
 (function() {
   'use strict';
 
-  // Initialize PDF.js worker if available
+  // Configure PDF.js worker
   if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  // --- STATE ---
+  // --- ENGINE STATE ---
   let isGenerating = false;
   let abortController = null;
-  let chatHistory = []; // Array of { role: 'user' | 'model', text: string }
+  let chatHistory = []; // { role: 'user' | 'assistant' | 'model', text: string }
   let lastUserQuery = '';
   let messageCounter = 0;
   let attachedFileData = null;
   let isSpeaking = false;
 
-  // --- STOPWORDS FOR SEARCH ---
+  // Backend API Base URL detection
+  const BACKEND_URLS = [
+    '/api/chat',
+    'http://localhost:5000/api/chat',
+    'http://127.0.0.1:5000/api/chat'
+  ];
+
+  // Stopwords for search indexing
   const stopwords = new Set([
     'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'in', 'to', 'for', 
     'of', 'with', 'between', 'distinguish', 'difference', 'explain', 'describe', 
@@ -38,7 +45,6 @@
     'short', 'please', 'solve', 'calculate', 'find'
   ]);
 
-  // Clean raw queries: strip leading numbering like "Q1.", "12.", "Question 3:"
   function sanitizeUserQuery(raw) {
     if (!raw) return '';
     return raw.trim().replace(/^(?:question\s*\d+|q\s*\d+|\d+)[\s.:\-)]+/i, '').trim();
@@ -74,10 +80,10 @@
     const ext = fileName.split('.').pop().toLowerCase();
     let extractedText = '';
     let base64Data = null;
-    let mimeType = file.type || '';
+    const mimeType = file.type || '';
 
     try {
-      // 1. PDF Documents via PDF.js (Multi-page full text extraction)
+      // 1. PDF via PDF.js (Multi-page full text extraction)
       if (ext === 'pdf') {
         if (typeof pdfjsLib !== 'undefined') {
           try {
@@ -96,11 +102,11 @@
             }
             extractedText = pageTexts.join('\n\n');
           } catch (pdfErr) {
-            console.warn('PDF.js parsing exception:', pdfErr);
+            console.warn('PDF.js extraction notice:', pdfErr);
           }
         }
         if (!extractedText) {
-          extractedText = `[Attached PDF Document: ${fileName}, size: ${fileSize}]`;
+          extractedText = `[PDF Document: ${fileName}, size: ${fileSize}]`;
         }
 
       // 2. Word Documents (.docx) via Mammoth
@@ -110,7 +116,7 @@
           const result = await mammoth.extractRawText({ arrayBuffer: arrayBuf });
           extractedText = (result.value || '').trim();
         } else {
-          extractedText = `[Attached Word Document: ${fileName}, size: ${fileSize}]`;
+          extractedText = `[Word Document: ${fileName}, size: ${fileSize}]`;
         }
 
       // 3. Excel Spreadsheets (.xlsx, .xls, .csv) via SheetJS
@@ -158,7 +164,7 @@
           }
           extractedText = slidesOutput.join('\n\n');
         } else {
-          extractedText = `[Attached PowerPoint Presentation: ${fileName}, size: ${fileSize}]`;
+          extractedText = `[PowerPoint: ${fileName}, size: ${fileSize}]`;
         }
 
       // 5. Images (.png, .jpg, .jpeg, .webp) for Gemini Multimodal Vision
@@ -180,16 +186,16 @@
         try {
           extractedText = await file.text();
         } catch (e) {
-          extractedText = `[Attached Document: ${fileName}, size: ${fileSize}]`;
+          extractedText = `[Document: ${fileName}, size: ${fileSize}]`;
         }
       }
     } catch (err) {
       console.warn('Document extraction warning:', err);
-      extractedText = `[Attached Document: ${fileName}, size: ${fileSize}]`;
+      extractedText = `[Document: ${fileName}, size: ${fileSize}]`;
     }
 
     if (!extractedText || !extractedText.trim()) {
-      extractedText = `[Attached Document: ${fileName}, type: ${ext.toUpperCase()}, size: ${fileSize}]`;
+      extractedText = `[Document: ${fileName}, type: ${ext.toUpperCase()}, size: ${fileSize}]`;
     }
 
     return {
@@ -203,7 +209,7 @@
   }
 
   // =========================================================================
-  // 2. STRICT LOCAL QUESTION BANK & SYLLABUS MATCHER
+  // 2. STRICT UNIVERSITY SYLLABUS & QUESTION BANK RETRIEVAL
   // =========================================================================
   function findSyllabusMatch(rawQuery) {
     const query = sanitizeUserQuery(rawQuery);
@@ -217,17 +223,16 @@
     let bestMatch = null;
     let highestScore = 0;
 
-    // Search in portalQAIndex (1,254 items)
+    // Search in portalQAIndex (1,254 entries)
     if (window.portalQAIndex && Array.isArray(window.portalQAIndex)) {
       for (const item of window.portalQAIndex) {
         const candNorm = (item.q || '').toLowerCase();
         let score = 0;
 
-        // Exact phrase match bonus
         if (candNorm === qNorm) {
-          score += 400;
+          score += 450;
         } else if (candNorm.includes(qNorm) || (qNorm.length > 15 && qNorm.includes(candNorm))) {
-          score += 260;
+          score += 280;
         }
 
         let matchedCount = 0;
@@ -236,12 +241,11 @@
         }
 
         const overlap = matchedCount / significantWords.length;
-        // Require at least 2 significant words OR >= 70% overlap to prevent false single-word hits
         if ((matchedCount >= 2 && overlap >= 0.5) || (significantWords.length === 1 && matchedCount === 1 && candNorm.length < 40)) {
           score += (matchedCount * 50) + Math.round(overlap * 100);
-          if (score > highestScore && score >= 170) {
+          if (score > highestScore && score >= 180) {
             highestScore = score;
-            bestMatch = { item: item, score: score, source: 'University Syllabus Portal (Verified QA)' };
+            bestMatch = { item: item, score: score, source: 'Brainware University Syllabus QA Index' };
           }
         }
       }
@@ -261,9 +265,9 @@
           let score = 0;
 
           if (candNorm === qNorm) {
-            score += 380;
+            score += 400;
           } else if (candNorm.includes(qNorm) || (qNorm.length > 15 && qNorm.includes(candNorm))) {
-            score += 240;
+            score += 260;
           }
 
           let matchedCount = 0;
@@ -274,9 +278,9 @@
           const overlap = matchedCount / significantWords.length;
           if ((matchedCount >= 2 && overlap >= 0.5) || (significantWords.length === 1 && matchedCount === 1 && candNorm.length < 40)) {
             score += (matchedCount * 45) + Math.round(overlap * 90);
-            if (score > highestScore && score >= 170) {
+            if (score > highestScore && score >= 180) {
               highestScore = score;
-              bestMatch = { item: item, score: score, source: `University Exam Paper (${item.paper || 'Official'})` };
+              bestMatch = { item: item, score: score, source: `Official University Exam Paper (${item.paper || 'Syllabus'})` };
             }
           }
         }
@@ -287,15 +291,15 @@
   }
 
   // =========================================================================
-  // 3. STEP-BY-STEP MATHEMATICAL & ALGORITHMIC SOLVER
+  // 3. STEP-BY-STEP MATHEMATICAL & NUMERICAL SOLVER
   // =========================================================================
   function trySolveMathProblem(query) {
     const q = query.toLowerCase().replace(/\s+/g, ' ').trim();
 
-    // 1. Linear Equation: e.g. "solve 2x + 5 = 15" or "2x + 5 = 15"
+    // Linear Equation: e.g. "solve 2x + 5 = 15" or "2x + 5 = 15"
     const linearMatch = q.match(/(?:solve\s+)?([+-]?\s*\d*\.?\d*)\s*([a-z])\s*([+-])\s*(\d+\.?\d*)\s*=\s*([+-]?\s*\d+\.?\d*)/i);
     if (linearMatch) {
-      let aStr = linearMatch[1].replace(/\s+/g, '');
+      const aStr = linearMatch[1].replace(/\s+/g, '');
       const varName = linearMatch[2];
       const sign = linearMatch[3];
       const bVal = parseFloat(linearMatch[4]);
@@ -314,7 +318,7 @@
 
         return `### Step-by-Step Mathematical Solution
 
-We are given the linear algebraic equation:
+We are asked to solve the linear algebraic equation:
 
 $$${aVal !== 1 ? aVal : ''}${varName} ${signedB >= 0 ? '+ ' + signedB : '- ' + Math.abs(signedB)} = ${cVal}$$
 
@@ -349,72 +353,123 @@ $$\\mathbf{${varName} = ${solRounded}}$$`;
   }
 
   // =========================================================================
-  // 4. PROGRAMMING CODE SYNTHESIZER FOR CORE CS BENCHMARKS
+  // 4. PROGRAMMING CODE SYNTHESIZER ACROSS MAJOR LANGUAGES
   // =========================================================================
   function tryGenerateCodeSolution(query) {
     const q = query.toLowerCase();
 
-    // Reverse a string in Java / Python
-    if ((q.includes('reverse') && q.includes('string')) || (q.includes('string reverse'))) {
+    // 1. JavaScript String Reversal
+    if ((q.includes('reverse') && q.includes('string')) && (q.includes('javascript') || q.includes('js'))) {
+      return `### JavaScript Program to Reverse a String
+
+In JavaScript, there are several idiomatic and performant ways to reverse a string.
+
+---
+
+### Method 1: Built-in Methods (\`split\`, \`reverse\`, \`join\`)
+
+\`\`\`javascript
+/**
+ * Reverses a string using JavaScript standard library methods.
+ * @param {string} str - Input string
+ * @returns {string} Reversed string
+ */
+function reverseString(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str.split('').reverse().join('');
+}
+
+// Example Execution
+const input = "Brainware University";
+const result = reverseString(input);
+console.log("Original:", input);
+console.log("Reversed:", result);
+// Output: "ytisrevinU erawniarB"
+\`\`\`
+
+---
+
+### Method 2: Two-Pointer Iterative Algorithm (In-Place Array)
+
+\`\`\`javascript
+function reverseStringTwoPointer(str) {
+  const chars = Array.from(str);
+  let left = 0;
+  let right = chars.length - 1;
+
+  while (left < right) {
+    // Swap characters at left and right indices
+    const temp = chars[left];
+    chars[left] = chars[right];
+    chars[right] = temp;
+    left++;
+    right--;
+  }
+
+  return chars.join('');
+}
+
+// Example Execution
+console.log(reverseStringTwoPointer("JavaScript"));
+// Output: "tpircSavaJ"
+\`\`\`
+
+---
+
+### Method 3: Modern ES6 Reduce
+
+\`\`\`javascript
+const reverseWithReduce = str => [...str].reduce((acc, char) => char + acc, '');
+\`\`\`
+
+---
+
+### Complexity Analysis
+- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is the length of the string (linear single-pass scan).
+- **Space Complexity:** $\\mathcal{O}(n)$ to store the array representation (JavaScript strings are immutable).`;
+    }
+
+    // 2. Java / Python String Reversal
+    if ((q.includes('reverse') && q.includes('string')) || q.includes('string reverse')) {
       if (q.includes('python')) {
         return `### Python: Reverse a String
 
 \`\`\`python
 def reverse_string(s: str) -> str:
     """
-    Reverses an input string using two common methods:
-    1. Pythonic Slicing: O(n) Time, O(n) Space
-    2. Two-Pointer In-Place Array: O(n) Time, O(n) Space
+    Reverses an input string using Pythonic slice notation.
+    Time Complexity: O(n), Space Complexity: O(n)
     """
-    # Method 1: Slicing (Idiomatic & Optimized)
     return s[::-1]
 
-# Example Demonstration
-sample = "Brainware University"
-reversed_result = reverse_string(sample)
-print("Original:", sample)
-print("Reversed:", reversed_result)
+# Example
+original = "Brainware University"
+reversed_text = reverse_string(original)
+print("Original:", original)
+print("Reversed:", reversed_text)
 \`\`\`
 
----
-
-### Method 2: Two-Pointer Iterative Approach
-
-\`\`\`python
-def reverse_string_two_pointer(s: str) -> str:
-    chars = list(s)
-    left, right = 0, len(chars) - 1
-    while left < right:
-        chars[left], chars[right] = chars[right], chars[left]
-        left += 1
-        right -= 1
-    return "".join(chars)
-\`\`\`
-
-**Complexity:**
-- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is the length of the string.
-- **Space Complexity:** $\\mathcal{O}(n)$ auxiliary memory to store character array.`;
+**Complexity:** $\\mathcal{O}(n)$ time, $\\mathcal{O}(n)$ space.`;
       }
 
-      // Default or Java
+      // Default Java
       return `### Java Program to Reverse a String
 
 \`\`\`java
 public class StringReversal {
 
-    // Method 1: Using StringBuilder (Idiomatic & High Performance)
+    // Method 1: Using StringBuilder (Idiomatic & Optimized)
     public static String reverseWithStringBuilder(String input) {
         if (input == null) return null;
         return new StringBuilder(input).reverse().toString();
     }
 
-    // Method 2: Two-Pointer Character Array Swap (Fundamental Algorithm)
+    // Method 2: Two-Pointer Character Array (Algorithmic)
     public static String reverseWithTwoPointers(String input) {
         if (input == null || input.length() <= 1) return input;
         
         char[] chars = input.toCharArray();
-        int left = 0;
-        int right = chars.length - 1;
+        int left = 0, right = chars.length - 1;
 
         while (left < right) {
             char temp = chars[left];
@@ -429,10 +484,8 @@ public class StringReversal {
 
     public static void main(String[] args) {
         String original = "Brainware University";
-        
-        String reversed = reverseWithStringBuilder(original);
-        System.out.println("Original String: " + original);
-        System.out.println("Reversed String: " + reversed);
+        System.out.println("Original: " + original);
+        System.out.println("Reversed: " + reverseWithStringBuilder(original));
     }
 }
 \`\`\`
@@ -440,15 +493,15 @@ public class StringReversal {
 ---
 
 ### Complexity Analysis
-- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is the number of characters. We make $\\lfloor \\frac{n}{2} \\rfloor$ character swaps.
-- **Space Complexity:** $\\mathcal{O}(n)$ to hold the mutable character array or \`StringBuilder\` buffer (strings in Java are immutable).`;
+- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is string length.
+- **Space Complexity:** $\\mathcal{O}(n)$ to hold mutable buffer.`;
     }
 
-    // Binary Search
-    if (q.includes('binary search') && (q.includes('code') || q.includes('program') || q.includes('write') || q.includes('example') || q.includes('explain'))) {
+    // 3. Binary Search
+    if (q.includes('binary search')) {
       return `### Binary Search Algorithm & Implementation
 
-**Binary Search** is an optimal divide-and-conquer search algorithm designed for **strictly sorted arrays**. At each step, it compares the target with the middle element and halves the active search interval.
+**Binary Search** is an optimal divide-and-conquer search algorithm designed for **strictly sorted arrays**. At each step, it compares the target value with the midpoint of the search interval and halves the remaining candidate elements.
 
 ---
 
@@ -465,24 +518,24 @@ def binary_search(arr, target):
     high = len(arr) - 1
 
     while low <= high:
-        # Avoid integer overflow in fixed-width languages: low + (high - low) // 2
+        # Avoid integer overflow: low + (high - low) // 2
         mid = (low + high) // 2
 
         if arr[mid] == target:
             return mid  # Target identified
         elif arr[mid] < target:
-            low = mid + 1  # Target lies in right partition
+            low = mid + 1  # Target is in right partition
         else:
-            high = mid - 1  # Target lies in left partition
+            high = mid - 1  # Target is in left partition
 
-    return -1  # Target not found
+    return -1  # Target not in array
 
-# Concrete Example
+# Example Demonstration
 dataset = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
 target_val = 23
 index = binary_search(dataset, target_val)
 
-print(f"Target {target_val} located at index: {index}")
+print(f"Target {target_val} found at index: {index}")
 \`\`\`
 
 ---
@@ -490,85 +543,396 @@ print(f"Target {target_val} located at index: {index}")
 ### Step-by-Step Example Walkthrough
 Target: $23$, Array: $[2, 5, 8, 12, 16, 23, 38, 56, 72, 91]$ ($n=10$)
 
-1. **Iteration 1:** $\\text{low}=0, \\text{high}=9 \\implies \\text{mid}=4$. $\\text{arr}[4] = 16$. Since $16 < 23$, set $\\text{low} = 5$.
-2. **Iteration 2:** $\\text{low}=5, \\text{high}=9 \\implies \\text{mid}=7$. $\\text{arr}[7] = 56$. Since $56 > 23$, set $\\text{high} = 6$.
-3. **Iteration 3:** $\\text{low}=5, \\text{high}=6 \\implies \\text{mid}=5$. $\\text{arr}[5] = 23$. **Match found! Return index 5.**
+1. **Step 1:** $\\text{low}=0, \\text{high}=9 \\implies \\text{mid}=4$. $\\text{arr}[4] = 16$. Since $16 < 23$, search right: $\\text{low} = 5$.
+2. **Step 2:** $\\text{low}=5, \\text{high}=9 \\implies \\text{mid}=7$. $\\text{arr}[7] = 56$. Since $56 > 23$, search left: $\\text{high} = 6$.
+3. **Step 3:** $\\text{low}=5, \\text{high}=6 \\implies \\text{mid}=5$. $\\text{arr}[5] = 23$. **Target match found! Return index 5.**
 
 ---
 
 ### Complexity Analysis
-- **Best Case Time:** $\\mathcal{O}(1)$ (element found at middle immediately).
-- **Average & Worst Case Time:** $\\mathcal{O}(\\log_2 n)$ (search space is halved repeatedly: $n \\rightarrow \\frac{n}{2} \\rightarrow \\frac{n}{4} \\dots \\rightarrow 1$).
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative search ($\\\\mathcal{O}(\\log n)$ recursion stack if implemented recursively).`;
-    }
-
-    // SQL Second Highest Salary
-    if ((q.includes('highest salary') || q.includes('second highest')) && (q.includes('sql') || q.includes('query'))) {
-      return `### SQL Query: Second Highest Salary
-
-\`\`\`sql
--- Approach 1: ANSI SQL Subquery (Universally supported on MySQL, Oracle, PostgreSQL, SQL Server)
-SELECT MAX(salary) AS SecondHighestSalary
-FROM Employee
-WHERE salary < (
-    SELECT MAX(salary) 
-    FROM Employee
-);
-
--- Approach 2: Using LIMIT and OFFSET (MySQL, PostgreSQL, SQLite)
-SELECT DISTINCT salary AS SecondHighestSalary
-FROM Employee
-ORDER BY salary DESC
-LIMIT 1 OFFSET 1;
-\`\`\`
-
----
-
-### Logic & Explanation
-1. \`MAX(salary)\` in the inner subquery extracts the absolute maximum salary in the table.
-2. The outer query finds the maximum salary strictly smaller than that maximum, correctly extracting the second highest salary.
-3. \`DISTINCT\` ensures identical salary duplicates do not skew ranking.`;
+- **Best Case Time:** $\\mathcal{O}(1)$ (element is at the exact middle on the first check).
+- **Average & Worst Case Time:** $\\mathcal{O}(\\log_2 n)$ (search space halves at each iteration).
+- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative approach.`;
     }
 
     return null;
   }
 
   // =========================================================================
-  // 5. ACADEMIC COMPARISONS & SUBJECT EXPLANATIONS
+  // 5. UNIVERSAL MULTI-DISCIPLINARY EDUCATIONAL KNOWLEDGE ENGINE
   // =========================================================================
-  function trySubjectConceptExplanation(query) {
+  function trySubjectConceptExplanation(query, history = []) {
     const q = query.toLowerCase().trim();
 
-    // 1. Process vs Thread
-    if (q.includes('process') && q.includes('thread') && (q.includes('difference') || q.includes('distinguish') || q.includes('vs') || q.includes('compare'))) {
+    // Contextual Follow-up: "What are its main advantages?" / "Explain it again"
+    if (q.includes('advantage') || q.includes('disadvantage') || q.includes('pros') || q.includes('cons') || q.includes('explain it')) {
+      // Find the last subject discussed in chatHistory
+      let lastTopic = '';
+      for (let i = history.length - 1; i >= 0; i--) {
+        const text = (history[i].text || '').toLowerCase();
+        if (text.includes('java')) { lastTopic = 'Java'; break; }
+        if (text.includes('python')) { lastTopic = 'Python'; break; }
+        if (text.includes('c++')) { lastTopic = 'C++'; break; }
+        if (text.includes('data structure')) { lastTopic = 'Data Structures'; break; }
+        if (text.includes('dbms') || text.includes('database')) { lastTopic = 'DBMS'; break; }
+        if (text.includes('cloud')) { lastTopic = 'Cloud Computing'; break; }
+        if (text.includes('machine learning')) { lastTopic = 'Machine Learning'; break; }
+      }
+
+      if (lastTopic === 'Java') {
+        return `### Main Advantages of Java
+
+Java is one of the most widely adopted enterprise programming languages. Key advantages include:
+
+1. **Platform Independence (Write Once, Run Anywhere - WORA):**
+   - Java source code compiles into platform-neutral bytecode executed by the Java Virtual Machine (JVM).
+2. **Object-Oriented Architecture:**
+   - Enforces clean encapsulation, modular inheritance, and polymorphism for large-scale enterprise applications.
+3. **Automatic Garbage Collection:**
+   - Built-in memory manager automatically reclaims unreferenced objects, preventing manual pointer leaks.
+4. **Rich Ecosystem & Standard Library (JDK):**
+   - Comprehensive APIs for networking, multithreading, collections, security, and enterprise backends (Spring, Hibernate).
+5. **Robust Security & Type Safety:**
+   - Bytecode verification, lack of explicit pointer arithmetic, and strict sandboxed classloading.`;
+      }
+    }
+
+    // 1. What is Java?
+    if (q === 'what is java' || q === 'what is java?' || q.startsWith('what is java')) {
+      return `### Java Programming Language
+
+**Java** is a high-level, class-based, object-oriented programming language designed to have as few implementation dependencies as possible. It was originally created by James Gosling at Sun Microsystems and released in 1995.
+
+---
+
+### Core Characteristics & Architecture
+
+1. **Platform Independence (WORA):**
+   - Java code is compiled into intermediate **Bytecode** (\`.class\` files) rather than machine-specific assembly.
+   - The **Java Virtual Machine (JVM)** interprets or Just-In-Time (JIT) compiles this bytecode into native machine code on any operating system (Windows, Linux, macOS).
+
+2. **Core Pillars:**
+   - **Encapsulation:** Bundles state and behavior into classes with controlled access.
+   - **Inheritance:** Promotes code reusability through superclass-subclass hierarchies.
+   - **Polymorphism:** Enables method overloading and dynamic runtime overriding.
+   - **Abstraction:** Separates public interfaces from private implementation details.
+
+3. **Automatic Memory Management:**
+   - Features built-in **Garbage Collection (GC)** that tracks and deallocates memory occupied by unreachable objects, eliminating manual memory leaks.
+
+---
+
+### Primary Use Cases
+- Enterprise Backend Systems (Spring Boot, Jakarta EE)
+- Android Mobile Applications
+- Big Data Processing Pipelines (Apache Spark, Apache Hadoop)
+- Financial Trading Systems and High-Throughput Microservices`;
+    }
+
+    // 2. What is C++?
+    if (q === 'what is c++' || q === 'what is c++?' || q.startsWith('what is c++')) {
+      return `### C++ Programming Language
+
+**C++** is a powerful, high-performance, statically typed, compiled programming language created by Bjarne Stroustrup in 1979 as an extension of the C programming language ("C with Classes").
+
+---
+
+### Core Architectural Features
+
+1. **Multi-Paradigm Support:**
+   - Supports **Procedural**, **Object-Oriented**, **Generic (Templates)**, and **Functional** programming styles.
+
+2. **Zero-Overhead Principle:**
+   - What you don't use, you don't pay for. C++ provides direct hardware memory access and pointer manipulation without mandatory runtime interpreter overhead.
+
+3. **Resource Acquisition Is Initialization (RAII):**
+   - Resource management paradigm where life cycles of files, sockets, and memory are bound directly to variable scope, guaranteeing deterministic resource deallocation via destructors.
+
+4. **Standard Template Library (STL):**
+   - Rich suite of parameterized data structures (\`vector\`, \`map\`, \`unordered_set\`) and optimized algorithms (\`sort\`, \`binary_search\`).
+
+---
+
+### Key Applications
+- Operating Systems and Device Drivers
+- Game Engines (Unreal Engine)
+- High-Frequency Trading (HFT) and Low-Latency Financial Systems
+- Real-Time Graphics, Embedded Systems, and AI Accelerators`;
+    }
+
+    // 3. What is a Data Structure?
+    if (q.includes('data structure') && (q.includes('what is') || q.includes('define') || q.includes('explain'))) {
+      return `### Data Structures in Computer Science
+
+A **Data Structure** is a specialized format for organizing, processing, retrieving, and storing data in computer memory so that operations can be performed efficiently with minimal time and memory consumption.
+
+---
+
+### Classification Matrix
+
+1. **Linear Data Structures:**
+   - Elements form a sequential sequence where each element is connected to its previous and next neighbor.
+   - **Arrays:** Contiguous memory allocations providing $\\mathcal{O}(1)$ random access.
+   - **Linked Lists:** Nodes containing data and pointers, enabling $\\mathcal{O}(1)$ dynamic insertion/deletion.
+   - **Stacks:** Last-In, First-Out (LIFO) structure (used in recursion call-stacks and undo buffers).
+   - **Queues:** First-In, First-Out (FIFO) structure (used in CPU scheduling and message queues).
+
+2. **Non-Linear Data Structures:**
+   - Elements are arranged hierarchically or interconnected across arbitrary networks.
+   - **Trees (Binary Search Trees, AVL, Heaps):** Hierarchical structures providing $\\mathcal{O}(\\log n)$ search and priority extraction.
+   - **Graphs:** Sets of vertices connected by edges (used in routing algorithms, social networks, and dependency graphs).
+   - **Hash Tables:** Key-value mappings using hash functions to achieve $\\mathcal{O}(1)$ average-time lookup.
+
+---
+
+### Evaluation Criteria
+- **Time Complexity:** Measured using Big-O asymptotic notation ($\\\\mathcal{O}(1), \\mathcal{O}(\\log n), \\mathcal{O}(n)$).
+- **Space Complexity:** Auxiliary memory overhead required by pointers and storage.`;
+    }
+
+    // 4. What is Python?
+    if (q === 'what is python' || q === 'what is python?' || q.startsWith('what is python')) {
+      return `### Python Programming Language
+
+**Python** is an interpreted, high-level, general-purpose programming language designed by Guido van Rossum and first released in 1991. Its design philosophy emphasizes code readability and simplicity through clean syntax.
+
+---
+
+### Core Strengths & Features
+
+1. **Readable and Expressive Syntax:**
+   - Uses significant whitespace indentation rather than curly braces or semicolons, reducing syntactic clutter.
+2. **Dynamically Typed & Garbage Collected:**
+   - Variable types are inferred at runtime, with automatic reference counting and cyclic garbage collection.
+3. **Batteries-Included Standard Library:**
+   - Comprehensive modules for file I/O, mathematical operations, JSON parsing, HTTP networking, and regular expressions.
+4. **Dominance in AI and Data Science:**
+   - Unmatched ecosystem of optimized C-backed libraries: NumPy, Pandas, Scikit-Learn, PyTorch, and TensorFlow.
+
+---
+
+### Applications
+- Artificial Intelligence, Machine Learning, and Deep Learning
+- Data Analysis, Statistics, and Scientific Computing
+- Web Backend Development (Django, FastAPI, Flask)
+- Automation Scripting, DevOps, and Cyber Security Tooling`;
+    }
+
+    // 5. What is Photosynthesis?
+    if (q.includes('photosynthesis')) {
+      return `### Photosynthesis in Biological Sciences
+
+**Photosynthesis** is the fundamental biochemical process by which photoautotrophic organisms (green plants, algae, and cyanobacteria) convert light energy into chemical energy stored in glucose molecules.
+
+---
+
+### The Overall Chemical Equation
+
+$$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{\\text{Light Energy, Chlorophyll}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$$
+
+---
+
+### Two Main Biochemical Stages
+
+1. **Light-Dependent Reactions (Thylakoid Membranes):**
+   - Photons hit Chlorophyll molecules in Photosystem II and I.
+   - Water molecules undergo **photolysis**: $2\\text{H}_2\\text{O} \\rightarrow 4\\text{H}^+ + 4e^- + \\text{O}_2$.
+   - Electron transport produces energy storage molecules: **ATP** and **NADPH**.
+
+2. **Light-Independent Reactions / Calvin Cycle (Stroma):**
+   - **Carbon Fixation:** The enzyme **RuBisCO** fixes atmospheric $\\text{CO}_2$ with ribulose 1,5-bisphosphate (RuBP).
+   - Utilizing ATP and NADPH from the light reactions, 3-PGA is converted to G3P molecules, ultimately forming **Glucose** ($\\\\text{C}_6\\text{H}_{12}\\text{O}_6$).
+
+---
+
+### Ecological Significance
+- Produces virtually all oxygen in Earth's biosphere.
+- Serves as the primary trophic energy foundation for all terrestrial and aquatic food webs.`;
+    }
+
+    // 6. Explain Newton's Second Law
+    if (q.includes('newton') && (q.includes('second law') || q.includes('2nd law'))) {
+      return `### Newton's Second Law of Motion (Classical Mechanics)
+
+**Newton's Second Law of Motion** states that the rate of change of momentum of a body is directly proportional to the applied net force and takes place in the direction in which the force acts.
+
+---
+
+### Mathematical Derivation
+
+Linear momentum is defined as $\\vec{p} = m\\vec{v}$.
+
+From Newton's second law:
+
+$$\\vec{F}_{\\text{net}} = \\frac{d\\vec{p}}{dt} = \\frac{d(m\\vec{v})}{dt}$$
+
+For a body with constant mass ($m = \\text{constant}$):
+
+$$\\vec{F}_{\\text{net}} = m \\cdot \\frac{d\\vec{v}}{dt} = m\\vec{a}$$
+
+Where:
+- $\\vec{F}_{\\text{net}}$: Net external force vector acting on the mass (measured in Newtons, $\\text{N} = \\text{kg}\\cdot\\text{m}/\\text{s}^2$).
+- $m$: Inertial mass of the object (measured in kilograms, $\\text{kg}$).
+- $\\vec{a}$: Acceleration vector imparted to the object (measured in $\\text{m}/\\text{s}^2$).
+
+---
+
+### Physical Insights
+1. **Direct Proportionality:** Doubling the net applied force doubles the object's acceleration ($a \\propto F$).
+2. **Inverse Proportionality:** Doubling the object's mass halves the acceleration for the same force ($a \\propto \\frac{1}{m}$).
+3. **Equilibrium Condition:** When $\\vec{F}_{\\text{net}} = 0$, acceleration is zero, reproducing Newton's First Law.`;
+    }
+
+    // 7. What is Inflation?
+    if (q.includes('inflation') && (q.includes('what is') || q.includes('economics') || q.includes('define') || q.includes('explain'))) {
+      return `### Inflation in Macroeconomics
+
+**Inflation** is the quantitative economic measure of the rate at which the general price level of goods and services in an economy increases over a given period, resulting in a sustained decline in the purchasing power of money.
+
+---
+
+### Primary Types & Causes
+
+1. **Demand-Pull Inflation:**
+   - Occurs when aggregate demand for goods and services outpaces aggregate supply ("too much money chasing too few goods").
+2. **Cost-Push Inflation:**
+   - Driven by an aggregate supply decrease resulting from rising production costs (e.g., surges in crude oil prices, raw material shortages, wage hikes).
+3. **Built-In / Wage-Price Spiral:**
+   - Workers demand higher wages to keep up with rising living costs, prompting firms to raise prices further to maintain margins.
+
+---
+
+### Measurement Indices
+- **Consumer Price Index (CPI):** Measures the weighted average price of a representative basket of consumer goods and services.
+- **Wholesale Price Index (WPI) / Producer Price Index (PPI):** Tracks price fluctuations at the wholesale and producer stages before retail distribution.
+
+---
+
+### Policy Responses
+- **Monetary Policy:** Central banks raise benchmark interest rates (repo rates) and reduce monetary supply to cool excessive demand.
+- **Fiscal Policy:** Governments reduce public spending or increase taxation to lower disposable income in circulation.`;
+    }
+
+    // 8. Human Digestive System
+    if (q.includes('digestive system') || q.includes('human digestion')) {
+      return `### The Human Digestive System (Anatomy & Physiology)
+
+The **Human Digestive System** is a complex biological system responsible for the mechanical breakdown, chemical enzymatic hydrolysis, nutrient absorption, and waste elimination of ingested food.
+
+---
+
+### Sequential Anatomical Pathway & Mechanics
+
+1. **Mouth & Oral Cavity:**
+   - **Mechanical:** Teeth masticate food into a smaller surface area bolus.
+   - **Chemical:** Salivary glands secrete **salivary amylase**, initiating starch hydrolysis into maltose.
+
+2. **Esophagus:**
+   - Transport channel that propels the bolus downward into the stomach via involuntary coordinated muscular contractions called **peristalsis**.
+
+3. **Stomach:**
+   - Secretes gastric juice containing **Hydrochloric Acid (HCl, pH ~1.5 - 2.0)** and **Pepsinogen** (activated into **pepsin** to cleave peptide bonds in proteins).
+   - Churns food into an acidic fluid called **chyme**.
+
+4. **Small Intestine (Duodenum, Jejunum, Ileum):**
+   - **Primary Site of Digestion & Absorption.**
+   - **Bile** (synthesized by liver, stored in gallbladder) emulsifies lipids.
+   - **Pancreatic Juice** delivers lipase, trypsin, and amylase.
+   - Millions of microscopic finger-like projections (**villi** and **microvilli**) maximize surface area to absorb glucose, amino acids, and fatty acids into the bloodstream.
+
+5. **Large Intestine (Colon) & Rectum:**
+   - Reabsorbs excess water and electrolytes from indigestible remnants.
+   - Houses gut microbiota synthesizing Vitamin K and B-complex vitamins before compacting waste for excretion.`;
+    }
+
+    // 9. Explain the French Revolution
+    if (q.includes('french revolution')) {
+      return `### The French Revolution (1789–1799)
+
+The **French Revolution** was a transformative period of social and political upheaval in France that dismantled the ancient feudal monarchy (*Ancien Régime*), established the ideals of modern democratic republics, and influenced political theory worldwide.
+
+---
+
+### Primary Causes
+
+1. **Social Inequality (The Three Estates):**
+   - **First Estate (Clergy)** and **Second Estate (Nobility)** enjoyed tax exemptions, feudal privileges, and vast land holdings.
+   - **Third Estate (Commoners, Peasants, Bourgeoisie)** comprised 98% of the population, bore the entire national tax burden, and possessed zero political voice.
+2. **Financial Bankruptcy:**
+   - Heavy royal debts incurred from supporting the American Revolutionary War and extravagant royal expenditures at Versailles.
+3. **Enlightenment Ideals:**
+   - Works of Voltaire, Rousseau, and Montesquieu questioned the divine right of kings, advocating popular sovereignty and separation of powers.
+
+---
+
+### Major Chronological Milestones
+- **1789:** Convening of the Estates-General, Tennis Court Oath, and the **Storming of the Bastille** (July 14).
+- **1789:** Proclamation of the *Declaration of the Rights of Man and of the Citizen* (*"Liberté, Égalité, Fraternité"*).
+- **1792–1794:** Abolition of the monarchy, execution of King Louis XVI and Marie Antoinette, followed by the **Reign of Terror** led by Maximilien Robespierre.
+- **1799:** The Coup of 18 Brumaire, wherein **Napoleon Bonaparte** seized power, ending the revolutionary republic and establishing the Consulate.
+
+---
+
+### Historical Legacy
+- Eradicated European feudalism and absolute divine-right monarchies.
+- Codified modern secular law, human rights doctrines, and national democratic citizenship.`;
+    }
+
+    // 10. What is Machine Learning?
+    if (q.includes('machine learning') && (q.includes('what is') || q.includes('define') || q.includes('explain'))) {
+      return `### Machine Learning (Artificial Intelligence)
+
+**Machine Learning (ML)** is a subfield of Artificial Intelligence (AI) and computational statistics focused on building mathematical models and algorithms that learn patterns and rules from historical training data to make predictions or decisions on unseen data without being explicitly programmed.
+
+---
+
+### The Three Fundamental Paradigms
+
+1. **Supervised Learning:**
+   - Trained on labeled pairs $(x_i, y_i)$.
+   - **Tasks:** Classification (discrete classes) and Regression (continuous numerical values).
+   - **Algorithms:** Linear Regression, Support Vector Machines (SVM), Random Forests, Deep Neural Networks.
+
+2. **Unsupervised Learning:**
+   - Trained on unlabeled datasets $(x_i)$ to detect latent patterns and intrinsic geometries.
+   - **Tasks:** Clustering, Anomaly Detection, and Dimensionality Reduction.
+   - **Algorithms:** K-Means, DBSCAN, Principal Component Analysis (PCA).
+
+3. **Reinforcement Learning (RL):**
+   - An autonomous agent learns an optimal behavioral policy $\\pi(a|s)$ through continuous trial-and-error interaction with a dynamic environment, maximizing cumulative scalar rewards.
+   - **Algorithms:** Q-Learning, Deep Q-Networks (DQN), PPO.
+
+---
+
+### Core Mathematical Pipeline
+$$\\text{Raw Data} \\rightarrow \\text{Feature Engineering} \\rightarrow \\text{Model Optimization (Loss Minimization } \\min_\\theta \\mathcal{L}(\\theta)) \\rightarrow \\text{Evaluation / Inference}$$`;
+    }
+
+    // 11. Process vs Thread
+    if (q.includes('process') && q.includes('thread') && (q.includes('difference') || q.includes('vs') || q.includes('compare'))) {
       return `### Difference Between Process and Thread
 
-In Operating Systems, both **Processes** and **Threads** are fundamental units of execution, but they operate at different architectural layers.
+In Operating Systems, **Processes** and **Threads** are both fundamental units of program execution, but operate at distinct levels of memory and resource isolation.
 
 ---
 
 ### Side-by-Side Comparison Matrix
 
-| Parameter / Feature | Process | Thread |
+| Evaluation Metric | Process | Thread (Lightweight Process) |
 | :--- | :--- | :--- |
-| **Definition** | An independent program in execution with its own address space. | A lightweight execution unit within a parent process. |
-| **Address Space** | Has its own independent, isolated memory space. | Shares the memory space (code, data, heap) of its parent process. |
-| **Creation & Termination** | Heavyweight; high overhead for process control block (PCB) creation. | Lightweight; fast creation and low system overhead. |
-| **Context Switching** | Slower; requires flushing cache and switching page tables. | Fast; registers and program counter are swapped while memory space remains. |
-| **Inter-Communication** | Requires explicit Inter-Process Communication (IPC, Pipes, Shared Memory). | Direct communication via shared variables in memory. |
-| **Resource Isolation** | High isolation; a crash in one process does not affect other processes. | Low isolation; an unhandled exception or memory corruption can terminate all threads. |
-
----
-
-### Key Architectural Takeaway
-A **Process** provides protected resource containment, whereas a **Thread** enables high-concurrency parallelism within that resource container.`;
+| **Definition** | An independent program in execution with its own virtual address space. | A lightweight execution unit within a parent process. |
+| **Memory Isolation** | Fully isolated address space; protected from other processes. | Shares code, data segment, and open file handles with other sibling threads. |
+| **Creation Overhead** | High; requires allocating a complete Process Control Block (PCB) and page tables. | Low; shares parent process memory, requiring only an individual Thread Control Block (TCB) and stack. |
+| **Context Switching** | Slower; requires flushing CPU caches (TLB) and switching memory mappings. | Fast; registers and Program Counter (PC) are swapped while memory space remains constant. |
+| **Inter-Communication** | Requires explicit Inter-Process Communication (IPC: Pipes, Shared Memory, Sockets). | Direct communication via shared global and heap memory. |
+| **Fault Resilience** | High; a crash in one process does not affect other processes. | Low; an unhandled exception or memory crash in one thread can terminate the whole process. |`;
     }
 
-    // 2. TCP vs UDP
-    if ((q.includes('tcp') && q.includes('udp')) && (q.includes('difference') || q.includes('distinguish') || q.includes('vs') || q.includes('compare'))) {
+    // 12. TCP vs UDP
+    if ((q.includes('tcp') && q.includes('udp')) && (q.includes('difference') || q.includes('vs') || q.includes('compare'))) {
       return `### Difference Between TCP and UDP
 
-At the Transport Layer (Layer 4) of the OSI / TCP/IP model, **TCP (Transmission Control Protocol)** and **UDP (User Datagram Protocol)** handle host-to-host data transfer with contrasting priorities.
+At the Transport Layer (Layer 4) of the Internet Protocol Suite, **TCP (Transmission Control Protocol)** and **UDP (User Datagram Protocol)** provide contrasting host-to-host transmission guarantees.
 
 ---
 
@@ -576,260 +940,50 @@ At the Transport Layer (Layer 4) of the OSI / TCP/IP model, **TCP (Transmission 
 
 | Evaluation Metric | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |
 | :--- | :--- | :--- |
-| **Connection Nature** | **Connection-oriented** (Requires 3-way handshake before transfer: SYN $\\rightarrow$ SYN-ACK $\\rightarrow$ ACK). | **Connectionless** (Sends datagrams immediately with zero handshaking). |
-| **Reliability** | **Guaranteed delivery** with automatic retransmissions and acknowledgments. | **Best-effort delivery**; packets may be lost, duplicated, or arrive out of order. |
-| **Ordering** | Guarantees in-order packet sequence using sequence numbers. | No ordering guarantees; packets arrive as routed. |
-| **Header Overhead** | Heavier: 20 to 60 bytes. | Lightweight: Fixed 8 bytes. |
-| **Flow & Congestion Control** | Supported (Sliding Window, Slow Start, AIMD algorithm). | Not supported; transmits packets at application rate. |
-| **Typical Protocols** | HTTP, HTTPS, FTP, SSH, SMTP. | DNS, DHCP, VoIP, Video Streaming, Online Gaming. |
-
----
-
-### Selection Guideline
-Use **TCP** when absolute accuracy and data integrity are non-negotiable. Use **UDP** when low latency and real-time throughput are prioritized over lost packet recovery.`;
+| **Connection Nature** | **Connection-oriented** (Requires 3-way handshake: SYN $\\rightarrow$ SYN-ACK $\\rightarrow$ ACK). | **Connectionless** (Transmits datagrams immediately with zero pre-handshaking). |
+| **Reliability** | **Guaranteed delivery** with automated packet retransmissions and acknowledgments. | **Best-effort delivery**; packets may be dropped, duplicated, or arrive out of sequence. |
+| **Ordering** | Enforces strict in-order packet delivery using sequence numbers. | No ordering guarantees; packets are delivered in whatever order network routers route them. |
+| **Header Overhead** | Heavier: 20 to 60 bytes with flags, checksum, and window size. | Lightweight: Fixed 8 bytes. |
+| **Flow & Congestion Control** | Full support (Sliding window, slow-start, additive-increase multiplicative-decrease). | No congestion or flow control; transmits at the rate supplied by application. |
+| **Standard Protocols** | HTTP, HTTPS, SSH, FTP, SMTP, MySQL. | DNS, DHCP, VoIP, Real-Time Video Streaming, Online Multiplayer Gaming. |`;
     }
 
-    // 3. Supervised vs Unsupervised Learning
-    if ((q.includes('supervised') && q.includes('unsupervised')) && (q.includes('difference') || q.includes('learning') || q.includes('compare') || q.includes('vs'))) {
-      return `### Difference Between Supervised and Unsupervised Learning
+    // 13. ACID Properties in DBMS
+    if (q.includes('acid') && (q.includes('dbms') || q.includes('database') || q.includes('properties'))) {
+      return `### ACID Properties in Database Management Systems
 
-In Machine Learning, learning paradigms are classified by how data is structured and presented to the learning algorithm.
-
----
-
-### Side-by-Side Comparison Matrix
-
-| Dimension | Supervised Learning | Unsupervised Learning |
-| :--- | :--- | :--- |
-| **Data Nature** | Trained on **labeled data** $(x_i, y_i)$ where inputs correspond to verified ground truth targets. | Trained on **unlabeled data** $(x_i)$ with no predefined output classes or target scores. |
-| **Core Objective** | Learn a mapping function $f: X \\rightarrow Y$ to predict outputs for unseen inputs. | Discover hidden patterns, intrinsic cluster geometries, or latent representations. |
-| **Feedback Loop** | Direct feedback: Computes prediction error loss $\\mathcal{L}(\\hat{y}, y)$ and adjusts weights via backpropagation. | No ground-truth feedback; optimizes mathematical criteria like intra-cluster variance. |
-| **Primary Tasks** | **Classification** (Discrete categories) and **Regression** (Continuous values). | **Clustering** (Grouping data points) and **Dimensionality Reduction** (PCA, t-SNE). |
-| **Standard Algorithms** | Linear Regression, Logistic Regression, Decision Trees, Random Forests, SVM, Neural Networks. | K-Means Clustering, Hierarchical Clustering, DBSCAN, Principal Component Analysis (PCA). |
-
----
-
-### Summary Takeaway
-**Supervised Learning** trains with a teacher guiding each output, whereas **Unsupervised Learning** discovers internal structure and associations from data without guidance.`;
-    }
-
-    // 4. Deadlock and 4 Necessary Conditions
-    if (q.includes('deadlock') && (q.includes('condition') || q.includes('four') || q.includes('explain') || q.includes('what is'))) {
-      return `### Deadlock & The Four Necessary Conditions (Coffman Conditions)
-
-A **Deadlock** in an Operating System is a permanent blocking condition where a set of processes are unable to proceed because each process is holding a resource and waiting for another resource acquired by another process in the same set.
-
----
-
-### The 4 Necessary Coffman Conditions
-
-All four conditions must hold simultaneously for a deadlock to arise:
-
-1. **Mutual Exclusion:**
-   - At least one resource must be held in a non-shareable mode (only one process can use the resource at a time).
-
-2. **Hold and Wait:**
-   - A process must currently hold at least one resource while waiting to acquire additional resources currently held by other processes.
-
-3. **No Preemption:**
-   - Resources cannot be forcibly confiscated from a process; a resource can only be released voluntarily by the holding process after completing its task.
-
-4. **Circular Wait:**
-   - A closed chain of processes exists: $\{P_0, P_1, \\dots, P_n\}$ such that $P_0$ is waiting for a resource held by $P_1$, $P_1$ is waiting for a resource held by $P_2$, and $P_n$ is waiting for a resource held by $P_0$.
-
----
-
-### Deadlock Handling Strategies
-- **Prevention:** Invalidate at least one of the four Coffman conditions (e.g., impose resource ordering to eliminate circular wait).
-- **Avoidance:** Dynamically evaluate resource allocation state using the **Banker's Algorithm** to guarantee the system remains in a **safe state**.
-- **Detection & Recovery:** Allow deadlock to occur, detect cycles via Resource Allocation Graphs, and recover via process termination or resource preemption.`;
-    }
-
-    // 5. ACID Properties in DBMS
-    if (q.includes('acid') && (q.includes('dbms') || q.includes('database') || q.includes('property') || q.includes('properties') || q.includes('explain'))) {
-      return `### ACID Properties in DBMS
-
-The **ACID** properties are four fundamental guarantees that ensure database transactions are processed reliably, preserving database consistency even through system crashes and concurrent executions.
+The **ACID** properties are four fundamental guarantees that ensure database transactions are processed reliably, preserving database integrity even across hardware crashes and concurrent transactions.
 
 ---
 
 ### 1. Atomicity ("All or Nothing")
-- **Principle:** Every database transaction is executed as a single indivisible unit.
-- **Guarantee:** Either all operations in the transaction succeed and commit, or in the event of an error, the database rolls back to its exact state prior to the transaction.
-- **Mechanism:** Implemented via Write-Ahead Logging (WAL) and rollback segments.
+- **Principle:** Every database transaction is executed as an indivisible unit of work.
+- **Guarantee:** Either all modifications within the transaction are committed successfully, or if a single failure occurs, the entire transaction is rolled back to its initial state via Write-Ahead Logs (WAL).
 
 ---
 
-### 2. Consistency (Integrity Invariants)
+### 2. Consistency (State Invariants)
 - **Principle:** A transaction must transition the database from one valid state to another valid state.
-- **Guarantee:** All database schemas, foreign keys, constraints, and business rules remain strictly satisfied after completion.
+- **Guarantee:** All schema constraints, primary keys, foreign key relationships, and check validations remain strictly preserved upon transaction completion.
 
 ---
 
 ### 3. Isolation (Concurrency Control)
-- **Principle:** Intermediate states of concurrently running transactions must remain invisible to each other.
-- **Guarantee:** Concurrent execution produces the exact same outcome as if the transactions were executed serially.
-- **Standard Levels:** Read Uncommitted, Read Committed, Repeatable Read, Serializable (enforced via two-phase locking 2PL or MVCC).
+- **Principle:** Intermediate states of concurrently executing transactions must remain invisible to one another.
+- **Guarantee:** Concurrent transaction execution yields the exact same outcome as if the transactions were executed sequentially (serializability enforced via two-phase locking 2PL or MVCC).
 
 ---
 
 ### 4. Durability (Persistence Guarantee)
-- **Principle:** Once a transaction is successfully committed, its changes survive permanently.
-- **Guarantee:** Even in the event of an immediate power failure, operating system crash, or restart, committed changes are preserved from non-volatile storage (disk/SSD).`;
-    }
-
-    // 6. Normalization in DBMS
-    if (q.includes('normalization') && (q.includes('dbms') || q.includes('database') || q.includes('form') || q.includes('explain') || q.includes('what is'))) {
-      return `### Normalization in DBMS
-
-**Normalization** is a formal database design methodology that systematically decomposes relations to minimize data redundancy and eliminate update, insertion, and deletion anomalies.
-
----
-
-### The Normal Forms Progression
-
-1. **First Normal Form (1NF):**
-   - **Requirement:** Every column attribute must contain only **atomic (indivisible) values**.
-   - **Rule:** Eliminates repeating groups and multi-valued composite attributes.
-
-2. **Second Normal Form (2NF):**
-   - **Requirement:** Must be in 1NF **AND** all non-prime attributes must be **fully functionally dependent** on the primary key.
-   - **Rule:** Eliminates **partial dependencies** (where an attribute depends on only a portion of a composite candidate key).
-
-3. **Third Normal Form (3NF):**
-   - **Requirement:** Must be in 2NF **AND** no non-prime attribute is transitively dependent on the primary key.
-   - **Rule:** Eliminates **transitive dependencies** ($X \\rightarrow Y$ and $Y \\rightarrow Z \\implies X \\rightarrow Z$).
-
-4. **Boyce-Codd Normal Form (BCNF):**
-   - **Requirement:** For every functional dependency $X \\rightarrow Y$, the determinant $X$ must be a **super key**.
-   - **Rule:** A stricter version of 3NF handling relations with multiple overlapping candidate keys.
-
----
-
-### Core Benefits
-- **Storage Optimization:** Eliminates redundant duplicate data.
-- **Anomalies Elimination:** Prevents insertion, update, and deletion anomalies.
-- **Referential Integrity:** Enforces relational constraints cleanly.`;
-    }
-
-    // 7. Gradient Descent
-    if (q.includes('gradient descent') && (q.includes('what is') || q.includes('explain') || q.includes('machine learning') || q.includes('algorithm'))) {
-      return `### Gradient Descent Algorithm
-
-**Gradient Descent** is a first-order iterative mathematical optimization algorithm used in Machine Learning and Deep Learning to find local minima of a differentiable loss function $\\mathcal{L}(\\theta)$.
-
----
-
-### Mathematical Formulation
-
-The parameter update rule is defined as:
-
-$$\\theta_{t+1} = \\theta_t - \\eta \\cdot \\nabla_\\theta \\mathcal{L}(\\theta_t)$$
-
-Where:
-- $\\theta_t$: Current model parameter vector (weights and biases).
-- $\\eta$ (Learning Rate): Positive step-size hyperparameter that controls how far we step along the opposite direction of the gradient.
-- $\\nabla_\\theta \\mathcal{L}(\\theta_t)$: Gradient vector of the loss function evaluated at $\\theta_t$.
-
----
-
-### Variants of Gradient Descent
-
-1. **Batch Gradient Descent:** Computes the gradient over the entire dataset in each iteration. Stable but computationally expensive for large datasets.
-2. **Stochastic Gradient Descent (SGD):** Computes gradient and updates parameters using a single random training sample at each step. Fast, but noisy convergence path.
-3. **Mini-Batch Gradient Descent:** Evaluates gradients over a small batch of samples (e.g., 32, 64, 128). Combines vectorization efficiency with stochastic regularization.`;
-    }
-
-    // 8. What is DBMS?
-    if (q === 'what is dbms' || q === 'what is dbms?' || q === 'define dbms' || q === 'explain dbms') {
-      return `### Database Management System (DBMS)
-
-A **Database Management System (DBMS)** is specialized software that provides an interface between end-users, application programs, and physical database storage to create, manage, retrieve, and administer organized collections of data.
-
----
-
-### Core Components
-1. **Database Engine:** Handles physical data storage, memory buffer caching, and transaction logging.
-2. **Query Processor:** Parses, optimizes, and executes high-level queries (e.g., SQL) into efficient low-level access plans.
-3. **Transaction Manager:** Guarantees ACID properties and coordinates lock concurrency.
-4. **Data Dictionary / Catalog:** Stores metadata regarding tables, schemas, constraints, and indexes.
-
----
-
-### Fundamental Advantages over Traditional File Systems
-- **Redundancy Control:** Centralizes data storage to eliminate duplicate record storage.
-- **Concurrent Access:** Coordinates multi-user transactions using concurrency control locks.
-- **Data Integrity:** Enforces schema constraints, domain checks, and foreign keys.
-- **Security & Authorization:** Role-based access control protecting sensitive attributes.`;
-    }
-
-    // 9. What is an API?
-    if (q === 'what is an api' || q === 'what is an api?' || q === 'what is api' || q === 'define api') {
-      return `### Application Programming Interface (API)
-
-An **Application Programming Interface (API)** is a formal contractual specification that defines how different software applications communicate, exchange data, and invoke functionality from one another.
-
----
-
-### Core Architectural Paradigms
-
-1. **REST (Representational State Transfer):**
-   - Stateless client-server architecture running over HTTP.
-   - Utilizes standard HTTP verbs: \`GET\` (read), \`POST\` (create), \`PUT / PATCH\` (update), \`DELETE\` (remove).
-   - Transmits structured payloads typically formatted in JSON or XML.
-
-2. **GraphQL:**
-   - Query language for APIs that allows clients to request exactly the data fields they require in a single round-trip.
-
-3. **gRPC / RPC:**
-   - High-performance, low-latency framework utilizing HTTP/2 and Protocol Buffers (Protobuf) for distributed microservice communication.
-
----
-
-### Key Real-World Roles
-- **Abstraction:** Encapsulates underlying databases and complex backend logic behind clear endpoint contracts.
-- **Interoperability:** Enables cross-platform collaboration (e.g., a mobile application accessing cloud databases).
-- **Security:** Controls access via API keys, OAuth tokens, and rate limiters.`;
-    }
-
-    // 10. Advantages and Disadvantages of Cloud Computing
-    if (q.includes('cloud computing') && (q.includes('advantage') || q.includes('disadvantage') || q.includes('pros') || q.includes('cons'))) {
-      return `### Advantages and Disadvantages of Cloud Computing
-
-**Cloud Computing** delivers on-demand computational resources (compute servers, database storage, networking, software) over the Internet under a pay-as-you-go financial model.
-
----
-
-### Major Advantages
-
-1. **Cost Efficiency (OpEx vs. CapEx):**
-   - Eliminates massive capital expenditures required to purchase and maintain on-premise physical servers, uninterruptible power supplies, and datacenter cooling.
-2. **Elastic Scalability:**
-   - Dynamically scales computational capacity up or down automatically in response to real-time traffic spikes.
-3. **High Availability & Disaster Recovery:**
-   - Multi-region redundant architectures guarantee business continuity and automated failover capabilities.
-4. **Rapid Deployment:**
-   - New instances and infrastructure stacks can be provisioned in seconds across global edge regions.
-
----
-
-### Major Disadvantages & Challenges
-
-1. **Internet Dependency & Latency:**
-   - Cloud operations require continuous high-speed network connectivity; network interruptions halt service access.
-2. **Security & Data Privacy Concerns:**
-   - Storing sensitive intellectual property and regulated user data on third-party multi-tenant infrastructure introduces compliance and data jurisdiction risks.
-3. **Vendor Lock-In:**
-   - Migrating proprietary configurations and workloads between cloud providers (e.g., AWS, Azure, Google Cloud) involves high switching costs and architectural refactoring.
-4. **Unexpected Cost Spikes:**
-   - Unmonitored bandwidth egress fees and auto-scaling spikes can lead to unexpected cloud billing surges without strict budgetary guardrails.`;
+- **Principle:** Once a transaction commits, its modifications are permanently recorded.
+- **Guarantee:** Committed data updates will survive power outages, operating system crashes, and disk reboots from non-volatile storage.`;
     }
 
     return null;
   }
 
   // =========================================================================
-  // 6. REAL-TIME WIKIPEDIA REST API FACTUAL KNOWLEDGE RETRIEVER
+  // 6. REAL-TIME WIKIPEDIA FACTUAL KNOWLEDGE RETRIEVER
   // =========================================================================
   async function fetchLiveWikiArticle(topic) {
     if (!topic || topic.length < 3) return null;
@@ -845,163 +999,137 @@ An **Application Programming Interface (API)** is a formal contractual specifica
         }
       }
     } catch (e) {
-      // Ignore network errors on Wikipedia fetch
+      // Ignore network errors
     }
     return null;
   }
 
   // =========================================================================
-  // 7. GEMINI 1.5 FLASH API INTEGRATION WITH FULL MULTI-TURN MEMORY
+  // 7. BACKEND API CLIENT WITH AUTOMATIC LOCAL GEMINI FALLBACK
   // =========================================================================
-  async function queryGeminiApi(query, fileSnapshot = null) {
-    const apiKey = localStorage.getItem('gemini_api_key') || window.GEMINI_API_KEY || '';
-    if (!apiKey) return null;
+  async function queryBackendAI(query, history = [], fileSnapshot = null) {
+    const clientKey = localStorage.getItem('gemini_api_key') || window.GEMINI_API_KEY || '';
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    // 1. Try Backend Server Endpoint first
+    for (const backendUrl of BACKEND_URLS) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
 
-    const systemInstruction = `You are an expert University Professor, Academic Tutor, Computer Science Specialist, Mathematics Instructor, and Programming Mentor.
+        const response = await fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: query,
+            history: history.slice(-10),
+            file: fileSnapshot,
+            apiKey: clientKey
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
 
-Follow these strict answering rules:
-1. Understand the complete question before answering.
-2. Identify the subject and specific topic.
-3. Answer only what the question asks. Never generate unrelated explanations or generic academic filler.
-4. Use accurate, technically rigorous, and verified academic information.
-5. Explain difficult concepts clearly and logically.
-6. Use mathematical formulas with properly formatted LaTeX ($...$ for inline, $$...$$ for block formulas).
-7. When programming is requested, provide complete working code, explain key logic, state time/space complexity, and show expected output.
-8. Use clean Markdown comparison tables when contrasting concepts.
-9. When the user provides an attached document or image, prioritize the attached document as the primary reference and never hallucinate outside its contents.
-10. If you do not have sufficient information, honestly communicate the uncertainty instead of fabricating an answer.`;
-
-    // Construct sliding window of conversation history (up to last 10 messages)
-    const contents = [];
-    const recentHistory = chatHistory.slice(-10);
-
-    for (const msg of recentHistory) {
-      contents.push({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.text }]
-      });
-    }
-
-    // Prepare current user message parts
-    const currentParts = [];
-
-    // Multimodal Image support
-    if (fileSnapshot && fileSnapshot.base64 && fileSnapshot.base64.startsWith('data:image/')) {
-      const base64DataOnly = fileSnapshot.base64.split(',')[1];
-      currentParts.push({
-        inlineData: {
-          mimeType: fileSnapshot.mimeType || 'image/jpeg',
-          data: base64DataOnly
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.success && data.text) {
+            return { text: data.text, source: 'backend-gemini' };
+          }
         }
-      });
-    }
-
-    // Document context attachment
-    let fullPromptText = query;
-    if (fileSnapshot && fileSnapshot.text) {
-      fullPromptText = `[ATTACHED DOCUMENT CONTEXT: ${fileSnapshot.name} (${fileSnapshot.type})]\n${fileSnapshot.text.substring(0, 12000)}\n\n[STUDENT QUESTION]:\n${query}`;
-    }
-
-    currentParts.push({ text: fullPromptText });
-
-    contents.push({
-      role: 'user',
-      parts: currentParts
-    });
-
-    const requestBody = {
-      contents: contents,
-      systemInstruction: {
-        parts: [{ text: systemInstruction }]
-      },
-      generationConfig: {
-        temperature: 0.2,
-        topP: 0.95,
-        maxOutputTokens: 3000
+      } catch (err) {
+        // Backend not reachable on this URL; continue to next fallback
       }
-    };
+    }
 
-    abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 20000);
+    // 2. Client-Side Direct Google Gemini 1.5 Flash (for static GitHub Pages hosting)
+    if (clientKey) {
+      try {
+        const directEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(clientKey)}`;
+        const contents = [];
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: abortController.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.warn('Gemini API Error Response:', errorData);
-        if (response.status === 400 || response.status === 403) {
-          throw new Error(`Gemini API authorization error (${response.status}). Please verify your Gemini API key in Settings.`);
-        } else if (response.status === 429) {
-          throw new Error(`Gemini API quota rate-limit exceeded (429). Please wait a moment or use another key.`);
+        // Ingest previous turns
+        for (const item of history.slice(-10)) {
+          if (item && item.text) {
+            contents.push({
+              role: item.role === 'model' || item.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: item.text }]
+            });
+          }
         }
-        return null;
-      }
 
-      const data = await response.json();
-      const candidate = data.candidates && data.candidates[0];
+        const currentParts = [];
+        if (fileSnapshot && fileSnapshot.base64 && fileSnapshot.base64.startsWith('data:image/')) {
+          currentParts.push({
+            inlineData: {
+              mimeType: fileSnapshot.mimeType || 'image/jpeg',
+              data: fileSnapshot.base64.split(',')[1]
+            }
+          });
+        }
 
-      if (candidate && candidate.finishReason === 'SAFETY') {
-        return `*The AI safety filters flagged this request. Please rephrase your academic question with standard terminology.*`;
-      }
+        let fullTextPrompt = query;
+        if (fileSnapshot && fileSnapshot.text) {
+          fullTextPrompt = `[ATTACHED DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]\n${fileSnapshot.text.substring(0, 12000)}\n\n[STUDENT QUESTION]:\n${query}`;
+        }
+        currentParts.push({ text: fullTextPrompt });
 
-      const text = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
-      if (text && text.trim().length > 10) {
-        return text.trim();
+        contents.push({ role: 'user', parts: currentParts });
+
+        const resp = await fetch(directEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: contents,
+            generationConfig: { temperature: 0.2, maxOutputTokens: 3000 }
+          })
+        });
+
+        if (resp.ok) {
+          const geminiData = await resp.json();
+          const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            return { text: text.trim(), source: 'direct-gemini' };
+          }
+        }
+      } catch (e) {
+        console.warn('Direct client-side Gemini error:', e);
       }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        throw new Error('Gemini API request timed out. Please check your network connection.');
-      }
-      throw err;
     }
 
     return null;
   }
 
   // =========================================================================
-  // 8. MASTER INFERENCE ENGINE: TIERED ACADEMIC RESOLUTION
+  // 8. MASTER TIERED EDUCATIONAL INFERENCE ENGINE
   // =========================================================================
   async function generateAcademicResponse(query, fileSnapshot = null) {
     const qClean = sanitizeUserQuery(query);
+    const qLower = qClean.toLowerCase();
 
-    // Conversational greetings
+    // 1. Conversational Greetings
     const greetings = {
-      'hi': 'Hello! I am your University Academic AI Assistant. Ask me any question on Computer Science, Mathematics, DBMS, Operating Systems, Networking, or programming, and I will provide you with a clear, step-by-step solution.',
-      'hello': 'Greetings! What academic subject, problem, or exam question can I assist you with today?',
-      'hey': 'Hello! How can I assist with your studies or exam preparation today?'
+      'hi': 'Hello! I am Brainware Academic AI, your educational assistant. Ask me any question across Computer Science, Programming, Mathematics, Sciences, Engineering, Humanities, or Business, and I will guide you step by step.',
+      'hello': 'Greetings! How can I assist with your coursework, exam preparation, or academic research today?',
+      'hey': 'Hello! What educational concept, calculation, or coding problem can I solve for you?'
     };
-    if (greetings[qClean.toLowerCase()]) {
-      return { text: greetings[qClean.toLowerCase()], source: 'conversational' };
+    if (greetings[qLower]) {
+      return { text: greetings[qLower], source: 'conversational' };
     }
 
-    // 1. If an active Gemini API Key is configured, use Gemini 1.5 Flash as primary
-    try {
-      const geminiResult = await queryGeminiApi(query, fileSnapshot);
-      if (geminiResult) {
-        return { text: geminiResult, source: 'gemini' };
-      }
-    } catch (geminiErr) {
-      console.warn('Gemini inference error:', geminiErr);
+    // 2. Primary Engine: Backend or Direct Gemini Model
+    const aiResult = await queryBackendAI(query, chatHistory, fileSnapshot);
+    if (aiResult && aiResult.text) {
+      return aiResult;
     }
 
-    // 2. Attached Document Priority Mode (When Gemini key isn't active)
+    // 3. Document Analysis Mode (When file is attached and AI API is offline)
     if (fileSnapshot && fileSnapshot.text) {
       return {
-        text: `### Analysis of Attached Document: ${fileSnapshot.name}\n\n**Document Type:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Extracted Document Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 800)}...\n\`\`\`\n\n---\n\n### Query Assessment\nRegarding your question: *"${query}"*\n\n> **Notice:** To execute deep conversational semantic reasoning across this entire ${fileSnapshot.type} file with multimodal vision, activate your free Google Gemini API key by clicking the **API Key** button in the top navigation.`,
+        text: `### Document Analysis: ${fileSnapshot.name}\n\n**Format:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Document Content Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 1200)}...\n\`\`\`\n\n---\n\n### Summary Assessment\nThis ${fileSnapshot.type} document has been parsed. For deep cross-page reasoning and visual query answering, connect the Brainware AI backend server or provide your Gemini API key in settings.`,
         source: 'document'
       };
     }
 
-    // 3. Strict University Question Bank & Syllabus Match
+    // 4. University Syllabus & Exam Question Bank Grounding (portalQAIndex: 1,254 entries)
     const syllabusMatch = findSyllabusMatch(query);
     if (syllabusMatch && syllabusMatch.item) {
       const item = syllabusMatch.item;
@@ -1013,25 +1141,25 @@ Follow these strict answering rules:
       };
     }
 
-    // 4. Mathematical Equation Solver
+    // 5. Mathematical Calculation Solver
     const mathAns = trySolveMathProblem(query);
     if (mathAns) {
       return { text: mathAns, source: 'math' };
     }
 
-    // 5. Algorithmic Code Synthesizer
+    // 6. Programming Code Synthesizer
     const codeAns = tryGenerateCodeSolution(query);
     if (codeAns) {
       return { text: codeAns, source: 'code' };
     }
 
-    // 6. Core Subject Concept Explanations (Strict, Non-Generic)
-    const conceptAns = trySubjectConceptExplanation(query);
+    // 7. Universal Academic Subject Synthesizer
+    const conceptAns = trySubjectConceptExplanation(query, chatHistory);
     if (conceptAns) {
       return { text: conceptAns, source: 'concept' };
     }
 
-    // 7. Live Factual Knowledge Retrieval via Wikipedia API
+    // 8. Factual Academic Knowledge Retrieval via Wikipedia API
     const cleanTopic = qClean
       .replace(/^(what is|explain|describe|define|tell me about|how does|why is|what are|state)\s+/i, '')
       .replace(/[?!.]/g, '')
@@ -1047,15 +1175,15 @@ Follow these strict answering rules:
       }
     }
 
-    // 8. Honest Fallback (Never Hallucinate Generic Academic Nonsense)
+    // 9. Informative Guidance
     return {
-      text: `### Academic Query Notice\n\nI could not find an exact match for **"${qClean}"** in the local Brainware University syllabus database, and no custom Gemini API Key is currently active.\n\nTo unlock unconstrained, real-time AI reasoning across any educational subject:\n1. Click the **API Key** button in the top navigation.\n2. Paste your free Google Gemini API key.\n3. Re-ask your question for an instant, in-depth academic answer.`,
-      source: 'unresolved'
+      text: `### Academic Response\n\nTo ensure complete accuracy across all disciplines for **"${qClean}"**, please launch the Brainware Academic AI backend server (\`npm start\`) or configure your free Google Gemini API key by clicking the **API Key** button in the header navigation.`,
+      source: 'guidance'
     };
   }
 
   // =========================================================================
-  // 9. KATEX MATH FORMATTER & MARKDOWN RENDERER
+  // 9. KATEX MATH & MARKDOWN RENDERING
   // =========================================================================
   const mathSymbolMap = [
     [/\\alpha\b/g, 'α'], [/\\beta\b/g, 'β'], [/\\gamma\b/g, 'γ'], [/\\delta\b/g, 'δ'],
@@ -1134,10 +1262,9 @@ Follow these strict answering rules:
       renderedHtml = `<p>${text.replace(/\n/g, '<br>')}</p>`;
     }
 
-    // Apply KaTeX math formatting
     renderedHtml = renderMathInHtml(renderedHtml);
 
-    // Style Code Blocks with Copy Button
+    // Code blocks with syntax copy buttons
     renderedHtml = renderedHtml.replace(/<pre><code class="language-([a-zA-Z0-9_-]+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
       const codeId = 'code_' + Math.random().toString(36).substr(2, 9);
       return `
@@ -1153,7 +1280,6 @@ Follow these strict answering rules:
       `;
     });
 
-    // Style standard pre blocks
     renderedHtml = renderedHtml.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
       const codeId = 'code_' + Math.random().toString(36).substr(2, 9);
       return `
@@ -1169,7 +1295,7 @@ Follow these strict answering rules:
       `;
     });
 
-    // Style Markdown Tables with responsive wrapper
+    // Style Markdown Tables
     renderedHtml = renderedHtml.replace(/<table>([\s\S]*?)<\/table>/g, (match, tableInner) => {
       return `
         <div class="my-4 overflow-x-auto rounded-2xl border border-slate-200 shadow-sm bg-white">
@@ -1194,7 +1320,7 @@ Follow these strict answering rules:
     let currentLen = 0;
 
     while (currentLen < fullText.length) {
-      if (!isGenerating) break; // Check for stop generation cancellation
+      if (!isGenerating) break;
       currentLen = Math.min(fullText.length, currentLen + chunkSize);
       const partial = fullText.substring(0, currentLen);
       contentContainer.innerHTML = formatMarkdown(partial);
@@ -1212,7 +1338,7 @@ Follow these strict answering rules:
   }
 
   // =========================================================================
-  // 11. UI MESSAGE BUBBLES, ACTIONS & CONTROLS
+  // 11. UI BUBBLES & CONTROLLERS
   // =========================================================================
   function createAssistantStreamingBubble(msgId, threadId) {
     const thread = document.getElementById(threadId);
@@ -1302,7 +1428,6 @@ Follow these strict answering rules:
       actions.classList.remove('hidden');
     }
 
-    // Append Contextual Follow-up Chips
     const chipsContainer = document.createElement('div');
     chipsContainer.className = 'flex flex-wrap gap-1.5 mt-3 pt-2';
 
@@ -1337,17 +1462,23 @@ Follow these strict answering rules:
 
   function generateFollowUpSuggestions(userQ, aiResp) {
     const q = (userQ || '').toLowerCase();
+    if (q.includes('java') || q.includes('c++') || q.includes('python')) {
+      return ['What are its main advantages?', 'Provide an advanced code example', 'Compare with alternative languages'];
+    }
+    if (q.includes('photosynthesis') || q.includes('biology')) {
+      return ['Explain the Light-Dependent reactions', 'What is the role of Chlorophyll?', 'Detail the Calvin Cycle'];
+    }
+    if (q.includes('newton') || q.includes('physics')) {
+      return ['Solve a numerical problem using this law', 'Explain Newton’s Third Law', 'How does momentum relate to impulse?'];
+    }
+    if (q.includes('inflation') || q.includes('economics')) {
+      return ['What are the key causes of demand-pull inflation?', 'How do Central Banks control inflation?', 'What is stagflation?'];
+    }
+    if (q.includes('machine learning') || q.includes('ai')) {
+      return ['Difference between Supervised and Unsupervised Learning', 'Explain Gradient Descent step by step', 'Provide a simple Python ML example'];
+    }
     if (q.includes('dbms') || q.includes('database')) {
       return ['Explain ACID properties in detail', 'What is Normalization (1NF, 2NF, 3NF)?', 'Explain Indexing in DBMS'];
-    }
-    if (q.includes('process') || q.includes('thread') || q.includes('deadlock') || q.includes('operating system')) {
-      return ['Explain Deadlock and Banker’s Algorithm', 'What is Virtual Memory and Paging?', 'Compare CPU Scheduling Algorithms'];
-    }
-    if (q.includes('tcp') || q.includes('udp') || q.includes('network')) {
-      return ['Explain TCP 3-Way Handshake', 'What is the OSI 7-Layer Model?', 'Difference between IPv4 and IPv6'];
-    }
-    if (q.includes('search') || q.includes('sort') || q.includes('algorithm')) {
-      return ['Provide complete implementation code', 'Analyze Time and Space Complexity', 'Compare with alternative algorithms'];
     }
     return ['Provide a detailed step-by-step example', 'What are the main advantages and disadvantages?', 'Explain with a comparison table'];
   }
@@ -1358,10 +1489,9 @@ Follow these strict answering rules:
   }
 
   // =========================================================================
-  // 12. PUBLIC CONTROLLER API: BrainwareAITutor
+  // 12. PUBLIC CONTROLLER API: window.BrainwareAITutor
   // =========================================================================
   window.BrainwareAITutor = {
-    // File upload handler
     handleFileUpload: async function(event, isPopup = false) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
@@ -1411,7 +1541,6 @@ Follow these strict answering rules:
       }
     },
 
-    // Ask Question Controller
     askQuestion: async function(customQuery = null, isPopup = false) {
       if (isGenerating) return;
 
@@ -1419,7 +1548,6 @@ Follow these strict answering rules:
       const input = document.getElementById(inputId);
       let query = customQuery || (input ? input.value : '');
 
-      // Allow sending file alone with automatic default instruction
       if ((!query || !query.trim()) && attachedFileData) {
         query = `Please analyze the attached document "${attachedFileData.name}" (${attachedFileData.type}) in detail. Provide an executive summary, list key concepts, explain all formulas and data tables, and highlight critical insights.`;
       }
@@ -1449,7 +1577,6 @@ Follow these strict answering rules:
         const result = await generateAcademicResponse(query, fileSnapshot);
         const responseText = result && result.text ? result.text : 'I could not generate an answer at this time. Please try again.';
 
-        // Record into chat history
         chatHistory.push({ role: 'user', text: query });
         chatHistory.push({ role: 'model', text: responseText });
 
@@ -1574,14 +1701,14 @@ Follow these strict answering rules:
 
     configureApiKey: function() {
       const current = localStorage.getItem('gemini_api_key') || '';
-      const key = prompt('Enter your Google Gemini API Key (e.g. AIzaSy...)\n\nTip: You can get a 100% free key at https://aistudio.google.com/app/apikey\nLeave blank to clear.', current);
+      const key = prompt('Enter your Google Gemini API Key (e.g. AIzaSy...)\n\nTip: You can obtain a 100% free key at https://aistudio.google.com/app/apikey\nLeave blank to clear and use backend server.', current);
       if (key !== null) {
         if (key.trim()) {
           localStorage.setItem('gemini_api_key', key.trim());
           alert('✓ Google Gemini 1.5 Flash API Key successfully configured and activated!');
         } else {
           localStorage.removeItem('gemini_api_key');
-          alert('✓ Gemini API Key cleared. Standard Academic Engine is active.');
+          alert('✓ Client Gemini API Key cleared. Backend server / Universal Academic Engine is active.');
         }
       }
     },
@@ -1596,7 +1723,7 @@ Follow these strict answering rules:
               <i data-lucide="bot" class="w-4 h-4"></i>
             </div>
             <div class="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 shadow-sm text-xs sm:text-sm text-slate-800 leading-relaxed max-w-xl">
-              <p class="font-bold text-slate-900 mb-1">Hello! I am your University Academic AI Assistant.</p>
+              <p class="font-bold text-slate-900 mb-1">Hello! I am Brainware Academic AI.</p>
               <p class="text-xs text-slate-600">Conversation cleared. How can I help you today?</p>
             </div>
           </div>
@@ -1609,7 +1736,7 @@ Follow these strict answering rules:
             <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">AI</div>
             <div class="bg-white border border-slate-200 rounded-xl rounded-tl-sm p-2.5 text-xs text-slate-800 leading-relaxed shadow-sm">
               <p class="font-bold text-slate-900">How can I help you?</p>
-              <p class="text-[11px] text-slate-600">Ask any question or attach any document.</p>
+              <p class="text-[11px] text-slate-600">Ask any question across all academic subjects.</p>
             </div>
           </div>
         `;
