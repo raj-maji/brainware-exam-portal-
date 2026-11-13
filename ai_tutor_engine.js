@@ -13,6 +13,7 @@ window.BrainwareAITutor = (function() {
   let chatHistory = [];
   let lastUserQuery = "";
   let messageCounter = 0;
+  let attachedFileData = null;
 
   // Conversational greetings
   const quickGreetings = {
@@ -828,6 +829,48 @@ To guarantee reliability and data integrity—particularly during concurrent acc
       }
     },
 
+    handleFileUpload: async function(event, isPopup = false) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const previewId = isPopup ? 'fbFilePreview' : 'aiFilePreview';
+      const nameId = isPopup ? 'fbFileName' : 'aiFileName';
+      const sizeId = isPopup ? null : 'aiFileSize';
+
+      const prevEl = document.getElementById(previewId);
+      const nameEl = document.getElementById(nameId);
+      const sizeEl = sizeId ? document.getElementById(sizeId) : null;
+
+      if (prevEl && nameEl) {
+        nameEl.innerText = file.name;
+        if (sizeEl) sizeEl.innerText = '(Reading...)';
+        prevEl.classList.remove('hidden');
+      }
+
+      try {
+        attachedFileData = await parseUploadedDocument(file);
+        if (sizeEl) sizeEl.innerText = '(' + attachedFileData.size + ')';
+        if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (err) {
+        console.error('File parsing failed:', err);
+        this.removeAttachedFile(isPopup);
+      }
+    },
+
+    removeAttachedFile: function(isPopup = false) {
+      attachedFileData = null;
+      const fileInputId = isPopup ? 'fbFileInput' : 'aiFileInput';
+      const previewId = isPopup ? 'fbFilePreview' : 'aiFilePreview';
+
+      const inputEl = document.getElementById(fileInputId);
+      if (inputEl) inputEl.value = '';
+
+      const prevEl = document.getElementById(previewId);
+      if (prevEl) prevEl.classList.add('hidden');
+    },
+
     askQuestion: async function(customQuery, isPopup = false) {
       if (isGenerating) {
         this.stopGeneration();
@@ -836,7 +879,13 @@ To guarantee reliability and data integrity—particularly during concurrent acc
 
       const inputId = isPopup ? 'fbChatInput' : 'aiTutorInput';
       const input = document.getElementById(inputId);
-      const query = customQuery || (input ? input.value : '');
+      let query = customQuery || (input ? input.value : '');
+
+      // Allow sending file with empty prompt (defaults to comprehensive analysis)
+      if ((!query || !query.trim()) && attachedFileData) {
+        query = `Please analyze this attached ${attachedFileData.name} (${attachedFileData.type}) file in detail. Explain all key concepts, formulas, data tables, and findings.`;
+      }
+
       if (!query || !query.trim()) return;
 
       lastUserQuery = query.trim();
@@ -844,10 +893,14 @@ To guarantee reliability and data integrity—particularly during concurrent acc
         input.value = '';
       }
 
+      // Snapshot attached file for this question
+      const fileSnapshot = attachedFileData;
+      this.removeAttachedFile(isPopup);
+
       const threadId = isPopup ? 'fbChatMessages' : 'aiChatThread';
       const threadContainer = document.getElementById(threadId);
 
-      this.appendUserBubble(query, threadId);
+      this.appendUserBubble(query, threadId, fileSnapshot);
 
       const msgId = 'aimsg_' + (++messageCounter);
       const { contentContainer } = this.createAssistantStreamingBubble(msgId, threadId);
@@ -866,11 +919,17 @@ To guarantee reliability and data integrity—particularly during concurrent acc
           return;
         }
 
+        // Combine query with attached file data if present
+        let contextualQuery = query;
+        if (fileSnapshot && fileSnapshot.text) {
+          contextualQuery = `[ATTACHED DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]:\n${fileSnapshot.text.substring(0, 3500)}\n\n[STUDENT QUESTION]:\n${query}`;
+        }
+
         // 2. Strict Syllabus Grounding Check
         const syllabusMatch = findSyllabusMatch(query);
 
         // 3. Multi-Provider Live AI Inference
-        let responseText = await queryLiveAI(query, syllabusMatch ? syllabusMatch.item : null);
+        let responseText = await queryLiveAI(contextualQuery, syllabusMatch ? syllabusMatch.item : null);
 
         // 4. Fallback to Master Academic Knowledge Base (Pure ChatGPT/Gemini answer only)
         if (!responseText || responseText.length < 30) {
@@ -943,19 +1002,37 @@ To guarantee reliability and data integrity—particularly during concurrent acc
       if (container) container.scrollTop = container.scrollHeight;
     },
 
-    appendUserBubble: function(text, threadId) {
+    appendUserBubble: function(text, threadId, fileSnapshot = null) {
       const container = document.getElementById(threadId);
       if (!container) return;
 
       const bubble = document.createElement('div');
       bubble.className = 'flex justify-end mb-4 animate-fade-in';
+
+      let fileBadgeHtml = '';
+      if (fileSnapshot) {
+        fileBadgeHtml = `
+          <div class="mb-2 pb-2 border-b border-white/20 flex items-center gap-2 text-xs">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-white rounded-xl font-medium shadow-sm">
+              <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+              <b class="truncate max-w-[200px]">${this.escapeHtml(fileSnapshot.name)}</b>
+              <span class="text-[10px] opacity-80 font-mono">(${fileSnapshot.size})</span>
+            </span>
+          </div>
+        `;
+      }
+
       bubble.innerHTML = `
         <div class="max-w-[85%] bg-blue-600 text-white rounded-3xl rounded-tr-sm px-5 py-3 text-xs sm:text-sm font-medium leading-relaxed shadow-sm">
-          ${this.escapeHtml(text)}
+          ${fileBadgeHtml}
+          <div>${this.escapeHtml(text)}</div>
         </div>
       `;
       container.appendChild(bubble);
       container.scrollTop = container.scrollHeight;
+      if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     },
 
     regenerateLast: function() {

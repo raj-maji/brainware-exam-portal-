@@ -44,9 +44,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <!-- Multi-Format Document Parsing (Excel, Word, PPT, Text) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<script src="ai_tutor_engine.js?v=20261113_nologin"></script>
+<script src="ai_tutor_engine.js?v=20261113_attachments"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
 
@@ -215,10 +219,28 @@
           </div>
         </div>
 
-        <!-- INPUT ACTION BAR (Standard Chatbox) -->
+        <!-- INPUT ACTION BAR (Standard Chatbox with Multi-Format File Attachment) -->
         <div class="p-3 bg-white border-t border-slate-200">
+          <!-- Attached File Preview Badge -->
+          <div id="aiFilePreview" class="hidden pb-2.5 flex items-center gap-2 text-xs">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl font-medium shadow-sm animate-fade-in">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-600"></i>
+              <span id="aiFileName" class="truncate max-w-xs font-semibold">Attached File</span>
+              <span id="aiFileSize" class="text-[10px] text-blue-500"></span>
+              <button type="button" onclick="BrainwareAITutor.removeAttachedFile()" class="hover:text-red-600 ml-1 p-0.5 rounded transition font-black text-sm" title="Remove file">&times;</button>
+            </span>
+          </div>
+
           <form onsubmit="event.preventDefault(); BrainwareAITutor.askQuestion();" class="flex items-center gap-2">
-            <input type="text" id="aiTutorInput" placeholder="Type a regular question (e.g. What is binary search?, Explain React Virtual DOM)..." class="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-50 focus:bg-white text-xs sm:text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition font-medium text-slate-900">
+            <!-- Hidden File Input supporting all major formats -->
+            <input type="file" id="aiFileInput" class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.pptx,.ppt,.txt,.md,.json,.png,.jpg,.jpeg" onchange="BrainwareAITutor.handleFileUpload(event)">
+            
+            <button type="button" onclick="document.getElementById('aiFileInput').click()" class="p-3 text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-2xl border border-slate-200 transition flex items-center justify-center flex-shrink-0 min-w-[44px] min-h-[44px]" title="Attach Document, Excel, PPT, PDF, or Text File">
+              <i data-lucide="paperclip" class="w-4 h-4"></i>
+            </button>
+
+            <input type="text" id="aiTutorInput" placeholder="Ask any question, or attach a Word, Excel, PPT, or PDF file..." class="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-50 focus:bg-white text-xs sm:text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition font-medium text-slate-900">
+            
             <button type="submit" id="aiSendBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold p-3 rounded-2xl text-xs sm:text-sm shadow-md transition flex items-center justify-center flex-shrink-0 min-w-[44px] min-h-[44px]">
               <i data-lucide="send" class="w-4 h-4"></i>
             </button>
@@ -9997,10 +10019,13 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
           </div>
 
           <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
-            <button onclick="openModal('${paper.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+            <button onclick="openModal('${paper.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm" title="Open Interactive Examination Paper with Solutions">
               <i data-lucide="eye" class="w-3.5 h-3.5"></i> Open Paper
             </button>
-            <a href="Question%20Set/${paper.filename}" download class="p-2 text-slate-600 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-xl transition border border-slate-200" title="Download PDF Question Paper">
+            <a href="Question%20Set/${paper.filename}" target="_blank" class="p-2 text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-xl transition border border-slate-200 flex items-center justify-center shadow-sm" title="Open Official PDF in New Tab">
+              <i data-lucide="external-link" class="w-4 h-4"></i>
+            </a>
+            <a href="Question%20Set/${paper.filename}" download class="p-2 text-slate-600 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-xl transition border border-slate-200 flex items-center justify-center shadow-sm" title="Download PDF Question Paper">
               <i data-lucide="download" class="w-4 h-4"></i>
             </a>
           </div>
@@ -10162,8 +10187,11 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
         }
 
         codeEl.innerText = paper.code;
-        titleEl.innerText = paper.title + ' — Sample Examination Paper';
-        pdfBtnEl.href = 'Question%20Set/' + paper.filename;
+        titleEl.innerText = paper.title + ' — Examination Paper & Solutions';
+        const pdfUrl = 'Question%20Set/' + paper.filename;
+        pdfBtnEl.href = pdfUrl;
+        const newTabBtn = document.getElementById('modalNewTabPdfBtn');
+        if (newTabBtn) newTabBtn.href = pdfUrl;
 
         bodyEl.innerHTML = '';
 
@@ -10280,8 +10308,10 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
 
         // Show Modal with explicit display: flex and remove hidden
         modalEl.classList.remove('hidden');
+        modalEl.style.removeProperty('display');
         modalEl.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+        try { window.location.hash = 'paper=' + paperId; } catch(e) {}
 
         if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
@@ -10331,8 +10361,19 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
 
     // Initial render
     renderPapers();
-    if (typeof switchTab === 'function') {
-      switchTab('AI_TUTOR');
+    
+    // Check for direct paper link in URL hash or query params
+    const hashMatch = (window.location.hash || '').match(/paper=([A-Za-z0-9_]+)/);
+    const urlParams = new URLSearchParams(window.location.search);
+    const paperParam = (hashMatch ? hashMatch[1] : null) || urlParams.get('paper');
+
+    if (paperParam) {
+      if (typeof switchTab === 'function') switchTab('QUESTION_SET');
+      setTimeout(() => { if (typeof openModal === 'function') openModal(paperParam); }, 250);
+    } else {
+      if (typeof switchTab === 'function') {
+        switchTab('AI_TUTOR');
+      }
     }
     if (typeof selectQSetSubject === 'function') {
       
@@ -10381,9 +10422,20 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
         </div>
       </div>
 
-      <!-- POPUP INPUT -->
+      <!-- POPUP INPUT WITH ATTACHMENT -->
       <div class="p-2.5 bg-white border-t border-slate-200">
+        <div id="fbFilePreview" class="hidden pb-2 flex items-center gap-1 text-[11px]">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg font-medium truncate max-w-[260px]">
+            <i data-lucide="file-text" class="w-3 h-3 text-blue-600"></i>
+            <span id="fbFileName" class="truncate font-semibold">Attached File</span>
+            <button type="button" onclick="BrainwareAITutor.removeAttachedFile(true)" class="hover:text-red-600 ml-1 font-black">&times;</button>
+          </span>
+        </div>
         <form onsubmit="event.preventDefault(); BrainwareAITutor.askQuestion(null, true);" class="flex items-center gap-1.5">
+          <input type="file" id="fbFileInput" class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.pptx,.ppt,.txt,.md,.json,.png,.jpg,.jpeg" onchange="BrainwareAITutor.handleFileUpload(event, true)">
+          <button type="button" onclick="document.getElementById('fbFileInput').click()" class="p-2 text-slate-500 hover:text-blue-600 bg-slate-100 rounded-xl text-xs transition" title="Attach Document, Excel, PPT, or PDF">
+            <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+          </button>
           <input type="text" id="fbChatInput" placeholder="Ask a question..." class="flex-1 px-3 py-2 bg-slate-100 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
           <button type="submit" id="fbSendBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-2 rounded-xl text-xs transition flex items-center justify-center min-w-[34px] min-h-[34px]">
             <i data-lucide="send" class="w-3.5 h-3.5"></i>
@@ -10416,6 +10468,9 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
           <button onclick="printCurrentPaper()" class="text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl transition text-xs font-medium flex items-center gap-1.5 shadow-sm" title="Print Paper">
             <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print
           </button>
+          <a id="modalNewTabPdfBtn" href="#" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open PDF (New Tab)
+          </a>
           <a id="modalPdfBtn" href="#" target="_blank" download class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
             <i data-lucide="download" class="w-3.5 h-3.5"></i> Download PDF
           </a>
