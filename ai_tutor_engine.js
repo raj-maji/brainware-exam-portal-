@@ -1,90 +1,120 @@
 /**
- * Brainware University - Open Academic AI Agent
- * - Delivers pure, direct, high-quality answers identical to ChatGPT and Gemini
- * - Zero extraneous UI clutter (NO model badges, NO subject headers, NO footer noise)
- * - Full KaTeX mathematical formula rendering ($\lambda$, $\sigma$, $\theta$, $\alpha$)
- * - Mathematical logic operators: AND ($\land$), OR ($\lor$), NOT ($\neg$), Implication ($\implies$), Equivalence ($\iff$)
- * - Multi-provider live AI (Puter.js + Free OpenAI endpoints) + Master Academic Knowledge Base
- * - Strict query sanitization preventing false question-number or document mismatches
+ * Brainware University - Open Academic AI Agent & AI Tutor Engine
+ * Version: 2026.11.13 - Master Academic Edition
+ * 
+ * Features:
+ * 1. Multi-Format Document Parsing: Real PDF.js multi-page extraction, Mammoth (DOCX), SheetJS (XLSX/CSV), JSZip (PPTX), and Image Base64 Multimodal Vision.
+ * 2. Official Google Gemini 1.5 Flash API with Full Multi-Turn Conversation History.
+ * 3. Strict University Question Bank & Syllabus Matcher (portalQAIndex: 1,254 items + papersData: 14 sets) with High-Confidence Thresholds.
+ * 4. Zero False-Positive Keyword Overlaps & Zero Generic Fallback Hallucinations.
+ * 5. Step-by-Step KaTeX Math Derivations & Verified Multi-Language Code Implementations.
+ * 6. Interactive TTS Read Aloud, Streaming Typewriter, Code Copy, Message Copy, and Follow-up Chips.
  */
 
-window.BrainwareAITutor = (function() {
-  let isGenerating = false;
-  let chatHistory = [];
-  let lastUserQuery = "";
-  let messageCounter = 0;
-  let attachedFileData = null;
+(function() {
+  'use strict';
 
-  // Conversational greetings
-  const quickGreetings = {
-    "hi": "Hello! How can I help you today? Ask me any question related to your subjects, computer science, mathematics, or programming, and I will give you a clear, straightforward answer.",
-    "hello": "Hi there! What topic or question can I help you with today?",
-    "hey": "Hey! How can I assist you with your studies or questions today?",
-    "who are you": "I am your AI Academic Study Assistant. I am here to provide clear, accurate, and comprehensive answers to any educational, technical, or mathematical question you have.",
-    "what is your name": "I am your Brainware AI Study Assistant.",
-    "thank you": "You're very welcome! Let me know if you need any further clarification or have another question.",
-    "thanks": "Glad to help! Feel free to ask more questions anytime.",
-    "bye": "Goodbye! Best of luck with your studies!"
-  };
-
-  // Unicode mathematical symbol mappings for fallback & copy
-  const mathSymbolMap = [
-    [/\\lambda\b/g, 'λ'],
-    [/\\alpha\b/g, 'α'],
-    [/\\beta\b/g, 'β'],
-    [/\\theta\b/g, 'θ'],
-    [/\\sigma\b/g, 'σ'],
-    [/\\mu\b/g, 'μ'],
-    [/\\pi\b/g, 'π'],
-    [/\\Delta\b/g, 'Δ'],
-    [/\\nabla\b/g, '∇'],
-    [/\\land\b/g, '∧'],
-    [/\\lor\b/g, '∨'],
-    [/\\neg\b/g, '¬'],
-    [/\\oplus\b/g, '⊕'],
-    [/\\implies\b/g, '⇒'],
-    [/\\iff\b/g, '⇔'],
-    [/\\equiv\b/g, '≡'],
-    [/\\rightarrow\b/g, '→'],
-    [/\\leftarrow\b/g, '←'],
-    [/\\forall\b/g, '∀'],
-    [/\\exists\b/g, '∃'],
-    [/\\in\b/g, '∈'],
-    [/\\notin\b/g, '∉'],
-    [/\\subseteq\b/g, '⊆'],
-    [/\\subset\b/g, '⊂'],
-    [/\\cup\b/g, '∪'],
-    [/\\cap\b/g, '∩'],
-    [/\\le\b/g, '≤'],
-    [/\\ge\b/g, '≥'],
-    [/\\neq\b/g, '≠'],
-    [/\\approx\b/g, '≈'],
-    [/\\times\b/g, '×'],
-    [/\\cdot\b/g, '·'],
-    [/\\partial\b/g, '∂'],
-    [/\\infty\b/g, '∞']
-  ];
-
-  function applyUnicodeMathFallback(str) {
-    if (!str) return "";
-    let s = str;
-    for (const [regex, rep] of mathSymbolMap) {
-      s = s.replace(regex, rep);
-    }
-    return s;
+  // Initialize PDF.js worker if available
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  // Sanitize user query: strip leading question numbers like "Q12.", "12.", "Question 12:"
-  // Multi-Format File Parser supporting Word, Excel, PowerPoint, PDF, Code & Text
+  // --- STATE ---
+  let isGenerating = false;
+  let abortController = null;
+  let chatHistory = []; // Array of { role: 'user' | 'model', text: string }
+  let lastUserQuery = '';
+  let messageCounter = 0;
+  let attachedFileData = null;
+  let isSpeaking = false;
+
+  // --- STOPWORDS FOR SEARCH ---
+  const stopwords = new Set([
+    'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'in', 'to', 'for', 
+    'of', 'with', 'between', 'distinguish', 'difference', 'explain', 'describe', 
+    'what', 'how', 'why', 'who', 'where', 'can', 'you', 'tell', 'me', 'about', 
+    'state', 'compare', 'contrast', 'write', 'briefly', 'terms', 'define', 'give', 
+    'list', 'following', 'does', 'do', 'are', 'by', 'its', 'from', 'discuss', 'note',
+    'short', 'please', 'solve', 'calculate', 'find'
+  ]);
+
+  // Clean raw queries: strip leading numbering like "Q1.", "12.", "Question 3:"
+  function sanitizeUserQuery(raw) {
+    if (!raw) return '';
+    return raw.trim().replace(/^(?:question\s*\d+|q\s*\d+|\d+)[\s.:\-)]+/i, '').trim();
+  }
+
+  function cleanSyllabusHtml(html) {
+    if (!html) return '';
+    let clean = html;
+    clean = clean.replace(/<div class="[^"]*">/gi, '');
+    clean = clean.replace(/<\/div>/gi, '\n');
+    clean = clean.replace(/<p class="[^"]*">/gi, '');
+    clean = clean.replace(/<\/p>/gi, '\n\n');
+    clean = clean.replace(/<span class="[^"]*">/gi, '');
+    clean = clean.replace(/<\/span>/gi, '');
+    clean = clean.replace(/<br\s*[\/]?>/gi, '\n');
+    clean = clean.replace(/&nbsp;/gi, ' ');
+    clean = clean.replace(/&rarr;/gi, '→');
+    clean = clean.replace(/&amp;/gi, '&');
+    clean = clean.replace(/&lt;/gi, '<');
+    clean = clean.replace(/&gt;/gi, '>');
+    clean = clean.replace(/&quot;/gi, '"');
+    clean = clean.replace(/&#039;/gi, "'");
+    clean = clean.replace(/^(Ans|Answer):?/i, '');
+    return clean.trim();
+  }
+
+  // =========================================================================
+  // 1. MULTI-FORMAT DOCUMENT PROCESSING (PDF, DOCX, XLSX, PPTX, TXT, IMAGE)
+  // =========================================================================
   async function parseUploadedDocument(file) {
-    const fileName = file.name || "uploaded_file";
-    const fileSize = (file.size / 1024).toFixed(1) + " KB";
+    const fileName = file.name || 'uploaded_document';
+    const fileSize = (file.size / 1024).toFixed(1) + ' KB';
     const ext = fileName.split('.').pop().toLowerCase();
-    let extractedText = "";
+    let extractedText = '';
+    let base64Data = null;
+    let mimeType = file.type || '';
 
     try {
-      // 1. Excel Spreadsheets (.xlsx, .xls, .csv)
-      if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+      // 1. PDF Documents via PDF.js (Multi-page full text extraction)
+      if (ext === 'pdf') {
+        if (typeof pdfjsLib !== 'undefined') {
+          try {
+            const arrayBuf = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuf });
+            const pdfDoc = await loadingTask.promise;
+            const pageTexts = [];
+            const maxPages = Math.min(pdfDoc.numPages, 40);
+            for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+              const page = await pdfDoc.getPage(pageNum);
+              const content = await page.getTextContent();
+              const pageStrings = content.items.map(item => item.str).filter(Boolean);
+              if (pageStrings.length > 0) {
+                pageTexts.push(`[Page ${pageNum}]: ` + pageStrings.join(' '));
+              }
+            }
+            extractedText = pageTexts.join('\n\n');
+          } catch (pdfErr) {
+            console.warn('PDF.js parsing exception:', pdfErr);
+          }
+        }
+        if (!extractedText) {
+          extractedText = `[Attached PDF Document: ${fileName}, size: ${fileSize}]`;
+        }
+
+      // 2. Word Documents (.docx) via Mammoth
+      } else if (ext === 'docx') {
+        if (typeof mammoth !== 'undefined') {
+          const arrayBuf = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer: arrayBuf });
+          extractedText = (result.value || '').trim();
+        } else {
+          extractedText = `[Attached Word Document: ${fileName}, size: ${fileSize}]`;
+        }
+
+      // 3. Excel Spreadsheets (.xlsx, .xls, .csv) via SheetJS
+      } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
         if (typeof XLSX !== 'undefined') {
           const arrayBuf = await file.arrayBuffer();
           const workbook = XLSX.read(arrayBuf, { type: 'array' });
@@ -93,7 +123,7 @@ window.BrainwareAITutor = (function() {
             const worksheet = workbook.Sheets[sheetName];
             const csv = XLSX.utils.sheet_to_csv(worksheet);
             if (csv && csv.trim()) {
-              sheetsOutput.push(`--- Sheet: ${sheetName} ---\n` + csv.trim());
+              sheetsOutput.push(`--- Worksheet: ${sheetName} ---\n` + csv.trim());
             }
           });
           extractedText = sheetsOutput.join('\n\n');
@@ -101,17 +131,7 @@ window.BrainwareAITutor = (function() {
           extractedText = await file.text();
         }
 
-      // 2. Word Documents (.docx)
-      } else if (ext === 'docx') {
-        if (typeof mammoth !== 'undefined') {
-          const arrayBuf = await file.arrayBuffer();
-          const result = await mammoth.extractRawText({ arrayBuffer: arrayBuf });
-          extractedText = result.value || '';
-        } else {
-          extractedText = `[Word Document: ${fileName}, size: ${fileSize}]`;
-        }
-
-      // 3. PowerPoint Presentations (.pptx)
+      // 4. PowerPoint Presentations (.pptx) via JSZip
       } else if (ext === 'pptx') {
         if (typeof JSZip !== 'undefined') {
           const arrayBuf = await file.arrayBuffer();
@@ -133,52 +153,38 @@ window.BrainwareAITutor = (function() {
               if (m[1].trim()) textMatches.push(m[1].trim());
             }
             if (textMatches.length) {
-              slidesOutput.push(`[Slide ${i+1}]: ` + textMatches.join(' '));
+              slidesOutput.push(`[Slide ${i + 1}]: ` + textMatches.join(' '));
             }
           }
           extractedText = slidesOutput.join('\n\n');
         } else {
-          extractedText = `[PowerPoint Presentation: ${fileName}, size: ${fileSize}]`;
+          extractedText = `[Attached PowerPoint Presentation: ${fileName}, size: ${fileSize}]`;
         }
 
-      // 4. Source Code and Plain Text Files
-      } else if (['txt', 'md', 'json', 'py', 'js', 'html', 'css', 'java', 'c', 'cpp', 'sql', 'xml', 'log'].includes(ext)) {
+      // 5. Images (.png, .jpg, .jpeg, .webp) for Gemini Multimodal Vision
+      } else if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(ext)) {
+        base64Data = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+        extractedText = `[Attached Image: ${fileName}, MIME: ${file.type || 'image/jpeg'}, size: ${fileSize}]`;
+
+      // 6. Source Code & Plain Text Files
+      } else if (['txt', 'md', 'json', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'sql', 'html', 'css', 'js', 'ts', 'xml', 'log'].includes(ext)) {
         extractedText = await file.text();
-
-      // 5. PDF Files
-      } else if (ext === 'pdf') {
-        try {
-          const buf = await file.arrayBuffer();
-          const uint8 = new Uint8Array(buf);
-          let rawStr = '';
-          for (let i = 0; i < Math.min(uint8.length, 40000); i++) {
-            if (uint8[i] >= 32 && uint8[i] <= 126) rawStr += String.fromCharCode(uint8[i]);
-            else if (uint8[i] === 10 || uint8[i] === 13) rawStr += ' ';
-          }
-          const words = rawStr.match(/[A-Za-z0-9_.,;:?!-]{3,}/g);
-          if (words && words.length > 20) {
-            extractedText = `[PDF Document Text Content: ${fileName}]:\n` + words.slice(0, 800).join(' ');
-          } else {
-            extractedText = `[Attached PDF Document: ${fileName}, size: ${fileSize}]`;
-          }
-        } catch(e) {
-          extractedText = `[Attached PDF Document: ${fileName}, size: ${fileSize}]`;
-        }
-
-      // 6. Image Files (.png, .jpg, .jpeg, .webp)
-      } else if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'].includes(ext)) {
-        extractedText = `[Attached Image: ${fileName}, type: ${file.type || ext}, size: ${fileSize}]`;
 
       // 7. General Fallback
       } else {
         try {
           extractedText = await file.text();
-        } catch(e) {
+        } catch (e) {
           extractedText = `[Attached Document: ${fileName}, size: ${fileSize}]`;
         }
       }
-    } catch(err) {
-      console.warn('Document parsing error:', err);
+    } catch (err) {
+      console.warn('Document extraction warning:', err);
       extractedText = `[Attached Document: ${fileName}, size: ${fileSize}]`;
     }
 
@@ -190,51 +196,19 @@ window.BrainwareAITutor = (function() {
       name: fileName,
       size: fileSize,
       type: ext.toUpperCase(),
-      text: extractedText.trim()
+      mimeType: mimeType || 'application/octet-stream',
+      text: extractedText.trim(),
+      base64: base64Data
     };
   }
 
-  function sanitizeUserQuery(raw) {
-    if (!raw) return "";
-    let cleaned = raw.trim();
-    cleaned = cleaned.replace(/^(?:question\s*\d+|q\s*\d+|\d+)[\s.:\-)]+/i, '');
-    return cleaned.trim();
-  }
-
-  const stopwords = new Set([
-    "the", "is", "at", "which", "on", "a", "an", "and", "or", "in", "to", "for", 
-    "of", "with", "between", "distinguish", "difference", "explain", "describe", 
-    "what", "how", "why", "who", "where", "can", "you", "tell", "me", "about", 
-    "state", "compare", "contrast", "write", "briefly", "terms", "define", "give", 
-    "list", "following", "does", "do", "are", "by", "its", "from"
-  ]);
-
-  function cleanSyllabusHtml(html) {
-    if (!html) return "";
-    let clean = html;
-    clean = clean.replace(/<div class="[^"]*">/gi, '');
-    clean = clean.replace(/<\/div>/gi, '\n');
-    clean = clean.replace(/<p class="[^"]*">/gi, '');
-    clean = clean.replace(/<\/p>/gi, '\n\n');
-    clean = clean.replace(/<span class="[^"]*">/gi, '');
-    clean = clean.replace(/<\/span>/gi, '');
-    clean = clean.replace(/<br\s*[\/]?>/gi, '\n');
-    clean = clean.replace(/&nbsp;/gi, ' ');
-    clean = clean.replace(/&rarr;/gi, '→');
-    clean = clean.replace(/&amp;/gi, '&');
-    clean = clean.replace(/&lt;/gi, '<');
-    clean = clean.replace(/&gt;/gi, '>');
-    clean = clean.replace(/&quot;/gi, '"');
-    clean = clean.replace(/&#039;/gi, "'");
-    clean = clean.replace(/^(Ans|Answer):?/i, '');
-    return clean.trim();
-  }
-
-  // Intelligent Syllabus & Question Bank Matcher (Searches 1,254 local syllabus Q&As + 14 Exam Papers)
+  // =========================================================================
+  // 2. STRICT LOCAL QUESTION BANK & SYLLABUS MATCHER
+  // =========================================================================
   function findSyllabusMatch(rawQuery) {
     const query = sanitizeUserQuery(rawQuery);
     const qNorm = query.toLowerCase().trim();
-    if (!qNorm) return null;
+    if (!qNorm || qNorm.length < 4) return null;
 
     const tokens = qNorm.match(/[a-z0-9_.-]+/g) || [];
     const significantWords = tokens.filter(w => !stopwords.has(w) && w.length > 2);
@@ -243,50 +217,53 @@ window.BrainwareAITutor = (function() {
     let bestMatch = null;
     let highestScore = 0;
 
-    // 1. Search in verified local syllabus database (portalQAIndex: 1,254 items)
+    // Search in portalQAIndex (1,254 items)
     if (window.portalQAIndex && Array.isArray(window.portalQAIndex)) {
       for (const item of window.portalQAIndex) {
         const candNorm = (item.q || '').toLowerCase();
         let score = 0;
 
-        // Exact phrase match
-        if (candNorm.includes(qNorm) || qNorm.includes(candNorm)) {
-          score += 250;
+        // Exact phrase match bonus
+        if (candNorm === qNorm) {
+          score += 400;
+        } else if (candNorm.includes(qNorm) || (qNorm.length > 15 && qNorm.includes(candNorm))) {
+          score += 260;
         }
 
-        // Token match
         let matchedCount = 0;
         for (const w of significantWords) {
           if (candNorm.includes(w)) matchedCount++;
         }
 
         const overlap = matchedCount / significantWords.length;
-        if (matchedCount > 0) {
-          score += (matchedCount * 40) + Math.round(overlap * 60);
-        }
-
-        if (score > highestScore && (overlap >= 0.5 || matchedCount >= 2 || (significantWords.length === 1 && matchedCount === 1))) {
-          highestScore = score;
-          bestMatch = { item: item, score: score, source: 'portalQAIndex' };
+        // Require at least 2 significant words OR >= 70% overlap to prevent false single-word hits
+        if ((matchedCount >= 2 && overlap >= 0.5) || (significantWords.length === 1 && matchedCount === 1 && candNorm.length < 40)) {
+          score += (matchedCount * 50) + Math.round(overlap * 100);
+          if (score > highestScore && score >= 170) {
+            highestScore = score;
+            bestMatch = { item: item, score: score, source: 'University Syllabus Portal (Verified QA)' };
+          }
         }
       }
     }
 
-    // 2. Search in all 14 Examination Papers (papersData: Group A, B, C)
+    // Search in papersData (14 Exam Sets)
     if (window.papersData && Array.isArray(window.papersData)) {
       for (const paper of window.papersData) {
         const allQuestions = [
-          ...(paper.group_a || []).map(q => ({ q: q.q, a: `**Correct Option: ${q.ans}**\n\n*Rationale:* ${q.expl}`, type: 'MCQ' })),
-          ...(paper.group_b || []).map(q => ({ q: q.q, a: `**Solution Outline:**\n\n${q.hint}`, type: 'Short' })),
-          ...(paper.group_c || []).map(q => ({ q: q.q, a: `**Comprehensive Solution Framework:**\n\n${q.hint}`, type: 'Descriptive' }))
+          ...(paper.group_a || []).map(q => ({ q: q.q, a: `**Correct Option: ${q.ans}**\n\n*Rationale & Solution:* ${q.expl}`, type: 'MCQ', paper: paper.title })),
+          ...(paper.group_b || []).map(q => ({ q: q.q, a: `**Solution Outline:**\n\n${q.hint}`, type: 'Short Answer', paper: paper.title })),
+          ...(paper.group_c || []).map(q => ({ q: q.q, a: `**Comprehensive Solution Framework:**\n\n${q.hint}`, type: 'Descriptive', paper: paper.title }))
         ];
 
         for (const item of allQuestions) {
           const candNorm = (item.q || '').toLowerCase();
           let score = 0;
 
-          if (candNorm.includes(qNorm) || qNorm.includes(candNorm)) {
-            score += 220;
+          if (candNorm === qNorm) {
+            score += 380;
+          } else if (candNorm.includes(qNorm) || (qNorm.length > 15 && qNorm.includes(candNorm))) {
+            score += 240;
           }
 
           let matchedCount = 0;
@@ -295,237 +272,242 @@ window.BrainwareAITutor = (function() {
           }
 
           const overlap = matchedCount / significantWords.length;
-          if (matchedCount > 0) {
-            score += (matchedCount * 35) + Math.round(overlap * 50);
-          }
-
-          if (score > highestScore && (overlap >= 0.5 || matchedCount >= 2 || (significantWords.length === 1 && matchedCount === 1))) {
-            highestScore = score;
-            bestMatch = { item: item, score: score, source: 'papersData' };
+          if ((matchedCount >= 2 && overlap >= 0.5) || (significantWords.length === 1 && matchedCount === 1 && candNorm.length < 40)) {
+            score += (matchedCount * 45) + Math.round(overlap * 90);
+            if (score > highestScore && score >= 170) {
+              highestScore = score;
+              bestMatch = { item: item, score: score, source: `University Exam Paper (${item.paper || 'Official'})` };
+            }
           }
         }
       }
     }
 
-    if (highestScore >= 45 && bestMatch) {
-      return bestMatch;
+    return bestMatch;
+  }
+
+  // =========================================================================
+  // 3. STEP-BY-STEP MATHEMATICAL & ALGORITHMIC SOLVER
+  // =========================================================================
+  function trySolveMathProblem(query) {
+    const q = query.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    // 1. Linear Equation: e.g. "solve 2x + 5 = 15" or "2x + 5 = 15"
+    const linearMatch = q.match(/(?:solve\s+)?([+-]?\s*\d*\.?\d*)\s*([a-z])\s*([+-])\s*(\d+\.?\d*)\s*=\s*([+-]?\s*\d+\.?\d*)/i);
+    if (linearMatch) {
+      let aStr = linearMatch[1].replace(/\s+/g, '');
+      const varName = linearMatch[2];
+      const sign = linearMatch[3];
+      const bVal = parseFloat(linearMatch[4]);
+      const cVal = parseFloat(linearMatch[5].replace(/\s+/g, ''));
+
+      let aVal = 1;
+      if (aStr === '' || aStr === '+') aVal = 1;
+      else if (aStr === '-') aVal = -1;
+      else aVal = parseFloat(aStr);
+
+      if (!isNaN(aVal) && aVal !== 0 && !isNaN(bVal) && !isNaN(cVal)) {
+        const signedB = sign === '-' ? -bVal : bVal;
+        const rhsAfterSub = cVal - signedB;
+        const solution = rhsAfterSub / aVal;
+        const solRounded = Number.isInteger(solution) ? solution : solution.toFixed(4);
+
+        return `### Step-by-Step Mathematical Solution
+
+We are given the linear algebraic equation:
+
+$$${aVal !== 1 ? aVal : ''}${varName} ${signedB >= 0 ? '+ ' + signedB : '- ' + Math.abs(signedB)} = ${cVal}$$
+
+---
+
+### Step 1: Isolate the Variable Term
+Subtract $${signedB}$ from both sides of the equation:
+
+$$${aVal !== 1 ? aVal : ''}${varName} = ${cVal} - (${signedB})$$
+$$${aVal !== 1 ? aVal : ''}${varName} = ${rhsAfterSub}$$
+
+---
+
+### Step 2: Solve for $${varName}$
+Divide both sides by the coefficient of $${varName}$ ($${aVal}$):
+
+$$${varName} = \\frac{${rhsAfterSub}}{${aVal}} = ${solRounded}$$
+
+---
+
+### Step 3: Verification
+Substitute $${varName} = ${solRounded}$ back into the original equation:
+
+$$${aVal}(${solRounded}) ${signedB >= 0 ? '+ ' + signedB : '- ' + Math.abs(signedB)} = ${aVal * solution + signedB} = ${cVal} \\quad \\text{(LHS = RHS Verified)}$$
+
+**Final Answer:**
+$$\\mathbf{${varName} = ${solRounded}}$$`;
+      }
     }
+
     return null;
   }
 
-    // =========================================================================
-  // UNIVERSAL LIVE AI & KNOWLEDGE ENGINE (Zero-Login, Zero-Auth, 100% Free)
-  // Combines:
-  // 1. Google Gemini 1.5 Flash (if custom API key configured in localStorage)
-  // 2. Real-Time Educational Knowledge Engine (CORS-enabled Wikipedia REST API)
-  // 3. Algorithmic Code & Formula Synthesis Engine
   // =========================================================================
-
-  async function fetchLiveWikiArticle(term) {
-    try {
-      const cleanTerm = term.trim();
-      if (!cleanTerm) return null;
-
-      // Search Wikipedia (Official CORS-enabled endpoint: origin=*)
-      const searchUrl = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(cleanTerm) + '&format=json&origin=*';
-      const sResp = await fetch(searchUrl, { headers: { 'User-Agent': 'BrainwareAcademicAI/1.0' } });
-      if (!sResp.ok) return null;
-      const sData = await sResp.json();
-      const results = sData?.query?.search;
-      if (!results || results.length === 0) return null;
-
-      const topTitle = results[0].title;
-
-      // Summary endpoint (Instant, high-speed, zero preflight issue)
-      const sumUrl = 'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(topTitle);
-      const sumResp = await fetch(sumUrl, { headers: { 'User-Agent': 'BrainwareAcademicAI/1.0' } });
-      if (!sumResp.ok) return null;
-      const sumData = await sumResp.json();
-
-      return {
-        title: sumData.title || topTitle,
-        description: sumData.description || '',
-        extract: sumData.extract || ''
-      };
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // Code generator for common programming and DSA requests
+  // 4. PROGRAMMING CODE SYNTHESIZER FOR CORE CS BENCHMARKS
+  // =========================================================================
   function tryGenerateCodeSolution(query) {
     const q = query.toLowerCase();
-    
-    // Binary Search
-    if (q.includes('binary search') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Binary Search Algorithm Implementation
 
-**Binary Search** is an efficient divide-and-conquer search algorithm on a sorted collection that repeatedly divides the search interval in half.
+    // Reverse a string in Java / Python
+    if ((q.includes('reverse') && q.includes('string')) || (q.includes('string reverse'))) {
+      if (q.includes('python')) {
+        return `### Python: Reverse a String
+
+\`\`\`python
+def reverse_string(s: str) -> str:
+    """
+    Reverses an input string using two common methods:
+    1. Pythonic Slicing: O(n) Time, O(n) Space
+    2. Two-Pointer In-Place Array: O(n) Time, O(n) Space
+    """
+    # Method 1: Slicing (Idiomatic & Optimized)
+    return s[::-1]
+
+# Example Demonstration
+sample = "Brainware University"
+reversed_result = reverse_string(sample)
+print("Original:", sample)
+print("Reversed:", reversed_result)
+\`\`\`
+
+---
+
+### Method 2: Two-Pointer Iterative Approach
+
+\`\`\`python
+def reverse_string_two_pointer(s: str) -> str:
+    chars = list(s)
+    left, right = 0, len(chars) - 1
+    while left < right:
+        chars[left], chars[right] = chars[right], chars[left]
+        left += 1
+        right -= 1
+    return "".join(chars)
+\`\`\`
+
+**Complexity:**
+- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is the length of the string.
+- **Space Complexity:** $\\mathcal{O}(n)$ auxiliary memory to store character array.`;
+      }
+
+      // Default or Java
+      return `### Java Program to Reverse a String
+
+\`\`\`java
+public class StringReversal {
+
+    // Method 1: Using StringBuilder (Idiomatic & High Performance)
+    public static String reverseWithStringBuilder(String input) {
+        if (input == null) return null;
+        return new StringBuilder(input).reverse().toString();
+    }
+
+    // Method 2: Two-Pointer Character Array Swap (Fundamental Algorithm)
+    public static String reverseWithTwoPointers(String input) {
+        if (input == null || input.length() <= 1) return input;
+        
+        char[] chars = input.toCharArray();
+        int left = 0;
+        int right = chars.length - 1;
+
+        while (left < right) {
+            char temp = chars[left];
+            chars[left] = chars[right];
+            chars[right] = temp;
+            left++;
+            right--;
+        }
+
+        return new String(chars);
+    }
+
+    public static void main(String[] args) {
+        String original = "Brainware University";
+        
+        String reversed = reverseWithStringBuilder(original);
+        System.out.println("Original String: " + original);
+        System.out.println("Reversed String: " + reversed);
+    }
+}
+\`\`\`
+
+---
+
+### Complexity Analysis
+- **Time Complexity:** $\\mathcal{O}(n)$ where $n$ is the number of characters. We make $\\lfloor \\frac{n}{2} \\rfloor$ character swaps.
+- **Space Complexity:** $\\mathcal{O}(n)$ to hold the mutable character array or \`StringBuilder\` buffer (strings in Java are immutable).`;
+    }
+
+    // Binary Search
+    if (q.includes('binary search') && (q.includes('code') || q.includes('program') || q.includes('write') || q.includes('example') || q.includes('explain'))) {
+      return `### Binary Search Algorithm & Implementation
+
+**Binary Search** is an optimal divide-and-conquer search algorithm designed for **strictly sorted arrays**. At each step, it compares the target with the middle element and halves the active search interval.
+
+---
+
+### Python Implementation
 
 \`\`\`python
 def binary_search(arr, target):
     """
-    Searches for target in a sorted list arr.
-    Returns the index if found, otherwise returns -1.
+    Performs iterative binary search on a sorted list.
+    Returns index of target if found, else -1.
     Time Complexity: O(log n), Space Complexity: O(1)
     """
     low = 0
     high = len(arr) - 1
 
     while low <= high:
+        # Avoid integer overflow in fixed-width languages: low + (high - low) // 2
         mid = (low + high) // 2
-        mid_val = arr[mid]
 
-        if mid_val == target:
-            return mid  # Element found at index mid
-        elif mid_val < target:
-            low = mid + 1  # Search right half
+        if arr[mid] == target:
+            return mid  # Target identified
+        elif arr[mid] < target:
+            low = mid + 1  # Target lies in right partition
         else:
-            high = mid - 1  # Search left half
+            high = mid - 1  # Target lies in left partition
 
-    return -1  # Element not present
+    return -1  # Target not found
 
-# Example Execution
-numbers = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
+# Concrete Example
+dataset = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
 target_val = 23
-result = binary_search(numbers, target_val)
+index = binary_search(dataset, target_val)
 
-if result != -1:
-    print(f"Element {target_val} found at index: {result}")
-else:
-    print(f"Element {target_val} is not in the array.")
+print(f"Target {target_val} located at index: {index}")
 \`\`\`
 
 ---
 
-### Complexity Analysis
-- **Time Complexity:**
-  - Best Case: $\\mathcal{O}(1)$ (target is at the midpoint on the first check)
-  - Average & Worst Case: $\\mathcal{O}(\\log n)$ (halves the search space each step)
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative approach ($\\mathcal{O}(\\log n)$ call-stack for recursive approach).
-- **Prerequisite:** The input dataset **must be strictly sorted**.`;
-    }
+### Step-by-Step Example Walkthrough
+Target: $23$, Array: $[2, 5, 8, 12, 16, 23, 38, 56, 72, 91]$ ($n=10$)
 
-    // Bubble Sort
-    if (q.includes('bubble sort') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Bubble Sort Algorithm Implementation
-
-**Bubble Sort** is a comparison-based sorting algorithm that repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order.
-
-\`\`\`python
-def bubble_sort(arr):
-    """
-    Sorts a list in ascending order using optimized Bubble Sort.
-    Time Complexity: O(n^2), Space Complexity: O(1)
-    """
-    n = len(arr)
-    for i in range(n):
-        swapped = False
-        # Last i elements are already sorted in place
-        for j in range(0, n - i - 1):
-            if arr[j] > arr[j + 1]:
-                arr[j], arr[j + 1] = arr[j + 1], arr[j]
-                swapped = True
-        # If no two elements were swapped in inner loop, array is sorted
-        if not swapped:
-            break
-    return arr
-
-# Example Execution
-data = [64, 34, 25, 12, 22, 11, 90]
-sorted_data = bubble_sort(data)
-print("Sorted Array:", sorted_data)
-\`\`\`
+1. **Iteration 1:** $\\text{low}=0, \\text{high}=9 \\implies \\text{mid}=4$. $\\text{arr}[4] = 16$. Since $16 < 23$, set $\\text{low} = 5$.
+2. **Iteration 2:** $\\text{low}=5, \\text{high}=9 \\implies \\text{mid}=7$. $\\text{arr}[7] = 56$. Since $56 > 23$, set $\\text{high} = 6$.
+3. **Iteration 3:** $\\text{low}=5, \\text{high}=6 \\implies \\text{mid}=5$. $\\text{arr}[5] = 23$. **Match found! Return index 5.**
 
 ---
 
 ### Complexity Analysis
-- **Time Complexity:**
-  - Best Case: $\\mathcal{O}(n)$ (when array is already sorted, with \`swapped\` flag check)
-  - Worst Case: $\\mathcal{O}(n^2)$ (when array is sorted in reverse)
-- **Space Complexity:** $\\mathcal{O}(1)$ (in-place sorting).`;
-    }
-
-    // Quick Sort
-    if (q.includes('quick sort') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Quick Sort Algorithm Implementation
-
-**Quick Sort** is an efficient divide-and-conquer sorting algorithm that selects a 'pivot' element and partitions the other elements into two sub-arrays according to whether they are less than or greater than the pivot.
-
-\`\`\`python
-def quick_sort(arr):
-    """
-    Sorts a list in ascending order using recursive Quick Sort.
-    Average Time: O(n log n), Worst Time: O(n^2), Space: O(log n)
-    """
-    if len(arr) <= 1:
-        return arr
-    
-    pivot = arr[len(arr) // 2]
-    left = [x for x in arr if x < pivot]
-    middle = [x for x in arr if x == pivot]
-    right = [x for x in arr if x > pivot]
-    
-    return quick_sort(left) + middle + quick_sort(right)
-
-# Example Execution
-numbers = [38, 27, 43, 3, 9, 82, 10]
-print("Sorted Array:", quick_sort(numbers))
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:**
-  - Average Case: $\\mathcal{O}(n \\log n)$
-  - Worst Case: $\\mathcal{O}(n^2)$ (when chosen pivot is consistently the minimum or maximum)
-- **Space Complexity:** $\\mathcal{O}(\\log n)$ call stack frames.`;
-    }
-
-    // Fibonacci
-    if (q.includes('fibonacci') && (q.includes('code') || q.includes('program') || q.includes('implement') || q.includes('python') || q.includes('c++') || q.includes('java'))) {
-      return `### Fibonacci Series Implementation (Iterative & Dynamic Programming)
-
-The Fibonacci sequence is defined by the recurrence relation:
-
-$$F(0) = 0, \\quad F(1) = 1, \\quad F(n) = F(n-1) + F(n-2) \\quad \\text{for } n \\ge 2$$
-
-\`\`\`python
-def fibonacci_series(n):
-    """
-    Generates the first n Fibonacci numbers with O(n) time and O(1) space.
-    """
-    if n <= 0:
-        return []
-    if n == 1:
-        return [0]
-    
-    fib = [0, 1]
-    a, b = 0, 1
-    for _ in range(2, n):
-        a, b = b, a + b
-        fib.append(b)
-    return fib
-
-# Print first 10 Fibonacci terms
-print("First 10 Fibonacci terms:", fibonacci_series(10))
-\`\`\`
-
----
-
-### Complexity Analysis
-- **Time Complexity:** $\\mathcal{O}(n)$
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space (excluding storage for the output list).`;
+- **Best Case Time:** $\\mathcal{O}(1)$ (element found at middle immediately).
+- **Average & Worst Case Time:** $\\mathcal{O}(\\log_2 n)$ (search space is halved repeatedly: $n \\rightarrow \\frac{n}{2} \\rightarrow \\frac{n}{4} \\dots \\rightarrow 1$).
+- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary space for iterative search ($\\\\mathcal{O}(\\log n)$ recursion stack if implemented recursively).`;
     }
 
     // SQL Second Highest Salary
     if ((q.includes('highest salary') || q.includes('second highest')) && (q.includes('sql') || q.includes('query'))) {
       return `### SQL Query: Second Highest Salary
 
-To find the second highest salary from an \`Employee\` table, use either the \`LIMIT / OFFSET\` clause or a subquery:
-
 \`\`\`sql
--- Approach 1: Subquery (ANSI SQL Compatible across MySQL, Oracle, PostgreSQL, SQL Server)
+-- Approach 1: ANSI SQL Subquery (Universally supported on MySQL, Oracle, PostgreSQL, SQL Server)
 SELECT MAX(salary) AS SecondHighestSalary
 FROM Employee
 WHERE salary < (
@@ -533,7 +515,7 @@ WHERE salary < (
     FROM Employee
 );
 
--- Approach 2: Using LIMIT and OFFSET (MySQL / PostgreSQL / SQLite)
+-- Approach 2: Using LIMIT and OFFSET (MySQL, PostgreSQL, SQLite)
 SELECT DISTINCT salary AS SecondHighestSalary
 FROM Employee
 ORDER BY salary DESC
@@ -542,1025 +524,955 @@ LIMIT 1 OFFSET 1;
 
 ---
 
-### Explanation
-1. \`MAX(salary)\` identifies the absolute highest salary.
-2. The outer query filters for the maximum salary that is strictly less than the highest salary, correctly extracting the second highest value.
-3. \`DISTINCT\` ensures that duplicate salaries do not lead to ties returning the highest salary twice.`;
+### Logic & Explanation
+1. \`MAX(salary)\` in the inner subquery extracts the absolute maximum salary in the table.
+2. The outer query finds the maximum salary strictly smaller than that maximum, correctly extracting the second highest salary.
+3. \`DISTINCT\` ensures identical salary duplicates do not skew ranking.`;
     }
 
     return null;
   }
 
-  // Universal Live Academic Response Synthesizer
-  async function queryUniversalAcademicAI(query, syllabusContext) {
-    const qLower = query.toLowerCase().trim();
+  // =========================================================================
+  // 5. ACADEMIC COMPARISONS & SUBJECT EXPLANATIONS
+  // =========================================================================
+  function trySubjectConceptExplanation(query) {
+    const q = query.toLowerCase().trim();
 
-    // 1. Check for programming code generation
-    const codeAns = tryGenerateCodeSolution(query);
-    if (codeAns) return codeAns;
+    // 1. Process vs Thread
+    if (q.includes('process') && q.includes('thread') && (q.includes('difference') || q.includes('distinguish') || q.includes('vs') || q.includes('compare'))) {
+      return `### Difference Between Process and Thread
 
-    // 2. Check for Comparative Query ("difference between X and Y", "compare A and B", "A vs B")
-    const compMatch = qLower.match(/(?:difference between|distinguish between|compare)\s+(.+?)\s+(?:and|with|to)\s+(.+?)(?:\?|$)/i) 
-                   || qLower.match(/(.+?)\s+vs\.?\s+(.+?)(?:\?|$)/i);
+In Operating Systems, both **Processes** and **Threads** are fundamental units of execution, but they operate at different architectural layers.
 
-    if (compMatch) {
-      const termA = compMatch[1].replace(/^(the|a|an)\s+/i, '').trim();
-      const termB = compMatch[2].replace(/^(the|a|an)\s+/i, '').trim();
+---
 
-      const [artA, artB] = await Promise.all([fetchLiveWikiArticle(termA), fetchLiveWikiArticle(termB)]);
+### Side-by-Side Comparison Matrix
 
-      if (artA && artB) {
-        const descA = artA.description || 'Core Technical Concept';
-        const descB = artB.description || 'Core Technical Concept';
-        const defA = (artA.extract.split('. ')[0] || artA.title) + '.';
-        const defB = (artB.extract.split('. ')[0] || artB.title) + '.';
-
-        return `### Comparison: ${artA.title} vs. ${artB.title}
-
-| Feature / Dimension | ${artA.title} | ${artB.title} |
+| Parameter / Feature | Process | Thread |
 | :--- | :--- | :--- |
-| **Category** | ${descA} | ${descB} |
-| **Primary Definition** | ${defA} | ${defB} |
-| **Core Architecture** | Operates according to formal principles of ${artA.title}. | Operates according to formal principles of ${artB.title}. |
-| **Primary Use Cases** | Systems requiring specialized ${termA} mechanics. | Systems requiring specialized ${termB} mechanics. |
+| **Definition** | An independent program in execution with its own address space. | A lightweight execution unit within a parent process. |
+| **Address Space** | Has its own independent, isolated memory space. | Shares the memory space (code, data, heap) of its parent process. |
+| **Creation & Termination** | Heavyweight; high overhead for process control block (PCB) creation. | Lightweight; fast creation and low system overhead. |
+| **Context Switching** | Slower; requires flushing cache and switching page tables. | Fast; registers and program counter are swapped while memory space remains. |
+| **Inter-Communication** | Requires explicit Inter-Process Communication (IPC, Pipes, Shared Memory). | Direct communication via shared variables in memory. |
+| **Resource Isolation** | High isolation; a crash in one process does not affect other processes. | Low isolation; an unhandled exception or memory corruption can terminate all threads. |
 
 ---
 
-### In-Depth Breakdown
+### Key Architectural Takeaway
+A **Process** provides protected resource containment, whereas a **Thread** enables high-concurrency parallelism within that resource container.`;
+    }
 
-#### 1. ${artA.title}
-${artA.extract}
+    // 2. TCP vs UDP
+    if ((q.includes('tcp') && q.includes('udp')) && (q.includes('difference') || q.includes('distinguish') || q.includes('vs') || q.includes('compare'))) {
+      return `### Difference Between TCP and UDP
 
-#### 2. ${artB.title}
-${artB.extract}
+At the Transport Layer (Layer 4) of the OSI / TCP/IP model, **TCP (Transmission Control Protocol)** and **UDP (User Datagram Protocol)** handle host-to-host data transfer with contrasting priorities.
 
 ---
 
-### Key Takeaway
-While **${artA.title}** primarily emphasizes ${descA.toLowerCase()}, **${artB.title}** focuses on ${descB.toLowerCase()}. The appropriate choice depends on system throughput, operational constraints, and architectural requirements.`;
-      }
-    }
+### Side-by-Side Comparison Matrix
 
-    // 3. Single Subject Knowledge Retrieval via Wikipedia Live Engine
-    const cleanTopic = query
-      .replace(/^(what is|explain|describe|define|tell me about|how does|why is|what are|state)\s+/i, '')
-      .replace(/[?!.]/g, '')
-      .trim();
-
-    const article = await fetchLiveWikiArticle(cleanTopic);
-    if (article && article.extract && article.extract.length > 40) {
-      const sentences = article.extract.split(/(?<=[.?!])\s+/);
-      const definition = sentences.slice(0, 2).join(' ');
-      const mechanism = sentences.slice(2, 5).join(' ') || sentences.slice(1).join(' ');
-
-      return `### ${article.title} ${article.description ? `*(${article.description})*` : ''}
-
-${definition}
-
----
-
-### Core Working Principle & Fundamentals
-
-${mechanism}
-
----
-
-### Key Properties & Real-World Applications
-- **Theoretical Foundations:** Grounded in the rigorous scientific and mathematical frameworks of **${article.title}**.
-- **System Constraints & Properties:** Governed by established physical, mathematical, or algorithmic laws.
-- **Practical Deployment:** Extensively applied across modern science, software engineering, industrial systems, and academic research.`;
-    }
-
-    return null;
-  }
-
-  // Multi-Provider Live AI Inference (Direct Gemini 1.5 Flash + Universal Academic Engine)
-  async function queryLiveAI(query, syllabusContext) {
-    // 1. Check if user configured a Google Gemini API Key
-    const geminiKey = localStorage.getItem('gemini_api_key') || window.GEMINI_API_KEY || '';
-    if (geminiKey) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 9000);
-
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`;
-        const systemInstruction = "You are an expert AI Academic Tutor and Professor. Provide a clear, direct, comprehensive, high-quality answer to the question asked. Use LaTeX notation ($...$ and $$...$$) for formulas. Use clean Markdown tables when comparing. Do not include introductory filler or robotic meta-text.";
-        
-        let promptText = `${systemInstruction}\n\nQuestion: ${query}`;
-        if (syllabusContext) {
-          promptText += `\n\nReference Material: ${cleanSyllabusHtml(syllabusContext.a).substring(0, 1000)}`;
-        }
-
-        const resp = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (resp.ok) {
-          const data = await resp.json();
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text && text.trim().length > 30) {
-            return cleanAiResponse(text.trim());
-          }
-        }
-      } catch (err) {
-        console.warn("Gemini direct API call error, falling back to Universal Academic Engine:", err);
-      }
-    }
-
-    // 2. Universal Live Academic Knowledge Engine (100% Free, Zero Key, Zero Preflight Issue)
-    try {
-      const liveAns = await queryUniversalAcademicAI(query, syllabusContext);
-      if (liveAns && liveAns.length > 40) {
-        return liveAns;
-      }
-    } catch (e) {
-      console.warn("Universal live AI query notice:", e);
-    }
-
-    return null;
-  }
-
-  function cleanAiResponse(text) {
-    if (!text) return "";
-    let cleaned = text.trim();
-    cleaned = cleaned.replace(/^(?:Sure!|Certainly!|Here is (?:an|the) (?:explanation|answer):|As an AI language model,)\s*/i, '');
-    return cleaned.trim();
-  }
-
-
-  // Master Academic Knowledge Engine (Authoritative Educational Intelligence across All Disciplines)
-  function getMasterAcademicAnswer(rawQuery, syllabusMatch) {
-    const q = sanitizeUserQuery(rawQuery).toLowerCase().trim();
-
-    // 0. High-Confidence Syllabus Match from University Question Bank
-    if (syllabusMatch && syllabusMatch.item) {
-      const cleaned = cleanSyllabusHtml(syllabusMatch.item.a);
-      if (cleaned && cleaned.length > 35) {
-        return `### ${syllabusMatch.item.q}\n\n${cleaned}`;
-      }
-    }
-
-    // ==========================================
-    // 1. DATABASE MANAGEMENT SYSTEMS (DBMS)
-    // ==========================================
-
-    // Normalization & Normal Forms
-    if (q.includes('normaliz') || q.includes('1nf') || q.includes('2nf') || q.includes('3nf') || q.includes('bcnf')) {
-      return `### Normalization in Database Management Systems (DBMS)
-
-**Normalization** is the systematic technique of organizing data in a relational database to **eliminate data redundancy** and avoid insertion, update, and deletion anomalies. It divides larger tables into smaller, linked tables while preserving referential integrity.
-
----
-
-### Standard Normal Forms Breakdown
-
-| Normal Form | Core Requirement | Elimination Objective |
+| Evaluation Metric | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |
 | :--- | :--- | :--- |
-| **1NF (First Normal Form)** | Every column must contain **atomic (indivisible) values**, unique column names, and no repeating attribute groups. | Removes multi-valued attributes & nested tables. |
-| **2NF (Second Normal Form)** | Must be in **1NF**, and every non-prime attribute must be **fully functionally dependent** on the entire primary key. | Eliminates **Partial Dependencies** ($X \rightarrow Y$ where $X \subset \text{Key}$). |
-| **3NF (Third Normal Form)** | Must be in **2NF**, and no non-prime attribute should depend transitively on the primary key ($X \rightarrow Y \rightarrow Z$). | Eliminates **Transitive Dependencies**. |
-| **BCNF (Boyce-Codd Normal Form)** | For every functional dependency $X \rightarrow Y$, the determinant $X$ must be a **Super Key**. | Resolves anomalies arising from overlapping candidate keys. |
+| **Connection Nature** | **Connection-oriented** (Requires 3-way handshake before transfer: SYN $\\rightarrow$ SYN-ACK $\\rightarrow$ ACK). | **Connectionless** (Sends datagrams immediately with zero handshaking). |
+| **Reliability** | **Guaranteed delivery** with automatic retransmissions and acknowledgments. | **Best-effort delivery**; packets may be lost, duplicated, or arrive out of order. |
+| **Ordering** | Guarantees in-order packet sequence using sequence numbers. | No ordering guarantees; packets arrive as routed. |
+| **Header Overhead** | Heavier: 20 to 60 bytes. | Lightweight: Fixed 8 bytes. |
+| **Flow & Congestion Control** | Supported (Sliding Window, Slow Start, AIMD algorithm). | Not supported; transmits packets at application rate. |
+| **Typical Protocols** | HTTP, HTTPS, FTP, SSH, SMTP. | DNS, DHCP, VoIP, Video Streaming, Online Gaming. |
 
 ---
 
-### Step-by-Step Example
-
-Consider an unnormalized student record:
-\`Student(StudentID, Name, CoursesTaken, CourseFee)\`
-
-1. **Achieving 1NF:** Split \`CoursesTaken\` so each student-course pair has its own individual tuple with single atomic values.
-2. **Achieving 2NF:** Decompose into \`Student(StudentID, Name)\` and \`StudentCourse(StudentID, CourseID)\` so Course attributes do not depend on partial keys.
-3. **Achieving 3NF:** If \`CourseID \rightarrow Instructor\` and \`Instructor \rightarrow Department\`, split into separate \`Course\` and \`Instructor\` tables to remove the transitive chain.
-
-> **Key Rule for Exams:** In 3NF, for every functional dependency $X \rightarrow Y$, either $X$ is a super key **OR** $Y$ is a prime attribute. In BCNF, $X$ **must** strictly be a super key.`;
+### Selection Guideline
+Use **TCP** when absolute accuracy and data integrity are non-negotiable. Use **UDP** when low latency and real-time throughput are prioritized over lost packet recovery.`;
     }
 
-    // ACID Properties in DBMS
-    if (q.includes('acid') && (q.includes('property') || q.includes('transaction') || q.includes('dbms') || q.includes('database'))) {
-      return `### ACID Properties in Relational Database Management Systems
+    // 3. Supervised vs Unsupervised Learning
+    if ((q.includes('supervised') && q.includes('unsupervised')) && (q.includes('difference') || q.includes('learning') || q.includes('compare') || q.includes('vs'))) {
+      return `### Difference Between Supervised and Unsupervised Learning
 
-A **database transaction** is a single logical unit of work that accesses and modifies the database. To guarantee data validity despite system crashes or power failures, transactions must adhere strictly to the **ACID properties**:
-
----
-
-### 1. Atomicity ("All or Nothing")
-- **Principle:** Every statement within a transaction (reads, updates, inserts) must complete successfully. If any single operation fails, the entire transaction is rolled back (\`ROLLBACK\`) to its initial state.
-- **Example:** In a fund transfer of \$500 from Account A to Account B, if deduction from A succeeds but credit to B fails due to network outage, A's money is immediately refunded.
-- **Managed by:** Recovery Manager (Write-Ahead Logging / WAL).
+In Machine Learning, learning paradigms are classified by how data is structured and presented to the learning algorithm.
 
 ---
 
-### 2. Consistency ("State Integrity")
-- **Principle:** A transaction can only transition the database from one valid state to another, maintaining all predefined integrity constraints, check conditions, and foreign key relationships.
-- **Example:** The sum of balances of Account A and Account B before the transfer must exactly equal their sum after the transfer.
-- **Managed by:** Database schema constraints and transaction logic.
+### Side-by-Side Comparison Matrix
 
----
-
-### 3. Isolation ("Independent Concurrency")
-- **Principle:** Intermediate states of concurrent transactions are invisible to each other. Transactions execute as if they are running sequentially in isolation.
-- **SQL Isolation Levels:** Read Uncommitted $\rightarrow$ Read Committed $\rightarrow$ Repeatable Read $\rightarrow$ Serializable.
-- **Prevents:** Dirty reads, Non-repeatable reads, and Phantom reads.
-- **Managed by:** Concurrency Control Manager (Two-Phase Locking, Timestamp Ordering).
-
----
-
-### 4. Durability ("Permanent Persistence")
-- **Principle:** Once a transaction commits (\`COMMIT\`), its state changes persist permanently in non-volatile storage (disk/SSD), even if an immediate hardware crash or power loss occurs.
-- **Managed by:** Log Manager and recovery checkpoints.`;
-    }
-
-    // SQL Joins
-    if (q.includes('join') && (q.includes('sql') || q.includes('database') || q.includes('inner') || q.includes('outer'))) {
-      return `### Comprehensive Guide to SQL Joins
-
-A **JOIN** in SQL combines columns from one or more tables based on a related column between them (typically Primary Key $\leftrightarrow$ Foreign Key).
-
----
-
-### Visual Comparison Table
-
-| Join Type | Description | Result Behavior |
+| Dimension | Supervised Learning | Unsupervised Learning |
 | :--- | :--- | :--- |
-| **INNER JOIN** | Matches rows where join condition evaluates to TRUE in **both** tables. | Discards unmatched rows from both tables. |
-| **LEFT (OUTER) JOIN** | Returns **all** rows from the left table, plus matched rows from the right table. | Fills missing right-table columns with \`NULL\`. |
-| **RIGHT (OUTER) JOIN** | Returns **all** rows from the right table, plus matched rows from the left table. | Fills missing left-table columns with \`NULL\`. |
-| **FULL (OUTER) JOIN** | Returns all records when there is a match in either left or right table. | Fills non-matching sides with \`NULL\`. |
-| **CROSS JOIN** | Cartesian product of two tables ($m \\times n$ combinations). | Every row in Table A paired with every row in Table B. |
+| **Data Nature** | Trained on **labeled data** $(x_i, y_i)$ where inputs correspond to verified ground truth targets. | Trained on **unlabeled data** $(x_i)$ with no predefined output classes or target scores. |
+| **Core Objective** | Learn a mapping function $f: X \\rightarrow Y$ to predict outputs for unseen inputs. | Discover hidden patterns, intrinsic cluster geometries, or latent representations. |
+| **Feedback Loop** | Direct feedback: Computes prediction error loss $\\mathcal{L}(\\hat{y}, y)$ and adjusts weights via backpropagation. | No ground-truth feedback; optimizes mathematical criteria like intra-cluster variance. |
+| **Primary Tasks** | **Classification** (Discrete categories) and **Regression** (Continuous values). | **Clustering** (Grouping data points) and **Dimensionality Reduction** (PCA, t-SNE). |
+| **Standard Algorithms** | Linear Regression, Logistic Regression, Decision Trees, Random Forests, SVM, Neural Networks. | K-Means Clustering, Hierarchical Clustering, DBSCAN, Principal Component Analysis (PCA). |
 
 ---
 
-### Standard SQL Syntax Examples
-
-\`\`\`sql
--- 1. INNER JOIN (Only students enrolled in active courses)
-SELECT S.Name, C.CourseName 
-FROM Students S
-INNER JOIN Enrollments E ON S.StudentID = E.StudentID
-INNER JOIN Courses C ON E.CourseID = C.CourseID;
-
--- 2. LEFT JOIN (All students, even if they have not selected any course)
-SELECT S.Name, E.CourseID
-FROM Students S
-LEFT JOIN Enrollments E ON S.StudentID = E.StudentID;
-\`\`\`
-
-> **Performance Tip:** Always create an index on foreign key columns used in the \`ON\` condition to avoid full table scans $\\mathcal{O}(n \\times m)$.`;
+### Summary Takeaway
+**Supervised Learning** trains with a teacher guiding each output, whereas **Unsupervised Learning** discovers internal structure and associations from data without guidance.`;
     }
 
-    // ==========================================
-    // 2. OPERATING SYSTEMS (OS)
-    // ==========================================
+    // 4. Deadlock and 4 Necessary Conditions
+    if (q.includes('deadlock') && (q.includes('condition') || q.includes('four') || q.includes('explain') || q.includes('what is'))) {
+      return `### Deadlock & The Four Necessary Conditions (Coffman Conditions)
 
-    // Process vs Thread
-    if ((q.includes('process') && q.includes('thread')) || q.includes('process vs thread')) {
-      return `### Process vs Thread: Architectural Comparison
-
-In modern operating systems, execution workloads are divided into **processes** and **threads**.
-
----
-
-### Core Distinction
-
-- **Process:** An independent program in execution with its own dedicated memory address space (Text, Data, Heap, Stack), file descriptors, and OS resources.
-- **Thread:** The smallest sequence of programmed instructions that can be managed independently by a scheduler. Often called a **Lightweight Process (LWP)**, it exists within a process and shares its address space.
-
----
-
-### Side-by-Side Comparison Table
-
-| Metric | Process | Thread |
-| :--- | :--- | :--- |
-| **Memory Space** | Isolated private address space. | Shared heap, code, and global data with sibling threads; private stack and registers. |
-| **Creation Cost** | High (allocating virtual memory tables, descriptors). | Low (shares existing process memory). |
-| **Context Switch Overhead** | Significant (requires flushing TLB and switching page directories). | Minimal (registers and stack pointer only; TLB preserved). |
-| **Inter-Communication** | Heavyweight IPC (Pipes, Sockets, Shared Memory, Message Queues). | Fast and direct via shared memory variables. |
-| **Fault Isolation** | High: Crash in one process does not kill other processes. | Low: An unhandled memory fault in one thread can terminate the entire process. |
-
----
-
-### Memory Layout Comparison
-
-\`\`\`
-[ Process Address Space ]
-├── Text (Code Segment)       <-- Shared across all threads
-├── Data & BSS (Globals)      <-- Shared across all threads
-├── Heap (Dynamic malloc)     <-- Shared across all threads
-├── Thread 1: Stack & Registers (Private)
-└── Thread 2: Stack & Registers (Private)
-\`\`\``;
-    }
-
-    // Deadlocks & Coffman Conditions
-    if (q.includes('deadlock') || q.includes('coffman') || q.includes('banker')) {
-      return `### Deadlocks and Coffman Conditions in Operating Systems
-
-A **Deadlock** is a permanent operating system state where a set of processes are blocked because each process is holding a resource and waiting for another resource acquired by another process in the same set.
+A **Deadlock** in an Operating System is a permanent blocking condition where a set of processes are unable to proceed because each process is holding a resource and waiting for another resource acquired by another process in the same set.
 
 ---
 
 ### The 4 Necessary Coffman Conditions
 
-A deadlock can occur **if and only if** all four conditions hold simultaneously:
+All four conditions must hold simultaneously for a deadlock to arise:
 
-1. **Mutual Exclusion:** At least one resource must be non-shareable (only one process can use it at a time, e.g., a printer or exclusive mutex lock).
-2. **Hold and Wait:** A process must currently hold at least one resource while requesting additional resources held by other active processes.
-3. **No Preemption:** Resources cannot be forcibly confiscated from a process; they can only be released voluntarily after the process completes its task.
-4. **Circular Wait:** A closed chain of processes $\\{P_0, P_1, \\dots, P_n\\}$ exists such that $P_0$ waits for a resource held by $P_1$, $P_1$ waits for $P_2$, and $P_n$ waits for $P_0$.
+1. **Mutual Exclusion:**
+   - At least one resource must be held in a non-shareable mode (only one process can use the resource at a time).
+
+2. **Hold and Wait:**
+   - A process must currently hold at least one resource while waiting to acquire additional resources currently held by other processes.
+
+3. **No Preemption:**
+   - Resources cannot be forcibly confiscated from a process; a resource can only be released voluntarily by the holding process after completing its task.
+
+4. **Circular Wait:**
+   - A closed chain of processes exists: $\{P_0, P_1, \\dots, P_n\}$ such that $P_0$ is waiting for a resource held by $P_1$, $P_1$ is waiting for a resource held by $P_2$, and $P_n$ is waiting for a resource held by $P_0$.
 
 ---
 
-### Strategies for Handling Deadlocks
-
-| Strategy | Mechanism | Real-World Application |
-| :--- | :--- | :--- |
-| **Prevention** | Invalidate at least one of the 4 Coffman conditions (e.g., impose global resource ordering to break Circular Wait). | Critical embedded systems. |
-| **Avoidance** | Dynamically check system state for safety before granting resources using **Dijkstra's Banker's Algorithm** ($Need \\le Available$). | Managed resource pools. |
-| **Detection & Recovery**| Allow deadlocks to occur, periodically trace **Resource Allocation Graphs (RAG)** for cycles, and recover by terminating processes or preemption. | Modern databases (PostgreSQL, MySQL). |
-| **Ignorance (Ostrich Algorithm)** | Assume deadlocks occur rarely and ignore them; reboot if necessary. | Standard Unix/Linux and Windows kernels. |`;
+### Deadlock Handling Strategies
+- **Prevention:** Invalidate at least one of the four Coffman conditions (e.g., impose resource ordering to eliminate circular wait).
+- **Avoidance:** Dynamically evaluate resource allocation state using the **Banker's Algorithm** to guarantee the system remains in a **safe state**.
+- **Detection & Recovery:** Allow deadlock to occur, detect cycles via Resource Allocation Graphs, and recover via process termination or resource preemption.`;
     }
 
-    // Paging, Virtual Memory & Memory Management
-    if (q.includes('paging') || q.includes('virtual memory') || q.includes('page fault') || q.includes('tlb')) {
-      return `### Virtual Memory, Paging, and Address Translation
+    // 5. ACID Properties in DBMS
+    if (q.includes('acid') && (q.includes('dbms') || q.includes('database') || q.includes('property') || q.includes('properties') || q.includes('explain'))) {
+      return `### ACID Properties in DBMS
 
-**Virtual Memory** is a memory management capability of an operating system that allows execution of processes that are not completely in physical memory (RAM). It provides an illusion of vast contiguous memory to programs.
-
----
-
-### 1. Paging Architecture
-- **Virtual Address Space** is divided into fixed-size blocks called **Pages** (typically 4 KB).
-- **Physical Memory (RAM)** is divided into equal-sized blocks called **Frames**.
-- **Page Table:** A data structure maintained by the OS for every process that maps virtual Page Numbers ($p$) to physical Frame Numbers ($f$).
-
-$$\\text{Virtual Address} = \\langle p, d \\rangle \\xrightarrow{\\text{Page Table}} \\text{Physical Address} = \\langle f, d \\rangle$$
-*(where $p$ = Page number, $d$ = Offset within page, $f$ = Frame number).*
+The **ACID** properties are four fundamental guarantees that ensure database transactions are processed reliably, preserving database consistency even through system crashes and concurrent executions.
 
 ---
 
-### 2. Translation Lookaside Buffer (TLB)
-Because accessing the Page Table in RAM doubles memory access time, processors use a high-speed hardware cache called the **TLB**:
-- **TLB Hit:** Frame address is found directly in cache ($1\\text{--}2\\text{ ns}$).
-- **TLB Miss:** CPU must fetch the frame from the page table in RAM and update TLB.
-
-$$\\text{Effective Access Time (EAT)} = h \\cdot (t_{\\text{TLB}} + t_{\\text{RAM}}) + (1 - h) \\cdot (t_{\\text{TLB}} + 2 \\cdot t_{\\text{RAM}})$$
+### 1. Atomicity ("All or Nothing")
+- **Principle:** Every database transaction is executed as a single indivisible unit.
+- **Guarantee:** Either all operations in the transaction succeed and commit, or in the event of an error, the database rolls back to its exact state prior to the transaction.
+- **Mechanism:** Implemented via Write-Ahead Logging (WAL) and rollback segments.
 
 ---
 
-### 3. Page Faults & Handling
-A **Page Fault** is an interrupt generated when a program attempts to access a page marked invalid (not currently loaded in RAM, resident on disk swap space):
-1. CPU traps to OS kernel.
-2. OS verifies valid virtual memory address.
-3. Finds a free frame (or evicts a victim page using **LRU / FIFO** replacement).
-4. Issues disk I/O to read the required page into the frame.
-5. Updates page table valid bit to 1.
-6. Restarts the faulting CPU instruction.`;
+### 2. Consistency (Integrity Invariants)
+- **Principle:** A transaction must transition the database from one valid state to another valid state.
+- **Guarantee:** All database schemas, foreign keys, constraints, and business rules remain strictly satisfied after completion.
+
+---
+
+### 3. Isolation (Concurrency Control)
+- **Principle:** Intermediate states of concurrently running transactions must remain invisible to each other.
+- **Guarantee:** Concurrent execution produces the exact same outcome as if the transactions were executed serially.
+- **Standard Levels:** Read Uncommitted, Read Committed, Repeatable Read, Serializable (enforced via two-phase locking 2PL or MVCC).
+
+---
+
+### 4. Durability (Persistence Guarantee)
+- **Principle:** Once a transaction is successfully committed, its changes survive permanently.
+- **Guarantee:** Even in the event of an immediate power failure, operating system crash, or restart, committed changes are preserved from non-volatile storage (disk/SSD).`;
     }
 
-    // CPU Scheduling
-    if (q.includes('scheduling') || q.includes('round robin') || q.includes('fcfs') || q.includes('sjf')) {
-      return `### CPU Scheduling Algorithms in Operating Systems
+    // 6. Normalization in DBMS
+    if (q.includes('normalization') && (q.includes('dbms') || q.includes('database') || q.includes('form') || q.includes('explain') || q.includes('what is'))) {
+      return `### Normalization in DBMS
 
-CPU Scheduling determines which process in the ready queue is allocated the CPU core when the current process enters I/O wait or yields.
-
----
-
-### Key Performance Metrics
-- **Turnaround Time:** Completion Time $-$ Arrival Time ($T_{\\text{turnaround}} = T_{\\text{completion}} - T_{\\text{arrival}}$).
-- **Waiting Time:** Turnaround Time $-$ Burst Time ($T_{\\text{wait}} = T_{\\text{turnaround}} - T_{\\text{burst}}$).
-- **Response Time:** Time from arrival to first CPU allocation.
+**Normalization** is a formal database design methodology that systematically decomposes relations to minimize data redundancy and eliminate update, insertion, and deletion anomalies.
 
 ---
 
-### Algorithms Overview
+### The Normal Forms Progression
 
-| Algorithm | Preemption | Pros | Cons / Drawbacks |
-| :--- | :--- | :--- | :--- |
-| **First-Come, First-Served (FCFS)** | Non-preemptive | Simple, fair queue order. | Suffers from **Convoy Effect** (short jobs wait behind long ones). |
-| **Shortest Job First (SJF)** | Non-preemptive | **Provably optimal** minimum average waiting time. | Impossible to predict exact future CPU burst lengths; risks starvation. |
-| **Shortest Remaining Time First (SRTF)** | Preemptive | Optimal response for short bursts. | High context-switching overhead. |
-| **Round Robin (RR)** | Preemptive | Excellent interactive response; fair timeshare. | Performance heavily dependent on **Time Quantum ($q$)**. |
-| **Priority Scheduling** | Both | Critical tasks run first. | Can cause **Starvation** (solved by **Aging**). |
+1. **First Normal Form (1NF):**
+   - **Requirement:** Every column attribute must contain only **atomic (indivisible) values**.
+   - **Rule:** Eliminates repeating groups and multi-valued composite attributes.
 
-> **Round Robin Quantum Rule:** If $q \\rightarrow \\infty$, RR degrades into FCFS. If $q \\rightarrow 0$, context-switching overhead overwhelms CPU throughput. Standard quantum: $10\\text{--}50\\text{ ms}$.`;
+2. **Second Normal Form (2NF):**
+   - **Requirement:** Must be in 1NF **AND** all non-prime attributes must be **fully functionally dependent** on the primary key.
+   - **Rule:** Eliminates **partial dependencies** (where an attribute depends on only a portion of a composite candidate key).
+
+3. **Third Normal Form (3NF):**
+   - **Requirement:** Must be in 2NF **AND** no non-prime attribute is transitively dependent on the primary key.
+   - **Rule:** Eliminates **transitive dependencies** ($X \\rightarrow Y$ and $Y \\rightarrow Z \\implies X \\rightarrow Z$).
+
+4. **Boyce-Codd Normal Form (BCNF):**
+   - **Requirement:** For every functional dependency $X \\rightarrow Y$, the determinant $X$ must be a **super key**.
+   - **Rule:** A stricter version of 3NF handling relations with multiple overlapping candidate keys.
+
+---
+
+### Core Benefits
+- **Storage Optimization:** Eliminates redundant duplicate data.
+- **Anomalies Elimination:** Prevents insertion, update, and deletion anomalies.
+- **Referential Integrity:** Enforces relational constraints cleanly.`;
     }
 
-    // ==========================================
-    // 3. COMPUTER NETWORKS
-    // ==========================================
+    // 7. Gradient Descent
+    if (q.includes('gradient descent') && (q.includes('what is') || q.includes('explain') || q.includes('machine learning') || q.includes('algorithm'))) {
+      return `### Gradient Descent Algorithm
 
-    // OSI vs TCP/IP
-    if (q.includes('osi') || (q.includes('tcp/ip') && q.includes('layer'))) {
-      return `### OSI 7-Layer vs TCP/IP 4-Layer Reference Model
-
-Network architectures rely on layered abstraction to allow disparate hardware and software to communicate reliably.
+**Gradient Descent** is a first-order iterative mathematical optimization algorithm used in Machine Learning and Deep Learning to find local minima of a differentiable loss function $\\mathcal{L}(\\theta)$.
 
 ---
 
-### Layer-by-Layer Architectural Mapping
+### Mathematical Formulation
 
-| OSI Layer | Name | Function & Data Unit | Key Protocols | TCP/IP Layer |
-| :---: | :--- | :--- | :--- | :--- |
-| **7** | **Application** | Network interface for user software. | HTTP, HTTPS, FTP, DNS, SMTP, SSH | **Application** |
-| **6** | **Presentation** | Data formatting, encryption, compression. | SSL/TLS, JPEG, ASCII | *(Merged into Application)* |
-| **5** | **Session** | Establishes & maintains communication sessions. | RPC, NetBIOS | *(Merged into Application)* |
-| **4** | **Transport** | End-to-end reliability, segmentation, port addressing. (*Segment / Datagram*) | TCP, UDP | **Transport** |
-| **3** | **Network** | Logical addressing, routing across subnets. (*Packet*) | IP (IPv4, IPv6), ICMP, OSPF, BGP | **Internet** |
-| **2** | **Data Link** | Physical addressing (MAC), framing, hop-to-hop flow. (*Frame*) | Ethernet, Wi-Fi (802.11), ARP, VLAN | **Network Access** |
-| **1** | **Physical** | Transmission of raw electrical/optical bitstream. (*Bits*) | Cables, Fiber, RJ45, Repeaters | *(Merged into Network Access)* |
+The parameter update rule is defined as:
 
----
+$$\\theta_{t+1} = \\theta_t - \\eta \\cdot \\nabla_\\theta \\mathcal{L}(\\theta_t)$$
 
-### Data Encapsulation Process
-$$\\text{Data} \\xrightarrow{\\text{Transport}} \\text{Segment (adds Port)} \\xrightarrow{\\text{Network}} \\text{Packet (adds IP)} \\xrightarrow{\\text{Data Link}} \\text{Frame (adds MAC)} \\xrightarrow{\\text{Physical}} \\text{Bits}$$`;
-    }
-
-    // TCP 3-Way Handshake
-    if (q.includes('handshake') || (q.includes('tcp') && (q.includes('connection') || q.includes('three-way') || q.includes('3-way')))) {
-      return `### TCP 3-Way Handshake & Connection Teardown
-
-**Transmission Control Protocol (TCP)** is a connection-oriented, reliable transport protocol. Before transmitting payload data, client and server synchronize sequence numbers via the **Three-Way Handshake**.
-
----
-
-### Step-by-Step Handshake Protocol
-
-\`\`\`
-Client                                          Server
-  │                                               │
-  │ ─── 1. SYN [Seq = X] ───────────────────────> │  (Server receives SYN, enters SYN-RCVD)
-  │                                               │
-  │ <── 2. SYN-ACK [Seq = Y, Ack = X + 1] ─────── │  (Client verifies Ack, enters ESTABLISHED)
-  │                                               │
-  │ ─── 3. ACK [Seq = X + 1, Ack = Y + 1] ──────> │  (Server enters ESTABLISHED)
-  ▼                                               ▼
-[ Connection Fully Established — Full-Duplex Data Transmission Begins ]
-\`\`\`
-
-1. **Step 1: SYN (Synchronize)**
-   - Client generates an **Initial Sequence Number (ISN)** $X$ and sends a packet with the \`SYN\` flag set to 1.
-2. **Step 2: SYN-ACK (Synchronize-Acknowledgment)**
-   - Server reserves buffer memory, generates its own ISN $Y$, sets \`Ack = X + 1\`, and replies with both \`SYN\` and \`ACK\` flags set.
-3. **Step 3: ACK (Acknowledgment)**
-   - Client sends final confirmation with \`Ack = Y + 1\`. Connection transitions to \`ESTABLISHED\`.
-
----
-
-### Connection Teardown (4-Way Handshake)
-Terminating a full-duplex TCP stream requires 4 packets because each transmission direction closes independently:
-1. Client sends \`FIN\` $\\rightarrow$ Server sends \`ACK\`.
-2. Server finishes sending remaining data and sends its own \`FIN\` $\\rightarrow$ Client sends \`ACK\`.
-3. Client enters \`TIME_WAIT\` (typically 2 MSL = 60s) to guarantee server received final ACK.`;
-    }
-
-    // TCP vs UDP
-    if ((q.includes('tcp') && q.includes('udp')) || q.includes('tcp vs udp')) {
-      return `### TCP vs UDP: Transport Layer Comparison
-
-Both **TCP (Transmission Control Protocol)** and **UDP (User Datagram Protocol)** operate at Layer 4 of the OSI model, but are engineered for fundamentally different transport requirements.
-
----
-
-### Side-by-Side Comparison
-
-| Feature | TCP | UDP |
-| :--- | :--- | :--- |
-| **Connection Type** | Connection-oriented (requires 3-way handshake). | Connectionless (sends immediately). |
-| **Reliability** | **Guaranteed Delivery:** Retransmits lost packets via ACK & timeouts. | **Unreliable / Best-Effort:** Packets can be dropped or arrive out-of-order. |
-| **Ordering** | In-order delivery guaranteed (reorders packets). | No ordering guarantee. |
-| **Header Overhead** | $20\\text{--}60\\text{ bytes}$ (carries flags, sequence numbers, checksum, window size). | Fixed **8 bytes** (Source port, Dest port, Length, Checksum). |
-| **Flow & Congestion Control**| Implements Sliding Window & congestion algorithms (Slow Start, AIMD). | None. Transmits as fast as the application generates. |
-| **Use Cases** | Web (HTTP/HTTPS), File Transfer (FTP), Email (SMTP), Remote Login (SSH). | Live Video Streaming, VoIP, Online Gaming (DNS, DHCP, WebRTC). |`;
-    }
-
-    // ==========================================
-    // 4. DATA STRUCTURES & ALGORITHMS (DSA)
-    // ==========================================
-
-    // Binary Search
-    if (q.includes('binary search')) {
-      return `### Binary Search Algorithm & Complexity Analysis
-
-**Binary Search** is an efficient divide-and-conquer search algorithm that finds the position of a target value within a **sorted array**.
-
----
-
-### Algorithm Logic
-1. Compare target with the middle element: $\\text{mid} = \\text{low} + \\lfloor \\frac{\\text{high} - \\text{low}}{2} \\rfloor$.
-2. If $\\text{array}[\\text{mid}] == \\text{target}$, return index.
-3. If $\\text{target} < \\text{array}[\\text{mid}]$, search left half: $\\text{high} = \\text{mid} - 1$.
-4. If $\\text{target} > \\text{array}[\\text{mid}]$, search right half: $\\text{low} = \\text{mid} + 1$.
-5. Repeat until $\\text{low} > \\text{high}$.
-
----
-
-### Time & Space Complexity
-
-- **Best Case:** $\\mathcal{O}(1)$ (target is at exact middle).
-- **Average & Worst Case:** $\\mathcal{O}(\\log_2 n)$.
-- **Space Complexity:** $\\mathcal{O}(1)$ iterative; $\\mathcal{O}(\\log n)$ recursive stack.
-
----
-
-### Python Implementation
-
-\`\`\`python
-def binary_search(arr, target):
-    low, high = 0, len(arr) - 1
-    while low <= high:
-        mid = (low + high) // 2
-        if arr[mid] == target:
-            return mid
-        elif arr[mid] < target:
-            low = mid + 1
-        else:
-            high = mid - 1
-    return -1
-\`\`\`
-
-> **Invariant Proof:** At each step, the search interval size is halved: $n \\rightarrow \\frac{n}{2} \\rightarrow \\frac{n}{4} \\dots \\rightarrow 1$. Thus $k = \\log_2 n$ steps maximum.`;
-    }
-
-    // Sorting Algorithms Comparison
-    if (q.includes('sort') && (q.includes('algorithm') || q.includes('quick') || q.includes('merge') || q.includes('complexity'))) {
-      return `### Comprehensive Sorting Algorithms Comparison
-
-Sorting rearranges records in a specific numerical or lexicographical order.
-
----
-
-### Algorithm Complexity Matrix
-
-| Algorithm | Best Time | Average Time | Worst Time | Space | Stable? |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Quick Sort** | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n^2)$ (sorted input) | $\\mathcal{O}(\\log n)$ | No |
-| **Merge Sort** | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n)$ | **Yes** |
-| **Heap Sort** | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(n \\log n)$ | $\\mathcal{O}(1)$ in-place | No |
-| **Insertion Sort**| $\\mathcal{O}(n)$ (nearly sorted)| $\\mathcal{O}(n^2)$ | $\\mathcal{O}(n^2)$ | $\\mathcal{O}(1)$ | **Yes** |
-| **Bubble Sort** | $\\mathcal{O}(n)$ | $\\mathcal{O}(n^2)$ | $\\mathcal{O}(n^2)$ | $\\mathcal{O}(1)$ | **Yes** |
-
----
-
-### Key Exam Insights
-- **Quick Sort vs Merge Sort:** Quick Sort is faster in practice due to better CPU cache locality and small constant factors, but Merge Sort guarantees $\\mathcal{O}(n \\log n)$ worst-case and is stable for linked lists.
-- **Stability:** A sorting algorithm is **stable** if elements with identical keys retain their relative order after sorting.`;
-    }
-
-    // ==========================================
-    // 5. OBJECT-ORIENTED PROGRAMMING (OOP)
-    // ==========================================
-
-    if (q.includes('oop') || q.includes('polymorphism') || q.includes('inheritance') || q.includes('encapsulation') || q.includes('abstraction')) {
-      return `### The 4 Pillars of Object-Oriented Programming (OOP)
-
-OOP models software around data entities (**objects**) and behaviors (**methods**) rather than procedural actions.
-
----
-
-### 1. Encapsulation
-- **Definition:** Bundling attributes and methods into a single unit (class) while restricting direct outside access to internal states.
-- **Mechanism:** Implemented via private/protected fields with public getters and setters.
-- **Benefit:** Data integrity, security, and controlled validation.
-
----
-
-### 2. Abstraction
-- **Definition:** Hiding complex implementation details and showing only essential public interfaces to users.
-- **Mechanism:** Abstract classes and interfaces.
-- **Example:** An automobile driver presses the gas pedal (interface) without needing to monitor fuel injector combustion valves (implementation).
-
----
-
-### 3. Inheritance
-- **Definition:** Mechanism where a child class (**subclass**) derives properties and behaviors from a parent class (**superclass**).
-- **Benefit:** Code reuse and hierarchical domain modeling.
-
----
-
-### 4. Polymorphism ("Many Forms")
-- **Compile-Time Polymorphism (Static Binding / Overloading):** Multiple methods sharing the same name with different parameter signatures.
-- **Runtime Polymorphism (Dynamic Binding / Overriding):** A subclass provides a specific implementation of a method declared in its parent class resolved at runtime via virtual method tables (\`vtable\`).
-
-\`\`\`java
-// Polymorphism Example
-abstract class Shape { abstract void draw(); }
-class Circle extends Shape { void draw() { System.out.println("Drawing Circle"); } }
-class Square extends Shape { void draw() { System.out.println("Drawing Square"); } }
-
-Shape s = new Circle();
-s.draw(); // Output: Drawing Circle (Runtime dynamic dispatch)
-\`\`\``;
-    }
-
-    // ==========================================
-    // 6. MACHINE LEARNING & ARTIFICIAL INTELLIGENCE
-    // ==========================================
-
-    // Overfitting & Regularization
-    if (q.includes('overfitting') || q.includes('underfitting') || q.includes('regularization') || q.includes('bias variance')) {
-      return `### Overfitting, Underfitting, and Regularization in Machine Learning
-
-The primary goal of machine learning is **generalization**—performing well on unseen test data rather than merely memorizing the training dataset.
-
----
-
-### The Bias-Variance Tradeoff
-
-| State | Problem | Training Error | Validation Error | Cause & Fix |
-| :--- | :--- | :---: | :---: | :--- |
-| **Underfitting** | High Bias | **High** | **High** | Model is too simple. *Fix:* Add features, increase model complexity. |
-| **Overfitting** | High Variance | **Low** | **High** | Model memorizes training noise. *Fix:* Regularization, more data, dropout. |
-| **Optimal** | Low Bias & Variance | **Low** | **Low** | Ideal balance between capacity and generalization. |
-
----
-
-### Regularization Techniques
-
-To penalize overly complex models, loss functions incorporate a penalty term $\\lambda$:
-
-1. **Lasso Regularization ($L_1$ Penalty):**
-   $$\\mathcal{L}_{L1} = \\mathcal{L}_0 + \\lambda \\sum_{j=1}^{p} |w_j|$$
-   - Drives redundant weights to **exact zero**, acting as automated feature selection.
-2. **Ridge Regularization ($L_2$ Penalty):**
-   $$\\mathcal{L}_{L2} = \\mathcal{L}_0 + \\lambda \\sum_{j=1}^{p} w_j^2$$
-   - Shrinks weights toward zero but does not set them to absolute zero. Handles multicollinearity.
-3. **Dropout (Neural Networks):** Randomly deactivates neurons during training with probability $p$ to prevent co-adaptation.`;
-    }
-
-    // Gradient Descent & Optimization
-    if (q.includes('gradient descent') || (q.includes('loss') && q.includes('optimiz'))) {
-      return `### Gradient Descent Optimization Algorithm
-
-**Gradient Descent** is an iterative first-order optimization algorithm used to find the local minimum of a differentiable cost function $J(\\theta)$ by taking steps proportional to the negative gradient.
-
----
-
-### Mathematical Update Rule
-
-$$\\theta_{t+1} = \\theta_t - \\alpha \\cdot \\nabla J(\\theta_t)$$
-
-- $\\theta$: Parameter weight vector.
-- $\\alpha$: **Learning rate** (step size). If too small, convergence is slow; if too large, the optimizer diverges.
-- $\\nabla J(\\theta)$: Gradient vector of partial derivatives $\\left[ \\frac{\\partial J}{\\partial \\theta_0}, \\dots, \\frac{\\partial J}{\\partial \\theta_n} \\right]$.
+Where:
+- $\\theta_t$: Current model parameter vector (weights and biases).
+- $\\eta$ (Learning Rate): Positive step-size hyperparameter that controls how far we step along the opposite direction of the gradient.
+- $\\nabla_\\theta \\mathcal{L}(\\theta_t)$: Gradient vector of the loss function evaluated at $\\theta_t$.
 
 ---
 
 ### Variants of Gradient Descent
 
-| Variant | Dataset Used Per Step | Convergence Speed | Trajectory Stability |
-| :--- | :--- | :--- | :--- |
-| **Batch Gradient Descent** | All $N$ training examples | Slow for big data | Smooth, deterministic downhill. |
-| **Stochastic GD (SGD)** | 1 random sample | Fast iterations | Noisy fluctuations; helps escape saddle points. |
-| **Mini-Batch GD** | Batch of $32\\text{--}256$ samples | **Best balance** | Highly efficient on GPU tensor cores. |
-
-> **Advanced Optimizers:** Adam (Adaptive Moment Estimation), RMSProp, and Momentum accelerate convergence by adapting individual learning rates for each parameter.`;
+1. **Batch Gradient Descent:** Computes the gradient over the entire dataset in each iteration. Stable but computationally expensive for large datasets.
+2. **Stochastic Gradient Descent (SGD):** Computes gradient and updates parameters using a single random training sample at each step. Fast, but noisy convergence path.
+3. **Mini-Batch Gradient Descent:** Evaluates gradients over a small batch of samples (e.g., 32, 64, 128). Combines vectorization efficiency with stochastic regularization.`;
     }
 
-    // Bayes Theorem
-    if (q.includes('bayes') || q.includes('bayesian')) {
-      return `### Bayes' Theorem in Probability and Machine Learning
+    // 8. What is DBMS?
+    if (q === 'what is dbms' || q === 'what is dbms?' || q === 'define dbms' || q === 'explain dbms') {
+      return `### Database Management System (DBMS)
 
-**Bayes' Theorem** calculates conditional probability—the likelihood of an event occurring based on prior knowledge of conditions related to the event.
-
----
-
-### Mathematical Formula
-
-$$P(A \\mid B) = \\frac{P(B \\mid A) \\cdot P(A)}{P(B)}$$
-
-- **$P(A \\mid B)$ (Posterior Probability):** Probability of hypothesis $A$ given that evidence $B$ has occurred.
-- **$P(B \\mid A)$ (Likelihood):** Probability that evidence $B$ is observed given that hypothesis $A$ is true.
-- **$P(A)$ (Prior Probability):** Initial probability of hypothesis $A$ before seeing evidence $B$.
-- **$P(B)$ (Marginal Evidence):** Total probability of observing evidence $B$, calculated via the Law of Total Probability:
-  $$P(B) = \\sum_{i} P(B \\mid A_i) P(A_i)$$
+A **Database Management System (DBMS)** is specialized software that provides an interface between end-users, application programs, and physical database storage to create, manage, retrieve, and administer organized collections of data.
 
 ---
 
-### Application: Naive Bayes Classifier
-Naive Bayes applies Bayes' theorem under the assumption that all features $X = (x_1, \\dots, x_n)$ are **mutually independent** given the class $C_k$:
+### Core Components
+1. **Database Engine:** Handles physical data storage, memory buffer caching, and transaction logging.
+2. **Query Processor:** Parses, optimizes, and executes high-level queries (e.g., SQL) into efficient low-level access plans.
+3. **Transaction Manager:** Guarantees ACID properties and coordinates lock concurrency.
+4. **Data Dictionary / Catalog:** Stores metadata regarding tables, schemas, constraints, and indexes.
 
-$$P(C_k \\mid X) \\propto P(C_k) \\prod_{i=1}^{n} P(x_i \\mid C_k)$$
+---
 
-Extensively used in email spam filtering, medical diagnostics, and sentiment analysis.`;
+### Fundamental Advantages over Traditional File Systems
+- **Redundancy Control:** Centralizes data storage to eliminate duplicate record storage.
+- **Concurrent Access:** Coordinates multi-user transactions using concurrency control locks.
+- **Data Integrity:** Enforces schema constraints, domain checks, and foreign keys.
+- **Security & Authorization:** Role-based access control protecting sensitive attributes.`;
     }
 
-    // ==========================================
-    // 7. MATHEMATICS & DISCRETE STRUCTURES
-    // ==========================================
+    // 9. What is an API?
+    if (q === 'what is an api' || q === 'what is an api?' || q === 'what is api' || q === 'define api') {
+      return `### Application Programming Interface (API)
 
-    // Lagrange Multipliers
-    if (q.includes('lagrange') || q.includes('multiplier')) {
-      return `### Lagrange Multipliers (\\lambda) in Constrained Optimization
-
-The method of **Lagrange Multipliers** is a calculus strategy for finding the local extrema (maxima or minima) of a function $f(x, y)$ subject to equality constraints $g(x, y) = c$.
+An **Application Programming Interface (API)** is a formal contractual specification that defines how different software applications communicate, exchange data, and invoke functionality from one another.
 
 ---
 
-### Core Formulation
+### Core Architectural Paradigms
 
-At an extremum on the constraint curve, the gradient of the objective function $\\nabla f$ must be parallel to the gradient of the constraint function $\\nabla g$:
+1. **REST (Representational State Transfer):**
+   - Stateless client-server architecture running over HTTP.
+   - Utilizes standard HTTP verbs: \`GET\` (read), \`POST\` (create), \`PUT / PATCH\` (update), \`DELETE\` (remove).
+   - Transmits structured payloads typically formatted in JSON or XML.
 
-$$\\nabla f(x, y) = \\lambda \\nabla g(x, y)$$
+2. **GraphQL:**
+   - Query language for APIs that allows clients to request exactly the data fields they require in a single round-trip.
 
-where $\\lambda$ is the **Lagrange Multiplier**.
+3. **gRPC / RPC:**
+   - High-performance, low-latency framework utilizing HTTP/2 and Protocol Buffers (Protobuf) for distributed microservice communication.
 
 ---
 
-### The Lagrangian Function
-
-Construct the unconstrained Lagrangian function:
-
-$$\\mathcal{L}(x, y, \\lambda) = f(x, y) - \\lambda \\cdot \\big(g(x, y) - c\\big)$$
-
-Solve the system of partial differential equations:
-$$\\begin{cases}
-\\frac{\\partial \\mathcal{L}}{\\partial x} = 0 \\\\
-\\frac{\\partial \\mathcal{L}}{\\partial y} = 0 \\\\
-\\frac{\\partial \\mathcal{L}}{\\partial \\lambda} = g(x, y) - c = 0
-\\end{cases}$$
-
-> **Economic & Engineering Interpretation:** The multiplier $\\lambda$ represents the **shadow price** or rate of change of the optimal value with respect to relaxing the constraint ($d f^* / d c = \\lambda$).`;
+### Key Real-World Roles
+- **Abstraction:** Encapsulates underlying databases and complex backend logic behind clear endpoint contracts.
+- **Interoperability:** Enables cross-platform collaboration (e.g., a mobile application accessing cloud databases).
+- **Security:** Controls access via API keys, OAuth tokens, and rate limiters.`;
     }
 
-    // De Morgan's Laws & Propositional Logic
-    if (q.includes('morgan') || q.includes('logic') || (q.includes('and') && q.includes('or') && q.includes('not'))) {
-      return `### De Morgan's Laws and Propositional Logic
+    // 10. Advantages and Disadvantages of Cloud Computing
+    if (q.includes('cloud computing') && (q.includes('advantage') || q.includes('disadvantage') || q.includes('pros') || q.includes('cons'))) {
+      return `### Advantages and Disadvantages of Cloud Computing
 
-**De Morgan's Laws** describe the mathematical duality between the fundamental logical connectives: **AND ($\\land$)**, **OR ($\\lor$)**, and **NOT ($\\neg$)**.
-
----
-
-### 1. The Two Fundamental Laws
-
-1. **Negation of a Conjunction:**
-   $$\\neg (P \\land Q) \\iff (\\neg P \\lor \\neg Q)$$
-   *"It is not true that both P and Q are true if and only if at least one of them is false."*
-
-2. **Negation of a Disjunction:**
-   $$\\neg (P \\lor Q) \\iff (\\neg P \\land \\neg Q)$$
-   *"It is not true that either P or Q is true if and only if both P and Q are false."*
+**Cloud Computing** delivers on-demand computational resources (compute servers, database storage, networking, software) over the Internet under a pay-as-you-go financial model.
 
 ---
 
-### 2. Truth Table Verification for $\\neg(P \\land Q) \\iff \\neg P \\lor \\neg Q$
+### Major Advantages
 
-| $P$ | $Q$ | $P \\land Q$ | $\\neg (P \\land Q)$ | $\\neg P$ | $\\neg Q$ | $\\neg P \\lor \\neg Q$ | Equivalence |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| T | T | T | **F** | F | F | **F** | $\\top$ |
-| T | F | F | **T** | F | T | **T** | $\\top$ |
-| F | T | F | **T** | T | F | **T** | $\\top$ |
-| F | F | F | **T** | T | T | **T** | $\\top$ |
-
-Since the columns for $\\neg(P \\land Q)$ and $\\neg P \\lor \\neg Q$ are identical under all truth valuations, the equivalence is a **tautology**.
+1. **Cost Efficiency (OpEx vs. CapEx):**
+   - Eliminates massive capital expenditures required to purchase and maintain on-premise physical servers, uninterruptible power supplies, and datacenter cooling.
+2. **Elastic Scalability:**
+   - Dynamically scales computational capacity up or down automatically in response to real-time traffic spikes.
+3. **High Availability & Disaster Recovery:**
+   - Multi-region redundant architectures guarantee business continuity and automated failover capabilities.
+4. **Rapid Deployment:**
+   - New instances and infrastructure stacks can be provisioned in seconds across global edge regions.
 
 ---
 
-### 3. Logic Operators Reference
-- **Conjunction (AND):** $P \\land Q$ (True only if both are True).
-- **Disjunction (OR):** $P \\lor Q$ (True if at least one is True).
-- **Implication (If...then):** $P \\implies Q \\equiv \\neg P \\lor Q$.
-- **Biconditional (Equivalence):** $P \\iff Q \\equiv (P \\implies Q) \\land (Q \\implies P)$.`;
+### Major Disadvantages & Challenges
+
+1. **Internet Dependency & Latency:**
+   - Cloud operations require continuous high-speed network connectivity; network interruptions halt service access.
+2. **Security & Data Privacy Concerns:**
+   - Storing sensitive intellectual property and regulated user data on third-party multi-tenant infrastructure introduces compliance and data jurisdiction risks.
+3. **Vendor Lock-In:**
+   - Migrating proprietary configurations and workloads between cloud providers (e.g., AWS, Azure, Google Cloud) involves high switching costs and architectural refactoring.
+4. **Unexpected Cost Spikes:**
+   - Unmonitored bandwidth egress fees and auto-scaling spikes can lead to unexpected cloud billing surges without strict budgetary guardrails.`;
     }
 
-    // ==========================================
-    // 8. UNIVERSAL EDUCATIONAL INTENT SYNTHESIZER
-    // ==========================================
-
-    // If query is a comparison ("difference between A and B", "A vs B")
-    if (q.includes('difference') || q.includes('distinguish') || q.includes(' vs ') || q.includes('versus') || q.includes('compare')) {
-      const cleanSubject = rawQuery.replace(/^(?:what is the difference between|distinguish between|compare|difference between)\s*/i, '').replace(/[?.]/g, '').trim();
-      return `### Comparative Academic Analysis: ${cleanSubject}
-
----
-
-### 1. Fundamental Conceptual Distinction
-Understanding the distinctions within **${cleanSubject}** is essential for mastering software architecture, computational modeling, and university examination benchmarks.
-
----
-
-### 2. Side-by-Side Comparison Matrix
-
-| Evaluation Criteria | Primary Dimension | Secondary Dimension |
-| :--- | :--- | :--- |
-| **Core Objective** | Focuses on direct execution, specific functional scope, or baseline mechanism. | Focuses on higher abstraction, systemic integration, or optimized throughput. |
-| **Operational Overhead** | Operates with lower initial complexity or localized state management. | Requires additional coordination, protocol synchronization, or resource allocation. |
-| **Design Trade-offs** | Prioritizes simplicity, deterministic timing, or rapid deployment. | Prioritizes scalability, fault tolerance, modularity, or long-term maintainability. |
-| **Curriculum Application** | Standard introductory implementation benchmark. | Advanced distributed or enterprise production standard. |
-
----
-
-### 3. Critical Takeaways & Best Practices
-- **Selection Rule:** Choose the simpler, localized approach when resource constraints and bounded execution are critical. Adopt the decoupled, higher-abstraction paradigm when designing for large-scale maintainability and horizontal scalability.
-- **Exam Strategy:** Always state clear definitions, contrast memory and algorithmic complexity (using Big-O notation where applicable), and provide a concrete practical scenario to earn full evaluation credits.`;
-    }
-
-        // Default Intelligent Academic Synthesis (Specific to query topics)
-    const cleanTopic = rawQuery.replace(/[?.,!]/g, '').trim();
-    const words = cleanTopic.split(/\s+/).filter(w => !stopwords.has(w.toLowerCase()));
-    const keySubject = words.length > 0 ? words.join(' ') : cleanTopic;
-
-    return `### Academic Overview: ${cleanTopic}
-
-**${keySubject}** is an essential subject concept across university curricula and analytical problem-solving.
-
----
-
-### Core Principles & Foundations
-1. **Fundamental Definition:** It provides a structured methodology to model, evaluate, and solve domain-specific challenges with formal consistency.
-2. **Key Properties:** Ensures system integrity, optimizes execution constraints, and maintains predictable performance bounds.
-3. **Application Invariant:** In academic evaluations and practical examinations, questions on this topic test both theoretical foundations and operational implementation.
-
----
-
-### Key Dimensions & Best Practices
-- **Analytical Metric:** Evaluated through asymptotic performance, resource efficiency, and correctness under edge cases.
-- **Exam Guidance:** For full descriptive marks, always present a clear definition, the governing formulas or architecture, and a concrete real-world example.`;
+    return null;
   }
-  // Pre-process & render math using KaTeX (with Unicode fallback)
-  function renderMathInHtml(content) {
-    if (!content) return "";
-    let processed = content;
 
-    // Check if KaTeX is available
+  // =========================================================================
+  // 6. REAL-TIME WIKIPEDIA REST API FACTUAL KNOWLEDGE RETRIEVER
+  // =========================================================================
+  async function fetchLiveWikiArticle(topic) {
+    if (!topic || topic.length < 3) return null;
+    const cleanTopic = encodeURIComponent(topic.trim().replace(/\s+/g, '_'));
+    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${cleanTopic}`;
+
+    try {
+      const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.extract && data.type !== 'disambiguation' && data.extract.length > 50) {
+          return data;
+        }
+      }
+    } catch (e) {
+      // Ignore network errors on Wikipedia fetch
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // 7. GEMINI 1.5 FLASH API INTEGRATION WITH FULL MULTI-TURN MEMORY
+  // =========================================================================
+  async function queryGeminiApi(query, fileSnapshot = null) {
+    const apiKey = localStorage.getItem('gemini_api_key') || window.GEMINI_API_KEY || '';
+    if (!apiKey) return null;
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const systemInstruction = `You are an expert University Professor, Academic Tutor, Computer Science Specialist, Mathematics Instructor, and Programming Mentor.
+
+Follow these strict answering rules:
+1. Understand the complete question before answering.
+2. Identify the subject and specific topic.
+3. Answer only what the question asks. Never generate unrelated explanations or generic academic filler.
+4. Use accurate, technically rigorous, and verified academic information.
+5. Explain difficult concepts clearly and logically.
+6. Use mathematical formulas with properly formatted LaTeX ($...$ for inline, $$...$$ for block formulas).
+7. When programming is requested, provide complete working code, explain key logic, state time/space complexity, and show expected output.
+8. Use clean Markdown comparison tables when contrasting concepts.
+9. When the user provides an attached document or image, prioritize the attached document as the primary reference and never hallucinate outside its contents.
+10. If you do not have sufficient information, honestly communicate the uncertainty instead of fabricating an answer.`;
+
+    // Construct sliding window of conversation history (up to last 10 messages)
+    const contents = [];
+    const recentHistory = chatHistory.slice(-10);
+
+    for (const msg of recentHistory) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.text }]
+      });
+    }
+
+    // Prepare current user message parts
+    const currentParts = [];
+
+    // Multimodal Image support
+    if (fileSnapshot && fileSnapshot.base64 && fileSnapshot.base64.startsWith('data:image/')) {
+      const base64DataOnly = fileSnapshot.base64.split(',')[1];
+      currentParts.push({
+        inlineData: {
+          mimeType: fileSnapshot.mimeType || 'image/jpeg',
+          data: base64DataOnly
+        }
+      });
+    }
+
+    // Document context attachment
+    let fullPromptText = query;
+    if (fileSnapshot && fileSnapshot.text) {
+      fullPromptText = `[ATTACHED DOCUMENT CONTEXT: ${fileSnapshot.name} (${fileSnapshot.type})]\n${fileSnapshot.text.substring(0, 12000)}\n\n[STUDENT QUESTION]:\n${query}`;
+    }
+
+    currentParts.push({ text: fullPromptText });
+
+    contents.push({
+      role: 'user',
+      parts: currentParts
+    });
+
+    const requestBody = {
+      contents: contents,
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.95,
+        maxOutputTokens: 3000
+      }
+    };
+
+    abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 20000);
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.warn('Gemini API Error Response:', errorData);
+        if (response.status === 400 || response.status === 403) {
+          throw new Error(`Gemini API authorization error (${response.status}). Please verify your Gemini API key in Settings.`);
+        } else if (response.status === 429) {
+          throw new Error(`Gemini API quota rate-limit exceeded (429). Please wait a moment or use another key.`);
+        }
+        return null;
+      }
+
+      const data = await response.json();
+      const candidate = data.candidates && data.candidates[0];
+
+      if (candidate && candidate.finishReason === 'SAFETY') {
+        return `*The AI safety filters flagged this request. Please rephrase your academic question with standard terminology.*`;
+      }
+
+      const text = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
+      if (text && text.trim().length > 10) {
+        return text.trim();
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error('Gemini API request timed out. Please check your network connection.');
+      }
+      throw err;
+    }
+
+    return null;
+  }
+
+  // =========================================================================
+  // 8. MASTER INFERENCE ENGINE: TIERED ACADEMIC RESOLUTION
+  // =========================================================================
+  async function generateAcademicResponse(query, fileSnapshot = null) {
+    const qClean = sanitizeUserQuery(query);
+
+    // Conversational greetings
+    const greetings = {
+      'hi': 'Hello! I am your University Academic AI Assistant. Ask me any question on Computer Science, Mathematics, DBMS, Operating Systems, Networking, or programming, and I will provide you with a clear, step-by-step solution.',
+      'hello': 'Greetings! What academic subject, problem, or exam question can I assist you with today?',
+      'hey': 'Hello! How can I assist with your studies or exam preparation today?'
+    };
+    if (greetings[qClean.toLowerCase()]) {
+      return { text: greetings[qClean.toLowerCase()], source: 'conversational' };
+    }
+
+    // 1. If an active Gemini API Key is configured, use Gemini 1.5 Flash as primary
+    try {
+      const geminiResult = await queryGeminiApi(query, fileSnapshot);
+      if (geminiResult) {
+        return { text: geminiResult, source: 'gemini' };
+      }
+    } catch (geminiErr) {
+      console.warn('Gemini inference error:', geminiErr);
+    }
+
+    // 2. Attached Document Priority Mode (When Gemini key isn't active)
+    if (fileSnapshot && fileSnapshot.text) {
+      return {
+        text: `### Analysis of Attached Document: ${fileSnapshot.name}\n\n**Document Type:** ${fileSnapshot.type} (${fileSnapshot.size})\n\n**Extracted Document Excerpt:**\n\n\`\`\`\n${fileSnapshot.text.substring(0, 800)}...\n\`\`\`\n\n---\n\n### Query Assessment\nRegarding your question: *"${query}"*\n\n> **Notice:** To execute deep conversational semantic reasoning across this entire ${fileSnapshot.type} file with multimodal vision, activate your free Google Gemini API key by clicking the **API Key** button in the top navigation.`,
+        source: 'document'
+      };
+    }
+
+    // 3. Strict University Question Bank & Syllabus Match
+    const syllabusMatch = findSyllabusMatch(query);
+    if (syllabusMatch && syllabusMatch.item) {
+      const item = syllabusMatch.item;
+      const cleanAnswer = cleanSyllabusHtml(item.a || item.ans || item.hint || '');
+      const badge = `> **[Verified University Question Bank Solution]**  \n> *Source: ${syllabusMatch.source}*\n\n`;
+      return {
+        text: `${badge}### Question: ${item.q}\n\n${cleanAnswer}`,
+        source: 'syllabus'
+      };
+    }
+
+    // 4. Mathematical Equation Solver
+    const mathAns = trySolveMathProblem(query);
+    if (mathAns) {
+      return { text: mathAns, source: 'math' };
+    }
+
+    // 5. Algorithmic Code Synthesizer
+    const codeAns = tryGenerateCodeSolution(query);
+    if (codeAns) {
+      return { text: codeAns, source: 'code' };
+    }
+
+    // 6. Core Subject Concept Explanations (Strict, Non-Generic)
+    const conceptAns = trySubjectConceptExplanation(query);
+    if (conceptAns) {
+      return { text: conceptAns, source: 'concept' };
+    }
+
+    // 7. Live Factual Knowledge Retrieval via Wikipedia API
+    const cleanTopic = qClean
+      .replace(/^(what is|explain|describe|define|tell me about|how does|why is|what are|state)\s+/i, '')
+      .replace(/[?!.]/g, '')
+      .trim();
+
+    if (cleanTopic.length > 2) {
+      const wiki = await fetchLiveWikiArticle(cleanTopic);
+      if (wiki && wiki.extract && wiki.extract.length > 40) {
+        return {
+          text: `### ${wiki.title} ${wiki.description ? `*(${wiki.description})*` : ''}\n\n${wiki.extract}\n\n---\n\n*Reference: Grounded in authoritative academic reference materials.*`,
+          source: 'wikipedia'
+        };
+      }
+    }
+
+    // 8. Honest Fallback (Never Hallucinate Generic Academic Nonsense)
+    return {
+      text: `### Academic Query Notice\n\nI could not find an exact match for **"${qClean}"** in the local Brainware University syllabus database, and no custom Gemini API Key is currently active.\n\nTo unlock unconstrained, real-time AI reasoning across any educational subject:\n1. Click the **API Key** button in the top navigation.\n2. Paste your free Google Gemini API key.\n3. Re-ask your question for an instant, in-depth academic answer.`,
+      source: 'unresolved'
+    };
+  }
+
+  // =========================================================================
+  // 9. KATEX MATH FORMATTER & MARKDOWN RENDERER
+  // =========================================================================
+  const mathSymbolMap = [
+    [/\\alpha\b/g, 'α'], [/\\beta\b/g, 'β'], [/\\gamma\b/g, 'γ'], [/\\delta\b/g, 'δ'],
+    [/\\theta\b/g, 'θ'], [/\\lambda\b/g, 'λ'], [/\\mu\b/g, 'μ'], [/\\pi\b/g, 'π'],
+    [/\\sigma\b/g, 'σ'], [/\\tau\b/g, 'τ'], [/\\omega\b/g, 'ω'], [/\\rightarrow\b/g, '→'],
+    [/\\leftarrow\b/g, '←'], [/\\le\b/g, '≤'], [/\\ge\b/g, '≥'], [/\\neq\b/g, '≠'],
+    [/\\times\b/g, '×'], [/\\infty\b/g, '∞'], [/\\mathcal\{O\}/g, 'O']
+  ];
+
+  function applyUnicodeMathFallback(str) {
+    if (!str) return '';
+    let s = str;
+    for (const [regex, rep] of mathSymbolMap) {
+      s = s.replace(regex, rep);
+    }
+    return s;
+  }
+
+  function renderMathInHtml(content) {
+    if (!content) return '';
+    let processed = content;
     const hasKatex = typeof window.katex !== 'undefined' && typeof window.katex.renderToString === 'function';
 
     // 1. Block Math: $$...$$ and \[...\]
-    processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, function(match, expr) {
+    processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (match, expr) => {
       if (hasKatex) {
         try {
           return `<div class="katex-display my-3 overflow-x-auto text-center">${window.katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false })}</div>`;
-        } catch (e) {
-          console.warn("KaTeX display render error:", e);
-        }
+        } catch (e) {}
       }
       return `<div class="font-mono bg-blue-50/60 text-blue-900 p-3 my-2 rounded-xl text-center overflow-x-auto border border-blue-100">${applyUnicodeMathFallback(expr.trim())}</div>`;
     });
 
-    processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, function(match, expr) {
+    processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (match, expr) => {
       if (hasKatex) {
         try {
           return `<div class="katex-display my-3 overflow-x-auto text-center">${window.katex.renderToString(expr.trim(), { displayMode: true, throwOnError: false })}</div>`;
-        } catch (e) {
-          console.warn("KaTeX display render error:", e);
-        }
+        } catch (e) {}
       }
       return `<div class="font-mono bg-blue-50/60 text-blue-900 p-3 my-2 rounded-xl text-center overflow-x-auto border border-blue-100">${applyUnicodeMathFallback(expr.trim())}</div>`;
     });
 
     // 2. Inline Math: $...$ and \(...\)
-    processed = processed.replace(/\$([^\$\n]+?)\$/g, function(match, expr) {
+    processed = processed.replace(/\$([^\$\n]+?)\$/g, (match, expr) => {
       if (hasKatex) {
         try {
-          return `<span class="katex-inline">${window.katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false })}</span>`;
-        } catch (e) {
-          console.warn("KaTeX inline render error:", e);
-        }
+          return window.katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false });
+        } catch (e) {}
       }
-      return `<code class="font-mono bg-blue-50/80 text-blue-900 px-1.5 py-0.5 rounded text-[12px]">${applyUnicodeMathFallback(expr.trim())}</code>`;
+      return `<span class="font-mono text-blue-800 font-semibold bg-blue-50/50 px-1 py-0.5 rounded">${applyUnicodeMathFallback(expr.trim())}</span>`;
     });
 
-    processed = processed.replace(/\\\(([^\n]+?)\\\)/g, function(match, expr) {
+    processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (match, expr) => {
       if (hasKatex) {
         try {
-          return `<span class="katex-inline">${window.katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false })}</span>`;
-        } catch (e) {
-          console.warn("KaTeX inline render error:", e);
-        }
+          return window.katex.renderToString(expr.trim(), { displayMode: false, throwOnError: false });
+        } catch (e) {}
       }
-      return `<code class="font-mono bg-blue-50/80 text-blue-900 px-1.5 py-0.5 rounded text-[12px]">${applyUnicodeMathFallback(expr.trim())}</code>`;
+      return `<span class="font-mono text-blue-800 font-semibold bg-blue-50/50 px-1 py-0.5 rounded">${applyUnicodeMathFallback(expr.trim())}</span>`;
     });
 
     return processed;
   }
 
-  // Format Markdown with KaTeX integration
   function formatMarkdown(text) {
-    if (!text) return "";
-    let html = text;
+    if (!text) return '';
+    let renderedHtml = '';
 
-    // First render mathematical formulas
-    html = renderMathInHtml(html);
-
-    // Markdown parsing
-    if (window.marked && typeof window.marked.parse === 'function') {
+    if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
       try {
-        html = window.marked.parse(html);
+        renderedHtml = marked.parse(text);
       } catch (err) {
-        console.warn("Markdown parse warning:", err);
+        renderedHtml = `<p>${text.replace(/\n/g, '<br>')}</p>`;
       }
+    } else {
+      renderedHtml = `<p>${text.replace(/\n/g, '<br>')}</p>`;
     }
 
-    // Code blocks with syntax copy buttons
-    html = html.replace(/<pre><code class="language-(.*?)">([\s\S]*?)<\/code><\/pre>/g, function(match, lang, code) {
+    // Apply KaTeX math formatting
+    renderedHtml = renderMathInHtml(renderedHtml);
+
+    // Style Code Blocks with Copy Button
+    renderedHtml = renderedHtml.replace(/<pre><code class="language-([a-zA-Z0-9_-]+)">([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
       const codeId = 'code_' + Math.random().toString(36).substr(2, 9);
       return `
-        <div class="my-3 rounded-2xl overflow-hidden bg-slate-900 text-slate-100 text-xs border border-slate-800 shadow-md">
-          <div class="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800 text-[11px] font-mono text-slate-400">
-            <span class="font-bold uppercase tracking-wider text-blue-400">${lang}</span>
-            <button onclick="BrainwareAITutor.copyCode(this, '${codeId}')" class="flex items-center gap-1.5 hover:text-white transition px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-              <span>Copy</span>
+        <div class="relative my-4 rounded-2xl overflow-hidden border border-slate-700 bg-slate-900 text-slate-100 shadow-md">
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700 text-xs font-mono text-slate-400">
+            <span class="font-bold text-blue-400 uppercase tracking-wider">${lang}</span>
+            <button onclick="BrainwareAITutor.copyCodeBlock('${codeId}', this)" class="hover:text-white transition flex items-center gap-1 text-[11px] bg-slate-700/80 px-2 py-0.5 rounded">
+              <i data-lucide="copy" class="w-3 h-3"></i> <span>Copy</span>
             </button>
           </div>
-          <pre class="p-4 overflow-x-auto font-mono text-[12px] leading-relaxed"><code id="${codeId}">${code}</code></pre>
+          <pre class="p-4 text-xs font-mono overflow-x-auto leading-relaxed"><code id="${codeId}">${code}</code></pre>
         </div>
       `;
     });
 
-    // Style tables cleanly
-    html = html.replace(/<table>/g, '<div class="overflow-x-auto my-3 rounded-xl border border-slate-200 shadow-sm"><table class="w-full text-xs text-left border-collapse">');
-    html = html.replace(/<\/table>/g, '</table></div>');
-    html = html.replace(/<th>/g, '<th class="bg-slate-900 p-2.5 font-bold text-white border-b border-slate-800 text-xs">');
-    html = html.replace(/<tr>/g, '<tr class="even:bg-slate-50 hover:bg-blue-50/50 transition-colors">');
-    html = html.replace(/<td>/g, '<td class="p-2.5 border-b border-slate-100 text-slate-700 text-xs">');
+    // Style standard pre blocks
+    renderedHtml = renderedHtml.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
+      const codeId = 'code_' + Math.random().toString(36).substr(2, 9);
+      return `
+        <div class="relative my-4 rounded-2xl overflow-hidden border border-slate-700 bg-slate-900 text-slate-100 shadow-md">
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700 text-xs font-mono text-slate-400">
+            <span class="font-bold text-slate-300">CODE</span>
+            <button onclick="BrainwareAITutor.copyCodeBlock('${codeId}', this)" class="hover:text-white transition flex items-center gap-1 text-[11px] bg-slate-700/80 px-2 py-0.5 rounded">
+              <i data-lucide="copy" class="w-3 h-3"></i> <span>Copy</span>
+            </button>
+          </div>
+          <pre class="p-4 text-xs font-mono overflow-x-auto leading-relaxed"><code id="${codeId}">${code}</code></pre>
+        </div>
+      `;
+    });
 
-    // Headings
-    html = html.replace(/<h3>(.*?)<\/h3>/g, '<h3 class="text-sm font-bold text-slate-900 mt-4 mb-2 border-b border-slate-100 pb-1">$1</h3>');
-    html = html.replace(/<h2>(.*?)<\/h2>/g, '<h2 class="text-base font-bold text-slate-900 mt-5 mb-2.5">$1</h2>');
+    // Style Markdown Tables with responsive wrapper
+    renderedHtml = renderedHtml.replace(/<table>([\s\S]*?)<\/table>/g, (match, tableInner) => {
+      return `
+        <div class="my-4 overflow-x-auto rounded-2xl border border-slate-200 shadow-sm bg-white">
+          <table class="min-w-full text-xs text-left border-collapse">${tableInner}</table>
+        </div>
+      `;
+    });
 
-    return html;
+    renderedHtml = renderedHtml.replace(/<thead>/g, '<thead class="bg-slate-100 font-black text-slate-800 border-b border-slate-200">');
+    renderedHtml = renderedHtml.replace(/<th>/g, '<th class="px-4 py-3 border-r border-slate-200 last:border-r-0">');
+    renderedHtml = renderedHtml.replace(/<td>/g, '<td class="px-4 py-2.5 border-t border-slate-100 border-r border-slate-200 last:border-r-0 text-slate-700 font-medium">');
+
+    return renderedHtml;
   }
 
-  // Typewriter Streaming
-  async function streamTypewriter(fullText, textContainer, threadContainer) {
-    const words = fullText.split(/(\s+)/);
-    let displayed = "";
-    
-    for (let i = 0; i < words.length; i++) {
-      if (!isGenerating) break;
-      displayed += words[i];
-      textContainer.innerHTML = formatMarkdown(displayed) + '<span class="inline-block w-1.5 h-3.5 ml-1 bg-blue-600 animate-pulse align-middle"></span>';
-      
-      if (threadContainer) {
-        threadContainer.scrollTop = threadContainer.scrollHeight;
-      }
+  // =========================================================================
+  // 10. STREAMING TYPEWRITER EFFECT
+  // =========================================================================
+  async function streamTypewriter(fullText, contentContainer, scrollContainer) {
+    if (!contentContainer) return;
+    const chunkSize = 6;
+    let currentLen = 0;
 
-      if (words[i].trim().length > 0) {
-        await new Promise(r => setTimeout(r, 6));
+    while (currentLen < fullText.length) {
+      if (!isGenerating) break; // Check for stop generation cancellation
+      currentLen = Math.min(fullText.length, currentLen + chunkSize);
+      const partial = fullText.substring(0, currentLen);
+      contentContainer.innerHTML = formatMarkdown(partial);
+
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
+      await new Promise(resolve => setTimeout(resolve, 14));
     }
 
-    textContainer.innerHTML = formatMarkdown(displayed);
-    if (threadContainer) {
-      threadContainer.scrollTop = threadContainer.scrollHeight;
+    contentContainer.innerHTML = formatMarkdown(fullText);
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
   }
 
-  return {
-    init: function() {
-      console.log("Brainware AI Study Assistant ready with KaTeX math and pure ChatGPT/Gemini mode.");
-      this.attachInputKeyHandlers();
-    },
+  // =========================================================================
+  // 11. UI MESSAGE BUBBLES, ACTIONS & CONTROLS
+  // =========================================================================
+  function createAssistantStreamingBubble(msgId, threadId) {
+    const thread = document.getElementById(threadId);
+    if (!thread) return { bubble: null, contentContainer: null };
 
-    attachInputKeyHandlers: function() {
-      const mainInput = document.getElementById('aiTutorInput');
-      if (mainInput) {
-        mainInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            BrainwareAITutor.askQuestion();
-          }
-        });
+    const bubble = document.createElement('div');
+    bubble.id = msgId;
+    bubble.className = 'flex gap-3 mb-5 animate-fade-in group';
+
+    bubble.innerHTML = `
+      <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0 shadow-md">
+        <i data-lucide="bot" class="w-5 h-5"></i>
+      </div>
+      <div class="flex-1 bg-white border border-slate-200/80 rounded-3xl rounded-tl-sm p-4 sm:p-5 shadow-sm overflow-hidden text-xs sm:text-sm text-slate-800 leading-relaxed">
+        <div class="ai-content-body prose max-w-none prose-sm font-normal text-slate-800">
+          <div class="flex items-center gap-2 text-slate-400 text-xs italic py-1">
+            <span class="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            Thinking and generating academic response...
+          </div>
+        </div>
+        <div class="ai-msg-actions hidden mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div class="flex items-center gap-2">
+            <button onclick="BrainwareAITutor.copyMessageText('${msgId}', this)" class="hover:text-blue-600 px-2 py-1 rounded-lg hover:bg-slate-50 transition flex items-center gap-1 font-semibold text-[11px]" title="Copy full response">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i> <span>Copy</span>
+            </button>
+            <button onclick="BrainwareAITutor.readAloud('${msgId}', this)" class="hover:text-blue-600 px-2 py-1 rounded-lg hover:bg-slate-50 transition flex items-center gap-1 font-semibold text-[11px]" title="Read response aloud">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> <span>Read</span>
+            </button>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">Brainware Academic AI</span>
+        </div>
+      </div>
+    `;
+
+    thread.appendChild(bubble);
+    thread.scrollTop = thread.scrollHeight;
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+
+    const contentContainer = bubble.querySelector('.ai-content-body');
+    return { bubble, contentContainer };
+  }
+
+  function appendUserBubble(text, threadId, fileSnapshot = null) {
+    const thread = document.getElementById(threadId);
+    if (!thread) return;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'flex justify-end mb-4 animate-fade-in';
+
+    let fileBadgeHtml = '';
+    if (fileSnapshot) {
+      fileBadgeHtml = `
+        <div class="mb-2 pb-2 border-b border-white/20 flex items-center gap-2 text-xs">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-white rounded-xl font-medium shadow-sm">
+            <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+            <b class="truncate max-w-[200px]">${escapeHtml(fileSnapshot.name)}</b>
+            <span class="text-[10px] opacity-80 font-mono">(${fileSnapshot.size})</span>
+          </span>
+        </div>
+      `;
+    }
+
+    bubble.innerHTML = `
+      <div class="max-w-[85%] bg-blue-600 text-white rounded-3xl rounded-tr-sm px-5 py-3 text-xs sm:text-sm font-medium leading-relaxed shadow-sm">
+        ${fileBadgeHtml}
+        <div>${escapeHtml(text)}</div>
+      </div>
+    `;
+
+    thread.appendChild(bubble);
+    thread.scrollTop = thread.scrollHeight;
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  }
+
+  function finishMessage(msgId, fullText, threadId) {
+    const bubble = document.getElementById(msgId);
+    if (!bubble) return;
+
+    const actions = bubble.querySelector('.ai-msg-actions');
+    if (actions) {
+      actions.classList.remove('hidden');
+    }
+
+    // Append Contextual Follow-up Chips
+    const chipsContainer = document.createElement('div');
+    chipsContainer.className = 'flex flex-wrap gap-1.5 mt-3 pt-2';
+
+    const followUps = generateFollowUpSuggestions(lastUserQuery, fullText);
+    followUps.forEach(prompt => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'text-[11px] bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 px-3 py-1 rounded-xl transition border border-slate-200 font-semibold';
+      chip.innerText = prompt;
+      chip.onclick = () => {
+        const isPopup = threadId === 'fbChatMessages';
+        const inputId = isPopup ? 'fbChatInput' : 'aiTutorInput';
+        const input = document.getElementById(inputId);
+        if (input) input.value = prompt;
+        window.BrainwareAITutor.askQuestion(prompt, isPopup);
+      };
+      chipsContainer.appendChild(chip);
+    });
+
+    const body = bubble.querySelector('.flex-1');
+    if (body) {
+      body.appendChild(chipsContainer);
+    }
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+
+    const container = document.getElementById(threadId);
+    if (container) container.scrollTop = container.scrollHeight;
+  }
+
+  function generateFollowUpSuggestions(userQ, aiResp) {
+    const q = (userQ || '').toLowerCase();
+    if (q.includes('dbms') || q.includes('database')) {
+      return ['Explain ACID properties in detail', 'What is Normalization (1NF, 2NF, 3NF)?', 'Explain Indexing in DBMS'];
+    }
+    if (q.includes('process') || q.includes('thread') || q.includes('deadlock') || q.includes('operating system')) {
+      return ['Explain Deadlock and Banker’s Algorithm', 'What is Virtual Memory and Paging?', 'Compare CPU Scheduling Algorithms'];
+    }
+    if (q.includes('tcp') || q.includes('udp') || q.includes('network')) {
+      return ['Explain TCP 3-Way Handshake', 'What is the OSI 7-Layer Model?', 'Difference between IPv4 and IPv6'];
+    }
+    if (q.includes('search') || q.includes('sort') || q.includes('algorithm')) {
+      return ['Provide complete implementation code', 'Analyze Time and Space Complexity', 'Compare with alternative algorithms'];
+    }
+    return ['Provide a detailed step-by-step example', 'What are the main advantages and disadvantages?', 'Explain with a comparison table'];
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  // =========================================================================
+  // 12. PUBLIC CONTROLLER API: BrainwareAITutor
+  // =========================================================================
+  window.BrainwareAITutor = {
+    // File upload handler
+    handleFileUpload: async function(event, isPopup = false) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const previewId = isPopup ? 'fbFilePreview' : 'aiFilePreview';
+      const nameId = isPopup ? 'fbFileName' : 'aiFileName';
+      const sizeId = isPopup ? null : 'aiFileSize';
+
+      const prevEl = document.getElementById(previewId);
+      const nameEl = document.getElementById(nameId);
+      const sizeEl = sizeId ? document.getElementById(sizeId) : null;
+
+      if (prevEl && nameEl) {
+        nameEl.innerText = file.name;
+        if (sizeEl) sizeEl.innerText = '(Reading...)';
+        prevEl.classList.remove('hidden');
+        prevEl.style.removeProperty('display');
+        prevEl.style.display = 'flex';
       }
 
-      const popupInput = document.getElementById('fbChatInput');
-      if (popupInput) {
-        popupInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            BrainwareAITutor.askQuestion(null, true);
-          }
-        });
-      }
-    },
-
-    toggleChatPopup: function() {
-      const popup = document.getElementById('fbChatPopup');
-      if (popup) {
-        popup.classList.toggle('hidden');
-        if (!popup.classList.contains('hidden')) {
-          document.getElementById('fbChatInput')?.focus();
+      try {
+        attachedFileData = await parseUploadedDocument(file);
+        if (sizeEl && attachedFileData) {
+          sizeEl.innerText = `(${attachedFileData.size})`;
         }
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (err) {
+        console.error('File parsing notice:', err);
+        if (sizeEl) sizeEl.innerText = `(${ (file.size/1024).toFixed(1) } KB)`;
       }
     },
 
-    closeChatPopup: function() {
-      const popup = document.getElementById('fbChatPopup');
-      if (popup) popup.classList.add('hidden');
+    removeAttachedFile: function(isPopup = false) {
+      attachedFileData = null;
+      const fileInputId = isPopup ? 'fbFileInput' : 'aiFileInput';
+      const previewId = isPopup ? 'fbFilePreview' : 'aiFilePreview';
+
+      const inputEl = document.getElementById(fileInputId);
+      if (inputEl) inputEl.value = '';
+
+      const prevEl = document.getElementById(previewId);
+      if (prevEl) {
+        prevEl.classList.add('hidden');
+        prevEl.style.display = 'none';
+      }
+    },
+
+    // Ask Question Controller
+    askQuestion: async function(customQuery = null, isPopup = false) {
+      if (isGenerating) return;
+
+      const inputId = isPopup ? 'fbChatInput' : 'aiTutorInput';
+      const input = document.getElementById(inputId);
+      let query = customQuery || (input ? input.value : '');
+
+      // Allow sending file alone with automatic default instruction
+      if ((!query || !query.trim()) && attachedFileData) {
+        query = `Please analyze the attached document "${attachedFileData.name}" (${attachedFileData.type}) in detail. Provide an executive summary, list key concepts, explain all formulas and data tables, and highlight critical insights.`;
+      }
+
+      if (!query || !query.trim()) return;
+
+      lastUserQuery = query.trim();
+      if (input && !customQuery) {
+        input.value = '';
+      }
+
+      const fileSnapshot = attachedFileData;
+      this.removeAttachedFile(isPopup);
+
+      const threadId = isPopup ? 'fbChatMessages' : 'aiChatThread';
+      const threadContainer = document.getElementById(threadId);
+
+      appendUserBubble(query, threadId, fileSnapshot);
+
+      const msgId = 'aimsg_' + (++messageCounter);
+      const { contentContainer } = createAssistantStreamingBubble(msgId, threadId);
+
+      isGenerating = true;
+      this.updateSendButton(true, isPopup);
+
+      try {
+        const result = await generateAcademicResponse(query, fileSnapshot);
+        const responseText = result && result.text ? result.text : 'I could not generate an answer at this time. Please try again.';
+
+        // Record into chat history
+        chatHistory.push({ role: 'user', text: query });
+        chatHistory.push({ role: 'model', text: responseText });
+
+        await streamTypewriter(responseText, contentContainer, threadContainer);
+        finishMessage(msgId, responseText, threadId);
+      } catch (err) {
+        console.error('AI generation error:', err);
+        if (contentContainer) {
+          contentContainer.innerHTML = `<div class="p-3 bg-red-50 text-red-700 rounded-xl border border-red-200 font-semibold text-xs">Error: ${escapeHtml(err.message || 'Failed to process question. Please check network connection.')}</div>`;
+        }
+      } finally {
+        isGenerating = false;
+        this.updateSendButton(false, isPopup);
+      }
     },
 
     stopGeneration: function() {
-      if (isGenerating) {
-        isGenerating = false;
-        this.updateSendButton(false);
+      isGenerating = false;
+      if (abortController) {
+        abortController.abort();
       }
+      this.updateSendButton(false, false);
+      this.updateSendButton(false, true);
     },
 
     updateSendButton: function(generating, isPopup = false) {
@@ -1590,237 +1502,21 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
       }
     },
 
-    handleFileUpload: async function(event, isPopup = false) {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-
-      const previewId = isPopup ? 'fbFilePreview' : 'aiFilePreview';
-      const nameId = isPopup ? 'fbFileName' : 'aiFileName';
-      const sizeId = isPopup ? null : 'aiFileSize';
-
-      const prevEl = document.getElementById(previewId);
-      const nameEl = document.getElementById(nameId);
-      const sizeEl = sizeId ? document.getElementById(sizeId) : null;
-
-      if (prevEl && nameEl) {
-        nameEl.innerText = file.name;
-        if (sizeEl) sizeEl.innerText = '(Reading...)';
-        prevEl.classList.remove('hidden');
-        prevEl.style.removeProperty('display');
-        prevEl.style.display = 'flex';
-      }
-
-      try {
-        attachedFileData = await parseUploadedDocument(file);
-        if (sizeEl && attachedFileData) sizeEl.innerText = '(' + attachedFileData.size + ')';
-        if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons();
-        }
-      } catch (err) {
-        console.error('File parsing failed:', err);
-        this.removeAttachedFile(isPopup);
-      }
-    },
-
-    removeAttachedFile: function(isPopup = false) {
-      attachedFileData = null;
-      const fileInputId = isPopup ? 'fbFileInput' : 'aiFileInput';
-      const previewId = isPopup ? 'fbFilePreview' : 'aiFilePreview';
-
-      const inputEl = document.getElementById(fileInputId);
-      if (inputEl) inputEl.value = '';
-
-      const prevEl = document.getElementById(previewId);
-      if (prevEl) {
-        prevEl.classList.add('hidden');
-        prevEl.style.display = 'none';
-      }
-    },
-
-    askQuestion: async function(customQuery, isPopup = false) {
-      if (isGenerating) {
-        this.stopGeneration();
-        return;
-      }
-
-      const inputId = isPopup ? 'fbChatInput' : 'aiTutorInput';
-      const input = document.getElementById(inputId);
-      let query = customQuery || (input ? input.value : '');
-
-      // Allow sending file with empty prompt (defaults to comprehensive analysis)
-      if ((!query || !query.trim()) && attachedFileData) {
-        query = `Please analyze this attached ${attachedFileData.name} (${attachedFileData.type}) file in detail. Explain all key concepts, formulas, data tables, and findings.`;
-      }
-
-      if (!query || !query.trim()) return;
-
-      lastUserQuery = query.trim();
-      if (input && !customQuery) {
-        input.value = '';
-      }
-
-      // Snapshot attached file for this question
-      const fileSnapshot = attachedFileData;
-      this.removeAttachedFile(isPopup);
-
-      const threadId = isPopup ? 'fbChatMessages' : 'aiChatThread';
-      const threadContainer = document.getElementById(threadId);
-
-      this.appendUserBubble(query, threadId, fileSnapshot);
-
-      const msgId = 'aimsg_' + (++messageCounter);
-      const { contentContainer } = this.createAssistantStreamingBubble(msgId, threadId);
-
-      isGenerating = true;
-      this.updateSendButton(true, isPopup);
-
-      try {
-        const sanitized = sanitizeUserQuery(query);
-        const qClean = sanitized.toLowerCase();
-
-        // 1. Quick greetings
-        if (quickGreetings[qClean]) {
-          await streamTypewriter(quickGreetings[qClean], contentContainer, threadContainer);
-          this.finishMessage(msgId, quickGreetings[qClean], threadId);
-          return;
-        }
-
-        // Combine query with attached file data if present
-        let contextualQuery = query;
-        if (fileSnapshot && fileSnapshot.text) {
-          contextualQuery = `[ATTACHED DOCUMENT: ${fileSnapshot.name} (${fileSnapshot.type})]:\n${fileSnapshot.text.substring(0, 3500)}\n\n[STUDENT QUESTION]:\n${query}`;
-        }
-
-        // 2. Strict Syllabus Grounding Check
-        const syllabusMatch = findSyllabusMatch(query);
-
-        // 3. Multi-Provider Live AI Inference
-        let responseText = await queryLiveAI(contextualQuery, syllabusMatch ? syllabusMatch.item : null);
-
-        // 4. Fallback to Master Academic Knowledge Base (Pure ChatGPT/Gemini answer only)
-        if (!responseText || responseText.length < 30) {
-          responseText = getMasterAcademicAnswer(query, syllabusMatch);
-        }
-
-        // Stream the pure answer smoothly
-        await streamTypewriter(responseText, contentContainer, threadContainer);
-        this.finishMessage(msgId, responseText, threadId);
-
-      } catch (err) {
-        console.error("AI Assistant processing error:", err);
-        contentContainer.innerHTML = formatMarkdown("An unexpected interruption occurred. Please click **Regenerate** below to retry.");
-      } finally {
-        isGenerating = false;
-        this.updateSendButton(false, isPopup);
-      }
-    },
-
-    // Pure ChatGPT / Gemini Style Bubble: ONLY THE ANSWER, ZERO METADATA/BADGES
-    createAssistantStreamingBubble: function(msgId, threadId) {
-      const container = document.getElementById(threadId);
-      const bubble = document.createElement('div');
-      bubble.id = msgId;
-      bubble.className = 'flex items-start gap-3.5 mb-6 animate-fade-in group';
-
-      bubble.innerHTML = `
-        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex-shrink-0 flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
-          AI
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="ai-content-body text-slate-800 text-xs sm:text-sm leading-relaxed space-y-3">
-            <div class="flex items-center gap-2 text-slate-400 py-1">
-              <span class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
-              <span class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-              <span class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-            </div>
-          </div>
-          <div class="action-footer mt-2.5 flex items-center gap-2 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onclick="BrainwareAITutor.copyMessage(this, '${msgId}')" title="Copy response" class="p-1 hover:text-slate-700 hover:bg-slate-100 rounded-md transition flex items-center gap-1 text-xs">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-              <span class="text-[11px]">Copy</span>
-            </button>
-            <button onclick="BrainwareAITutor.regenerateLast()" title="Regenerate" class="p-1 hover:text-slate-700 hover:bg-slate-100 rounded-md transition flex items-center gap-1 text-xs">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-              <span class="text-[11px]">Regenerate</span>
-            </button>
-          </div>
-        </div>
-      `;
-
-      container.appendChild(bubble);
-      container.scrollTop = container.scrollHeight;
-
-      return {
-        bubbleContainer: bubble,
-        contentContainer: bubble.querySelector('.ai-content-body')
-      };
-    },
-
-    finishMessage: function(msgId, fullText, threadId) {
-      const bubble = document.getElementById(msgId);
-      if (!bubble) return;
-
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-
-      const container = document.getElementById(threadId);
-      if (container) container.scrollTop = container.scrollHeight;
-    },
-
-    appendUserBubble: function(text, threadId, fileSnapshot = null) {
-      const container = document.getElementById(threadId);
-      if (!container) return;
-
-      const bubble = document.createElement('div');
-      bubble.className = 'flex justify-end mb-4 animate-fade-in';
-
-      let fileBadgeHtml = '';
-      if (fileSnapshot) {
-        fileBadgeHtml = `
-          <div class="mb-2 pb-2 border-b border-white/20 flex items-center gap-2 text-xs">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-white rounded-xl font-medium shadow-sm">
-              <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
-              <b class="truncate max-w-[200px]">${this.escapeHtml(fileSnapshot.name)}</b>
-              <span class="text-[10px] opacity-80 font-mono">(${fileSnapshot.size})</span>
-            </span>
-          </div>
-        `;
-      }
-
-      bubble.innerHTML = `
-        <div class="max-w-[85%] bg-blue-600 text-white rounded-3xl rounded-tr-sm px-5 py-3 text-xs sm:text-sm font-medium leading-relaxed shadow-sm">
-          ${fileBadgeHtml}
-          <div>${this.escapeHtml(text)}</div>
-        </div>
-      `;
-      container.appendChild(bubble);
-      container.scrollTop = container.scrollHeight;
-      if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-    },
-
-    regenerateLast: function() {
-      if (lastUserQuery) {
-        this.askQuestion(lastUserQuery);
-      }
-    },
-
-    copyCode: function(btn, codeId) {
-      const codeElem = document.getElementById(codeId);
-      if (!codeElem) return;
-      const text = codeElem.textContent || codeElem.innerText;
+    copyCodeBlock: function(codeId, btn) {
+      const codeEl = document.getElementById(codeId);
+      if (!codeEl) return;
+      const text = codeEl.textContent || codeEl.innerText;
       navigator.clipboard.writeText(text).then(() => {
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = `<span class="text-emerald-400 font-bold">✓ Copied</span>`;
-        setTimeout(() => {
-          btn.innerHTML = originalHtml;
-        }, 2000);
+        const span = btn.querySelector('span');
+        if (span) {
+          const oldText = span.textContent;
+          span.textContent = 'Copied!';
+          setTimeout(() => { span.textContent = oldText; }, 2000);
+        }
       });
     },
 
-    copyMessage: function(btn, msgId) {
+    copyMessageText: function(msgId, btn) {
       const bubble = document.getElementById(msgId);
       if (!bubble) return;
       const body = bubble.querySelector('.ai-content-body');
@@ -1830,70 +1526,138 @@ Understanding the distinctions within **${cleanSubject}** is essential for maste
         const span = btn.querySelector('span');
         if (span) {
           const oldText = span.textContent;
-          span.textContent = "Copied!";
+          span.textContent = 'Copied!';
           setTimeout(() => { span.textContent = oldText; }, 2000);
         }
       });
     },
 
-        configureApiKey: function() {
+    readAloud: function(msgId, btn) {
+      if (!window.speechSynthesis) {
+        alert('Text-to-Speech is not supported in this browser.');
+        return;
+      }
+
+      if (isSpeaking) {
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        const span = btn.querySelector('span');
+        if (span) span.textContent = 'Read';
+        return;
+      }
+
+      const bubble = document.getElementById(msgId);
+      if (!bubble) return;
+      const body = bubble.querySelector('.ai-content-body');
+      if (!body) return;
+
+      const text = (body.textContent || body.innerText).replace(/[`$#*_~|]/g, ' ').replace(/\s+/g, ' ').trim();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      const span = btn.querySelector('span');
+      if (span) span.textContent = 'Stop';
+      isSpeaking = true;
+
+      utterance.onend = () => {
+        isSpeaking = false;
+        if (span) span.textContent = 'Read';
+      };
+      utterance.onerror = () => {
+        isSpeaking = false;
+        if (span) span.textContent = 'Read';
+      };
+
+      window.speechSynthesis.speak(utterance);
+    },
+
+    configureApiKey: function() {
       const current = localStorage.getItem('gemini_api_key') || '';
-      const key = prompt("Enter your Google Gemini API key (optional - leave empty to use built-in free Universal Academic Engine):", current);
+      const key = prompt('Enter your Google Gemini API Key (e.g. AIzaSy...)\n\nTip: You can get a 100% free key at https://aistudio.google.com/app/apikey\nLeave blank to clear.', current);
       if (key !== null) {
         if (key.trim()) {
           localStorage.setItem('gemini_api_key', key.trim());
-          alert("✓ Gemini API key successfully activated! Live Gemini 1.5 Flash is now active.");
+          alert('✓ Google Gemini 1.5 Flash API Key successfully configured and activated!');
         } else {
           localStorage.removeItem('gemini_api_key');
-          alert("✓ Gemini API key cleared. Universal Academic Engine is active.");
+          alert('✓ Gemini API Key cleared. Standard Academic Engine is active.');
         }
       }
     },
+
     clearChat: function() {
       chatHistory = [];
       const thread = document.getElementById('aiChatThread');
       if (thread) {
         thread.innerHTML = `
-          <div class="text-center py-12 px-4 max-w-md mx-auto">
-            <div class="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto shadow-md mb-3">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          <div class="flex gap-3 mb-4 animate-fade-in">
+            <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black flex-shrink-0 text-xs shadow-sm">
+              <i data-lucide="bot" class="w-4 h-4"></i>
             </div>
-            <h3 class="text-base font-bold text-slate-900 mb-1">How can I help you today?</h3>
-            <p class="text-xs text-slate-500 mb-6 leading-relaxed">
-              Ask any question from your curriculum, programming, mathematics, or computer science.
-            </p>
-            <div class="flex flex-wrap justify-center gap-2">
-              <button onclick="BrainwareAITutor.askQuestion('Distinguish between CBOW and Skip-Gram architectures of Word2Vec.')" class="text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm transition">
-                CBOW vs Skip-Gram
-              </button>
-              <button onclick="BrainwareAITutor.askQuestion('Explain Lagrange Multipliers using lambda and optimization.')" class="text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm transition">
-                Lagrange Multipliers (λ)
-              </button>
-              <button onclick="BrainwareAITutor.askQuestion('Explain De Morgan\\'s laws using AND, OR, and NOT logical operators.')" class="text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm transition">
-                De Morgan's Laws (∧, ∨, ¬)
-              </button>
-              <button onclick="BrainwareAITutor.askQuestion('What is a deadlock and explain the 4 Coffman conditions?')" class="text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm transition">
-                Deadlock & Coffman Conditions
-              </button>
-              <button onclick="BrainwareAITutor.askQuestion('What is the difference between a Process and a Thread?')" class="text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm transition">
-                Process vs Thread
-              </button>
+            <div class="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 shadow-sm text-xs sm:text-sm text-slate-800 leading-relaxed max-w-xl">
+              <p class="font-bold text-slate-900 mb-1">Hello! I am your University Academic AI Assistant.</p>
+              <p class="text-xs text-slate-600">Conversation cleared. How can I help you today?</p>
             </div>
           </div>
         `;
       }
+      const popupThread = document.getElementById('fbChatMessages');
+      if (popupThread) {
+        popupThread.innerHTML = `
+          <div class="flex gap-2 mb-3">
+            <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">AI</div>
+            <div class="bg-white border border-slate-200 rounded-xl rounded-tl-sm p-2.5 text-xs text-slate-800 leading-relaxed shadow-sm">
+              <p class="font-bold text-slate-900">How can I help you?</p>
+              <p class="text-[11px] text-slate-600">Ask any question or attach any document.</p>
+            </div>
+          </div>
+        `;
+      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     },
 
-    escapeHtml: function(text) {
-      if (!text) return "";
-      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-      return text.replace(/[&<>"']/g, m => map[m]);
+    toggleChatPopup: function() {
+      const popup = document.getElementById('floatingChatPopup');
+      if (!popup) return;
+      if (popup.classList.contains('hidden') || popup.style.display === 'none') {
+        popup.classList.remove('hidden');
+        popup.style.display = 'flex';
+      } else {
+        popup.classList.add('hidden');
+        popup.style.display = 'none';
+      }
     }
   };
-})();
 
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', function() {
-    if (window.BrainwareAITutor) window.BrainwareAITutor.init();
+  // Wire up Drag and Drop onto Chat Container
+  document.addEventListener('DOMContentLoaded', () => {
+    const dropZones = [document.getElementById('aiChatContainer'), document.getElementById('floatingChatPopup')].filter(Boolean);
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('ring-2', 'ring-blue-500');
+      });
+      zone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        zone.classList.remove('ring-2', 'ring-blue-500');
+      });
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('ring-2', 'ring-blue-500');
+        const files = e.dataTransfer.files;
+        if (files && files[0]) {
+          const isPopup = zone.id === 'floatingChatPopup';
+          window.BrainwareAITutor.handleFileUpload({ target: { files: [files[0]] } }, isPopup);
+        }
+      });
+    });
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
   });
-}
+
+})();
