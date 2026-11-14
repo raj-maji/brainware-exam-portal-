@@ -2,10 +2,11 @@
   "name": "brainware-academic-ai",
   "version": "2.0.0",
   "description": "Brainware University - Open Academic AI Agent & Educational Assistant",
-  "main": "server.js",
+  "main": "server.py",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "python server.py",
+    "dev": "python server.py",
+    "start:node": "node server.js"
   },
   "keywords": [
     "academic-ai",
