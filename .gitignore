@@ -3,10 +3,11 @@
 .env.local
 node_modules/
 
-# Ignore Python build and scratch scripts (except production server)
+# Ignore Python build and scratch scripts (except production server & model)
 *.py
 !server.py
 !app.py
+!academic_model.py
 *.pyc
 __pycache__/
 *.log
