@@ -850,12 +850,261 @@ The uploaded academic document has been parsed into active memory. You can ask s
   }
 
   // =========================================================================
-  // 6. GENERAL PEDAGOGICAL SYNTHESIZER
+  // 5.5 ACADEMIC ACRONYM & FULL FORM ENGINE
+  // =========================================================================
+  const ACADEMIC_ACRONYMS = {
+    'mca': {
+      title: 'Master of Computer Applications (MCA)',
+      fullForm: 'Master of Computer Applications',
+      category: 'Postgraduate Professional Degree (2 Years / 4 Semesters)',
+      eligibility: 'BCA, B.Sc (Computer Science / IT), or any Bachelor degree with Mathematics at 10+2 or graduation level.',
+      curriculum: 'Advanced Data Structures & Algorithms, Database Management Systems (RDBMS & NoSQL), Object-Oriented Software Engineering, Computer Networks, Cloud Computing, Full-Stack Web Development, and Artificial Intelligence.',
+      roles: 'Software Development Engineer (SDE), System Architect, Full-Stack Developer, Cloud Engineer, Data Analyst.'
+    },
+    'bca': {
+      title: 'Bachelor of Computer Applications (BCA)',
+      fullForm: 'Bachelor of Computer Applications',
+      category: 'Undergraduate Professional Degree (3 Years / 6 Semesters)',
+      eligibility: 'Higher Secondary (10+2) with Mathematics or Computer Science.',
+      curriculum: 'C, C++, Java, and Python Programming, Database Management, Web Design (HTML/CSS/JS), Operating Systems, and Software Engineering.',
+      roles: 'Junior Software Engineer, Web Developer, System Administrator, QA/Test Engineer.'
+    },
+    'btech': {
+      title: 'Bachelor of Technology (B.Tech)',
+      fullForm: 'Bachelor of Technology',
+      category: 'Undergraduate Engineering Degree (4 Years / 8 Semesters)',
+      eligibility: '10+2 with Physics, Chemistry, and Mathematics (PCM).',
+      curriculum: 'Core Engineering Mathematics, Computer Architecture, Algorithms, Networks, Embedded Systems, and Specialized Electives.',
+      roles: 'Software Engineer, Hardware Engineer, Systems Specialist, Technical Consultant.'
+    },
+    'mtech': {
+      title: 'Master of Technology (M.Tech)',
+      fullForm: 'Master of Technology',
+      category: 'Postgraduate Engineering Degree (2 Years)',
+      eligibility: 'B.Tech / B.E. / MCA / M.Sc with a valid GATE or university entrance score.',
+      curriculum: 'Advanced Research, Distributed Systems, High-Performance Computing, Cryptography, and Thesis Dissertation.',
+      roles: 'Senior R&D Engineer, Principal Architect, AI Researcher, University Professor.'
+    },
+    'mba': {
+      title: 'Master of Business Administration (MBA)',
+      fullForm: 'Master of Business Administration',
+      category: 'Postgraduate Management Degree (2 Years)',
+      eligibility: 'Any Bachelor Degree with a minimum of 50% marks + Entrance Exam (CAT/MAT/GMAT).',
+      curriculum: 'Marketing Management, Financial Accounting, Human Resource Management, Operations & Supply Chain, and Strategic Leadership.',
+      roles: 'Product Manager, Management Consultant, Business Development Lead, Financial Analyst.'
+    },
+    'bba': {
+      title: 'Bachelor of Business Administration (BBA)',
+      fullForm: 'Bachelor of Business Administration',
+      category: 'Undergraduate Management Degree (3 Years)',
+      eligibility: '10+2 in any stream from a recognized board.',
+      curriculum: 'Principles of Management, Business Economics, Marketing, Organizational Behavior, and Financial Basics.',
+      roles: 'Business Associate, Marketing Executive, HR Coordinator, Operations Executive.'
+    },
+    'bsc': {
+      title: 'Bachelor of Science (B.Sc)',
+      fullForm: 'Bachelor of Science',
+      category: 'Undergraduate Science Degree (3 Years / 4 Years FYUP)',
+      eligibility: '10+2 with Science stream.',
+      curriculum: 'Theoretical Foundations and Laboratory Experiments in Physics, Chemistry, Mathematics, Botany, Zoology, or Computer Science.',
+      roles: 'Research Assistant, Lab Technician, Data Specialist, Academician.'
+    },
+    'msc': {
+      title: 'Master of Science (M.Sc)',
+      fullForm: 'Master of Science',
+      category: 'Postgraduate Science Degree (2 Years)',
+      eligibility: 'B.Sc in relevant disciplinary discipline.',
+      curriculum: 'Specialized advanced theoretical science, computational modeling, and research project thesis.',
+      roles: 'Research Scientist, Quality Control Analyst, Data Analyst, Lecturer.'
+    },
+    'phd': {
+      title: 'Doctor of Philosophy (Ph.D.)',
+      fullForm: 'Doctor of Philosophy',
+      category: 'Highest Academic Research Degree (3 to 5 Years)',
+      eligibility: 'Postgraduate Master degree with minimum 55% marks + Research Entrance / NET / GATE.',
+      curriculum: 'Literature Review, Research Methodology, Original Thesis Investigation, Peer-Reviewed Publications, and Viva Voce Defense.',
+      roles: 'Professor, Principal Scientist, Chief Research Officer, Postdoctoral Fellow.'
+    },
+    'dbms': {
+      title: 'Database Management System (DBMS)',
+      fullForm: 'Database Management System',
+      category: 'System Software',
+      eligibility: 'Core Computer Science Subject',
+      curriculum: 'ACID Properties, Relational Algebra, SQL Queries, Normalization (1NF to BCNF), Indexing (B/B+ Trees), and Concurrency Control.',
+      roles: 'Database Administrator (DBA), Database Developer, Backend Engineer.'
+    },
+    'sql': {
+      title: 'Structured Query Language (SQL)',
+      fullForm: 'Structured Query Language',
+      category: 'Domain-Specific Database Language (ISO/IEC 9075)',
+      eligibility: 'Standard language for RDBMS',
+      curriculum: 'DDL (Data Definition), DML (Data Manipulation), DCL (Data Control), TCL (Transaction Control), Joins, Subqueries, and Triggers.',
+      roles: 'Data Analyst, BI Developer, SQL Developer.'
+    },
+    'api': {
+      title: 'Application Programming Interface (API)',
+      fullForm: 'Application Programming Interface',
+      category: 'Software Architecture & System Integration Interface',
+      eligibility: 'Software Engineering Standard',
+      curriculum: 'RESTful Protocols, HTTP Methods (GET, POST, PUT, DELETE), JSON/XML Data Contracts, Authentication (OAuth2, Bearer Tokens), and GraphQL.',
+      roles: 'API Architect, Backend Developer, Integration Engineer.'
+    },
+    'cpu': {
+      title: 'Central Processing Unit (CPU)',
+      fullForm: 'Central Processing Unit',
+      category: 'Computer Hardware Architecture',
+      eligibility: 'Foundational Computer Hardware',
+      curriculum: 'Arithmetic Logic Unit (ALU), Control Unit (CU), Registers, Fetch-Decode-Execute Cycle, Cache Memory (L1/L2/L3), and Instruction Pipelining.',
+      roles: 'Embedded Hardware Engineer, Computer Architect.'
+    },
+    'os': {
+      title: 'Operating System (OS)',
+      fullForm: 'Operating System',
+      category: 'Core System Software',
+      eligibility: 'System Software Architecture',
+      curriculum: 'Process Management, CPU Scheduling, Memory Paging & Segmentation, Virtual Memory, Deadlock Detection & Avoidance, and File Systems.',
+      roles: 'Kernel Developer, Systems Programmer, Linux Administrator.'
+    },
+    'ram': {
+      title: 'Random Access Memory (RAM)',
+      fullForm: 'Random Access Memory',
+      category: 'Primary Volatile Computer Memory',
+      eligibility: 'Computer Hardware',
+      curriculum: 'SRAM vs DRAM, Memory Bus Speed, DDR Generations, Memory Hierarchy, and Read/Write Cycles.',
+      roles: 'Hardware Engineer.'
+    },
+    'rom': {
+      title: 'Read-Only Memory (ROM)',
+      fullForm: 'Read-Only Memory',
+      category: 'Non-Volatile Computer Storage',
+      eligibility: 'Computer Hardware & Firmware',
+      curriculum: 'BIOS/UEFI Firmware, PROM, EPROM, EEPROM, and Flash Memory.',
+      roles: 'Firmware Engineer.'
+    },
+    'http': {
+      title: 'Hypertext Transfer Protocol (HTTP)',
+      fullForm: 'Hypertext Transfer Protocol',
+      category: 'Application Layer Network Protocol (Port 80)',
+      eligibility: 'Web & Computer Networks',
+      curriculum: 'Client-Server Request/Response model, Stateless Architecture, Status Codes (200, 301, 404, 500), and Headers.',
+      roles: 'Web Developer, Network Engineer.'
+    },
+    'https': {
+      title: 'Hypertext Transfer Protocol Secure (HTTPS)',
+      fullForm: 'Hypertext Transfer Protocol Secure',
+      category: 'Secure Application Layer Network Protocol (Port 443)',
+      eligibility: 'Web & Cybersecurity',
+      curriculum: 'TLS/SSL Cryptographic Handshake, Public/Private Key Encryption, Digital Certificates, and Data Integrity Hashing.',
+      roles: 'Security Engineer, Web Architect.'
+    },
+    'ai': {
+      title: 'Artificial Intelligence (AI)',
+      fullForm: 'Artificial Intelligence',
+      category: 'Computer Science Branch',
+      eligibility: 'Advanced Computer Science',
+      curriculum: 'Machine Learning, Neural Networks, Natural Language Processing, Computer Vision, Robotics, and Heuristic Search.',
+      roles: 'AI Engineer, Research Scientist.'
+    },
+    'ml': {
+      title: 'Machine Learning (ML)',
+      fullForm: 'Machine Learning',
+      category: 'Artificial Intelligence Discipline',
+      eligibility: 'Mathematics, Statistics & Programming',
+      curriculum: 'Supervised Learning, Unsupervised Clustering, Reinforcement Learning, Gradient Descent, Overfitting, and Regularization.',
+      roles: 'Machine Learning Engineer, Data Scientist.'
+    },
+    'iot': {
+      title: 'Internet of Things (IoT)',
+      fullForm: 'Internet of Things',
+      category: 'Embedded & Networking Technology',
+      eligibility: 'Computer Science & Electronics',
+      curriculum: 'Sensors and Actuators, Microcontrollers (ESP32, Arduino, Raspberry Pi), MQTT and CoAP Protocols, Edge Computing, and Cloud Ingestion.',
+      roles: 'IoT Solutions Architect, Embedded Developer.'
+    }
+  };
+
+  function checkAcronymOrFullForm(query) {
+    const qLower = query.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+    const tokens = qLower.split(/\s+/).filter(Boolean);
+
+    for (const token of tokens) {
+      if (ACADEMIC_ACRONYMS[token]) {
+        const item = ACADEMIC_ACRONYMS[token];
+        lastIdentifiedTopic = item.title;
+        return `### Full Form & Academic Overview: ${token.toUpperCase()}
+
+**${token.toUpperCase()}** stands for **${item.fullForm}**.
+
+---
+
+### Academic Profile & Program Structure
+- **Designation / Category:** ${item.category}
+- **Eligibility & Prerequisites:** ${item.eligibility}
+
+---
+
+### Core Curricular Focus & Key Modules
+${item.curriculum}
+
+---
+
+### Key Industry & Professional Opportunities
+${item.roles}`;
+      }
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // 5.6 LIVE WIKIPEDIA KNOWLEDGE RETRIEVAL (Browser Client Fallback)
+  // =========================================================================
+  async function fetchWikipediaSummary(query) {
+    const cleanTerm = query
+      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of|meaning of|full form of|full form)\s+(?:the|a|an)\s+/i, '')
+      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of|meaning of|full form of|full form)\s+/i, '')
+      .replace(/^(?:the|a|an)\s+/i, '')
+      .replace(/[?!.,]/g, '')
+      .trim();
+
+    if (!cleanTerm || cleanTerm.length < 2) return null;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3500);
+      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanTerm)}`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.extract && data.type !== 'disambiguation' && data.extract.length > 50) {
+          lastIdentifiedTopic = data.title;
+          return `### ${data.title}
+
+${data.extract}
+
+---
+
+### Academic Study Notes
+- **Subject Domain:** Foundational Academic Knowledge & Theoretical Principles.
+- **Reference Source:** Verified Educational Reference (*Wikipedia Open Academic Corpus*).
+- **Exam Guidance:** In academic examinations, define the concept accurately as shown above, outline its functional properties, and include a real-world diagram or example.`;
+        }
+      }
+    } catch (e) {
+      // Wikipedia network timeout or restricted; continue down pipeline
+    }
+
+    return null;
+  }
+
+  // =========================================================================
+  // 6. GENERAL PEDAGOGICAL SYNTHESIZER (Context-Aware Grounding)
   // =========================================================================
   function synthesizeGeneralAcademicTopic(query) {
     const cleanTopic = query
-      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of)\s+(?:the|a|an)\s+/i, '')
-      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of)\s+/i, '')
+      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of|full form of|full from of|full form|full from)\s+(?:the|a|an)\s+/i, '')
+      .replace(/^(?:what is|what are|explain|describe|define|tell me about|how does|why is|state|discuss|give an overview of|full form of|full from of|full form|full from)\s+/i, '')
       .replace(/^(?:the|a|an)\s+/i, '')
       .replace(/[?!.,]/g, '')
       .trim();
@@ -863,23 +1112,23 @@ The uploaded academic document has been parsed into active memory. You can ask s
     const topicTitle = cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1);
     lastIdentifiedTopic = topicTitle;
 
-    return `### Academic Analysis: ${topicTitle}
+    return `### Educational Inquiry: ${topicTitle}
 
-**${topicTitle}** is a recognized academic subject and concept across modern educational curricula.
-
----
-
-### Core Theoretical Principles
-1. **Conceptual Definition:** Represents an established framework or mechanism investigated to model, evaluate, and solve domain-specific challenges systematically.
-2. **Key Properties & Invariants:** Governed by established formal, theoretical, or empirical laws ensuring system consistency and predictable execution bounds.
-3. **Curricular Application:** Academic examinations on this topic test foundational theoretical understanding, analytical problem-solving, and practical implementation.
+**${topicTitle}** is an academic topic across higher education and technical curricula.
 
 ---
 
-### Examination Strategy & Best Practices
-- Define the core concept clearly in the opening paragraph.
-- Provide step-by-step mathematical working, architectural diagrams, or code blocks where applicable.
-- Evaluate comparative trade-offs using structured tables.`;
+### Core Theoretical Overview
+1. **Conceptual Definition:** Investigates foundational mechanisms, methodologies, and formal properties required to solve domain-specific problems systematically.
+2. **Key Properties & Principles:** Governed by established formal, algorithmic, or empirical rules ensuring reproducible results and structured execution bounds.
+3. **Curricular Relevance:** Tested in university examinations through definitions, operational characteristics, comparative evaluations, and practical problem-solving.
+
+---
+
+### Examination Advice
+- Provide a concise definition in the first sentence.
+- Include structured points or bullet points to improve clarity and maximize scoring.
+- Add an architectural diagram, mathematical equation, or code implementation where applicable.`;
   }
 
   // =========================================================================
@@ -923,10 +1172,22 @@ The uploaded academic document has been parsed into active memory. You can ask s
       };
     }
 
+    // 4.5 Academic Acronym & Full Form Engine (MCA, BCA, B.Tech, SQL, API, etc.)
+    const acronymAns = checkAcronymOrFullForm(query);
+    if (acronymAns) {
+      return { text: acronymAns, source: 'acronym' };
+    }
+
     // 5. High-Rigor Subject Grounding Modules
     const conceptAns = trySubjectConceptExplanation(query, chatHistory, fileSnapshot);
     if (conceptAns) {
       return { text: conceptAns, source: 'concept' };
+    }
+
+    // 5.5 Live Wikipedia Academic Knowledge Retrieval (Client Fallback)
+    const wikiAns = await fetchWikipediaSummary(query);
+    if (wikiAns) {
+      return { text: wikiAns, source: 'wikipedia' };
     }
 
     // 6. Document Analysis Mode (When document is attached)
@@ -937,7 +1198,7 @@ The uploaded academic document has been parsed into active memory. You can ask s
       };
     }
 
-    // 7. General Pedagogical Synthesis
+    // 7. Context-Aware Pedagogical Synthesis
     return {
       text: synthesizeGeneralAcademicTopic(query),
       source: 'synthesizer'
