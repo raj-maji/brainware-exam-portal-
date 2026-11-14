@@ -530,8 +530,178 @@ $${var} = {ans_str}$$"""
         return None
 
     def _get_curriculum_concept(self, q_lower: str) -> Optional[str]:
-        """Provides verified university examination answers across core subjects."""
-        # 1. TCP vs UDP Comparison
+        """Provides verified university examination answers across core academic disciplines."""
+
+        # 1. DEADLOCK IN OPERATING SYSTEMS & 4 COFFMAN CONDITIONS
+        if "deadlock" in q_lower:
+            self.last_identified_topic = "Deadlock in Operating Systems"
+            return """### Deadlock in Operating Systems & Coffman's Four Conditions
+
+In Operating Systems, a **Deadlock** is a state where a set of concurrent processes are permanently blocked because each process holds at least one resource and is waiting to acquire another resource held by another process in the same set.
+
+---
+
+### Coffman's Four Necessary Conditions
+For a deadlock to occur, all four of the following conditions must hold simultaneously:
+
+1. **Mutual Exclusion:**
+   - At least one resource must be non-shareable. Only one process can utilize the resource at any given time.
+   - *Example:* A physical printer or a dedicated write-lock on a file.
+
+2. **Hold and Wait:**
+   - A process must be currently holding at least one allocated resource while simultaneously waiting to acquire additional resources held by other processes.
+
+3. **No Preemption:**
+   - Resources cannot be forcibly taken away from a process. A resource can only be released voluntarily by the process after completing its task.
+
+4. **Circular Wait:**
+   - A closed circular chain of processes exists such that each process holds one resource and waits for a resource held by the next process in the cycle:
+   $$P_0 \\rightarrow P_1 \\rightarrow P_2 \\dots \\rightarrow P_n \\rightarrow P_0$$
+
+---
+
+### Resource Allocation Graph (RAG) Schematic
+```
+           Holds Resource R1
+     ┌─────────────────────────────┐
+     ▼                             │
+┌─────────┐   Requests Resource   ┌─────────┐
+│Process 1├──────────────────────>│Resource2│
+└─────────┘                       └────┬────┘
+     ▲                                 │
+     │        Holds Resource R2        │
+     └─────────────────────────────────┘
+                   (DEADLOCK CYCLE)
+```
+
+---
+
+### Deadlock Handling Strategies (University Exam Breakdown)
+1. **Deadlock Prevention:** Systematically negate at least one of Coffman's four conditions (e.g., impose strict global resource ordering to eliminate circular wait).
+2. **Deadlock Avoidance:** Use dynamic resource analysis to ensure the system never enters an unsafe state (e.g., **Dijkstra's Banker's Algorithm**).
+3. **Deadlock Detection & Recovery:** Allow deadlocks to occur, periodically detect cycles using a Wait-For Graph (WFG), and recover via process termination or resource preemption.
+4. **Ostrich Algorithm:** Ignore the problem entirely (employed by Unix and Windows when deadlocks are statistically rare)."""
+
+        # 2. ACID PROPERTIES IN DBMS
+        if ("acid" in q_lower and any(w in q_lower for w in ["property", "properties", "dbms", "database", "transaction"])) or "acid properties" in q_lower:
+            self.last_identified_topic = "ACID Properties in DBMS"
+            return """### Database Management Systems & The ACID Properties
+
+In Database Management Systems (DBMS), a **Transaction** is a logical unit of database processing that includes one or more database access operations. To preserve data integrity and consistency, every transaction must strictly adhere to the four **ACID** properties:
+
+---
+
+### Detailed Examination Breakdown
+
+#### 1. Atomicity ("All-or-Nothing" Invariant)
+- **Concept:** A transaction must execute completely, or none of its modifications should take effect. If a system failure occurs mid-transaction, all partial updates are rolled back.
+- **Implementation Mechanism:** Managed by the **Recovery Manager** using **Write-Ahead Logging (WAL)** and undo-logs.
+- **Example:** In a bank transfer of $500 from Account A to Account B:
+  $$\\text{Debit}(A, 500) \\quad \\text{and} \\quad \\text{Credit}(B, 500)$$
+  If the system crashes after debiting $A$, the debit must be aborted and rolled back so funds are not lost.
+
+#### 2. Consistency (Integrity Preservation)
+- **Concept:** Execution of a transaction must transform the database from one valid state to another valid state, preserving all schema constraints, cascades, foreign keys, and domain rules.
+- **Example:** The invariant condition:
+  $$\\text{Balance}(A) + \\text{Balance}(B) = \\text{Constant}$$
+  must hold identically both before and after the transaction commits.
+
+#### 3. Isolation (Concurrency Control)
+- **Concept:** Intermediate states of concurrent transactions must be invisible to each other. Transactions must execute as if they were running serially.
+- **Implementation Mechanism:** Managed by the **Concurrency Control Manager** using **Two-Phase Locking (2PL)**, Timestamp Ordering, or **Multi-Version Concurrency Control (MVCC)**.
+- **Isolation Levels (ANSI SQL):** Read Uncommitted -> Read Committed -> Repeatable Read -> Serializable.
+
+#### 4. Durability (Persistence Guarantee)
+- **Concept:** Once a transaction commits, its modifications are permanently recorded in non-volatile storage and will never be lost, even in the event of an immediate power outage or crash.
+- **Implementation Mechanism:** Enforced by flushing redo-logs to disk prior to acknowledging the commit (force-write policy).
+
+---
+
+### ACID Properties Summary Table
+
+| Property | Core Responsibility | System Component Responsible | Failure Handled |
+| :--- | :--- | :--- | :--- |
+| **Atomicity** | All operations succeed or all roll back | Recovery Manager (Undo Logs) | System crashes, transaction aborts |
+| **Consistency** | Database satisfies all semantic constraints | Database Schema & Application Logic | Constraint violations, invalid states |
+| **Isolation** | Concurrent transactions do not interfere | Concurrency Control (2PL / MVCC) | Dirty reads, non-repeatable reads |
+| **Durability** | Committed transactions survive system crashes | Recovery Manager (Redo Logs / WAL) | Hardware power failure, disk crashes |"""
+
+        # 3. PROCESS VS THREAD
+        if ("process" in q_lower and "thread" in q_lower) or "difference between process and thread" in q_lower:
+            self.last_identified_topic = "Process vs Thread"
+            return """### Difference Between Process and Thread (Operating Systems)
+
+In operating systems, a **Process** is an independent program in execution with its own dedicated memory address space, while a **Thread** is a basic unit of CPU execution (often termed a *lightweight process*) that runs inside the context of a process.
+
+---
+
+### Comparison Matrix (10 Marks Evaluation Table)
+
+| Evaluation Parameter | Process (Heavyweight Execution Unit) | Thread (Lightweight Execution Unit) | Examination Notes |
+| :--- | :--- | :--- | :--- |
+| **Definition** | An independent executing program in memory. | A single sequential flow of control within a process. | Thread is a sub-component of a process. |
+| **Address Space** | Isolated, dedicated virtual address space (Text, Data, Heap, Stack). | Shared address space (shares Code, Data, and Heap with peer threads). | Threads only have private Stack and Registers. |
+| **Context Switching Overhead** | High overhead (requires flushing TLB and loading memory page tables). | Minimal overhead (no MMU page table reload required). | Threads switch significantly faster. |
+| **Creation & Termination Time** | Slow (requires OS to allocate full memory descriptors and PCBs). | Very fast (allocates only a Thread Control Block (TCB) and stack). | Threads are efficient for concurrent tasks. |
+| **Inter-Communication (IPC)** | Expensive (requires IPC mechanisms: Pipes, Sockets, Shared Memory). | Inexpensive (threads read/write directly to shared heap memory). | Thread communication requires synchronization (mutexes). |
+| **Fault Isolation** | High (one process crashing does not affect other processes). | Low (an unhandled exception in one thread can crash the entire process). | Critical distinction in system reliability. |
+| **Resource Consumption** | Heavy memory and system descriptor footprint. | Very lightweight footprint. | Web servers use multithreading for scalability. |
+| **Control Block** | Managed via Process Control Block (PCB). | Managed via Thread Control Block (TCB). | OS schedules threads on modern multi-core CPUs. |
+
+---
+
+### Memory Model Schematic
+```
+PROCESS MEMORY BOUNDARY:
+┌──────────────────────────────────────────────────────────┐
+│  CODE SECTION (Shared)   │   DATA / HEAP (Shared)        │
+├──────────────────────────┼───────────────────────────────┤
+│  THREAD 1:               │   THREAD 2:                   │
+│  - Registers: R0..R7     │   - Registers: R0..R7         │
+│  - Private Stack Pointer │   - Private Stack Pointer     │
+└──────────────────────────┴───────────────────────────────┘
+```"""
+
+        # 4. DATA STRUCTURES
+        if ("data structure" in q_lower and "what is" in q_lower) or ("explain data structures" in q_lower):
+            self.last_identified_topic = "Data Structures in Computer Science"
+            return """### Data Structures in Computer Science
+
+A **Data Structure** is a specialized format for organizing, storing, managing, and retrieving data efficiently within computer memory, enabling optimized algorithmic operations.
+
+---
+
+### Classification Hierarchy
+
+```
+                      DATA STRUCTURES
+                             │
+            ┌────────────────┴────────────────┐
+            ▼                                 ▼
+    LINEAR STRUCTURES                NON-LINEAR STRUCTURES
+    (Sequential elements)            (Hierarchical / Multi-level)
+            │                                 │
+     ├── Arrays                       ├── Trees (BST, AVL, Red-Black)
+     ├── Linked Lists                 ├── Graphs (Directed, Undirected)
+     ├── Stacks (LIFO)                └── Heaps (Min-Heap, Max-Heap)
+     └── Queues (FIFO)
+```
+
+---
+
+### Core Data Structures & Asymptotic Complexity Matrix
+
+| Data Structure | Access Time | Search Time | Insertion Time | Deletion Time | Typical Real-World Application |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Array** | $O(1)$ | $O(n)$ | $O(n)$ | $O(n)$ | Lookup tables, image pixel buffers |
+| **Singly Linked List** | $O(n)$ | $O(n)$ | $O(1)$ (at head) | $O(1)$ (at head) | Dynamic memory allocation, playlists |
+| **Stack (LIFO)** | $O(n)$ | $O(n)$ | $O(1)$ (push) | $O(1)$ (pop) | Function call stack, undo operations |
+| **Queue (FIFO)** | $O(n)$ | $O(n)$ | $O(1)$ (enqueue) | $O(1)$ (dequeue) | CPU task scheduling, print queues |
+| **Binary Search Tree (BST)** | $O(\\log n)$ | $O(\\log n)$ | $O(\\log n)$ | $O(\\log n)$ | Dynamic sorted indexing |
+| **Hash Table** | $O(1)$ avg | $O(1)$ avg | $O(1)$ avg | $O(1)$ avg | Database indexing, symbol tables |
+| **Graph** | $O(V+E)$ | $O(V+E)$ (BFS/DFS) | $O(1)$ | $O(V+E)$ | Social networks, shortest-path routing |"""
+
+        # 5. TCP vs UDP Comparison
         if ("tcp" in q_lower and "udp" in q_lower) or ("difference between tcp and udp" in q_lower):
             self.last_identified_topic = "TCP and UDP Protocols"
             return """### Difference Between TCP and UDP (Transport Layer Protocols)
@@ -564,14 +734,9 @@ Client  ──────────────── ACK ──────�
 
 UDP Datagram Stream:
 Client  ── [Datagram 1] ── [Datagram 2] ───>  Server (Direct Transmission)
-```
+```"""
 
----
-
-### University Examination Summary
-In examinations, emphasize that TCP trades throughput for absolute data integrity, while UDP trades reliability for real-time speed."""
-
-        # 2. Photosynthesis
+        # 6. PHOTOSYNTHESIS
         if "photosynthesis" in q_lower:
             self.last_identified_topic = "Photosynthesis"
             return """### Photosynthesis in Biological Sciences
@@ -605,16 +770,9 @@ $$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow[\\text{Chlorophyll}]{\\tex
 │    Carbon Fixation via RuBisCO: CO2 + RuBP -> 3-PGA         │
 │    End Product: Glyceraldehyde-3-Phosphate (G3P) -> Glucose │
 └─────────────────────────────────────────────────────────────┘
-```
+```"""
 
----
-
-### Key Regulatory Factors
-1. **Light Intensity & Wavelength:** Absorbed primarily by Chlorophyll $a$ & $b$ at red (660 nm) and blue (430 nm) spectra.
-2. **Carbon Dioxide Concentration:** Acts as the primary rate-limiting substrate at standard ambient light.
-3. **Temperature:** Governed by enzyme kinetics (RuBisCO denatures above 40°C)."""
-
-        # 3. Newton's Second Law
+        # 7. NEWTON'S SECOND LAW
         if "newton" in q_lower and ("second" in q_lower or "2nd" in q_lower):
             self.last_identified_topic = "Newton's Second Law of Motion"
             return """### Newton's Second Law of Motion (Classical Mechanics)
@@ -688,12 +846,15 @@ In academic studies and industrial applications, **{topic}** offers significant 
 When answering questions on the advantages of **{topic}**, pair each point with a concrete real-world application or benchmark comparison."""
 
         # Check for Acronyms (MCA, BCA, BTech, SQL, DBMS, API, etc.)
-        tokens = re.sub(r'[^a-z0-9]', ' ', q_lower).split()
-        for t in tokens:
-            acronym_info = self._get_acronym_info(t)
-            if acronym_info:
-                self.last_identified_topic = acronym_info['title']
-                return f"""### Full Form & Academic Overview: {t.upper()}
+        # Only trigger if query is an acronym query (asks for full form, meaning, or query is 1-3 words)
+        is_acronym_intent = any(w in q_lower for w in ["full form", "full from", "stands for", "meaning of", "what does"]) or len(tokens) <= 3
+        if is_acronym_intent:
+            tokens = re.sub(r'[^a-z0-9]', ' ', q_lower).split()
+            for t in tokens:
+                acronym_info = self._get_acronym_info(t)
+                if acronym_info:
+                    self.last_identified_topic = acronym_info['title']
+                    return f"""### Full Form & Academic Overview: {t.upper()}
 
 **{t.upper()}** stands for **{acronym_info['fullForm']}**.
 
