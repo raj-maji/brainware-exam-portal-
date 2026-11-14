@@ -1,4 +1,7 @@
-# Brainware Academic AI - Python Backend Dependencies
+# Brainware Academic AI - Python Backend & Machine Learning Dependencies
 flask>=2.0.0
 requests>=2.25.0
 python-dotenv>=0.19.0
+numpy>=1.20.0
+scipy>=1.7.0
+openai>=1.0.0
