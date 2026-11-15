@@ -1,18 +1,18 @@
 """
 Brainware Academic AI - Enterprise Universal Educational Backend Server (Python Implementation)
 File: server.py
-Version: 5.2.0 - Powered by DynamicAcademicAIModel & OpenAI-Compatible REST Architecture
+Version: 6.0.0 - Powered by DynamicAcademicAIModel (Gemini & OpenAI Neural Engines)
 
 Architecture:
-1. DynamicAcademicAIModel (academic_model.py): Pure Python AI model implementing intent analysis,
-   NumPy & SciPy Vector RAG retrieval, OpenAI GPT & Gemini neural gateways, and exam formatting.
+1. DynamicAcademicAIModel (academic_model.py): Pure Python AI engine implementing universal
+   system instruction, Google Gemini & OpenAI gateways, real-time web search, and vector RAG.
 2. Endpoints:
-   - POST /api/chat: Native web portal answering endpoint.
-   - POST /v1/chat/completions: OpenAI-compatible Chat Completions API.
+   - POST /api/chat: Native web portal chat endpoint with document ingestion support.
+   - POST /v1/chat/completions: Standard OpenAI Chat Completions API.
    - GET /v1/models: OpenAI-compatible model catalog.
-   - GET /api/health: Service status and configured neural engines.
+   - GET /api/health: Real-time health check showing active neural gateways.
    - GET /api/config: Public configuration metadata.
-   - GET /: Serves index.html and all static assets (PDFs, JS, CSS).
+   - GET /: Serves index.html and all static assets.
 3. Thread-safe Token-Bucket Rate Limiter (60 req/min per IP).
 4. CORS-enabled with Access-Control-Allow-Origin: *.
 """
@@ -56,7 +56,6 @@ from academic_model import DynamicAcademicAIModel, AcademicAIModel
 # =============================================================================
 PORT = int(os.environ.get('PORT', 5000))
 HOST = os.environ.get('HOST', '0.0.0.0')
-PRIMARY_MODEL = os.environ.get('OPENAI_MODEL', os.environ.get('GEMINI_MODEL', 'academic-ml-v5'))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Initialize the Python Academic AI Model
@@ -121,30 +120,30 @@ def handle_options(_subpath: str = ''):
 def health_check():
     has_openai = ai_model.openai_gateway.is_available()
     has_gemini = ai_model.gemini_gateway.is_available()
+    active_engine = "OpenAI GPT" if has_openai else ("Google Gemini" if has_gemini else "Unconfigured (.env)")
     return jsonify({
         "status": "healthy",
-        "service": "Brainware Academic AI Worldwide Backend (Python)",
-        "version": "5.2.0",
+        "service": "Brainware Academic AI Universal Backend (Python)",
+        "version": "6.0.0",
         "runtime": f"Python {sys.version.split()[0]}",
-        "modelEngine": "DynamicAcademicAIModel (Python Core Engine)",
-        "activeEngines": {
+        "modelEngine": "DynamicAcademicAIModel",
+        "activeEngine": active_engine,
+        "activeGateways": {
             "openai_sdk": has_openai,
             "gemini_neural": has_gemini,
-            "vector_rag": ai_model.rag_model.matrix is not None,
-            "semantic_ml": True
+            "vector_rag": ai_model.rag_model.matrix is not None
         },
-        "primaryModel": PRIMARY_MODEL,
         "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     })
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
+    has_key = ai_model.openai_gateway.is_available() or ai_model.gemini_gateway.is_available()
     return jsonify({
         "serviceName": "Brainware Academic AI (Python Edition)",
-        "modelEngine": "DynamicAcademicAIModel",
-        "primaryModel": PRIMARY_MODEL,
+        "modelEngine": "DynamicAcademicAIModel (Gemini & OpenAI)",
         "rateLimitWindow": "60 requests/minute",
-        "hasServerKey": ai_model.openai_gateway.is_available() or ai_model.gemini_gateway.is_available()
+        "hasServerKey": has_key
     })
 
 # =============================================================================
@@ -197,10 +196,12 @@ def list_openai_models():
     return jsonify({
         "object": "list",
         "data": [
+            {"id": "gemini-1.5-flash", "object": "model", "owned_by": "google"},
+            {"id": "gemini-2.0-flash-exp", "object": "model", "owned_by": "google"},
+            {"id": "gemini-1.5-pro", "object": "model", "owned_by": "google"},
             {"id": "gpt-4o-mini", "object": "model", "owned_by": "openai"},
             {"id": "gpt-4o", "object": "model", "owned_by": "openai"},
-            {"id": "gemini-1.5-flash", "object": "model", "owned_by": "google"},
-            {"id": "brainware-academic-ml-v5", "object": "model", "owned_by": "brainware-university"}
+            {"id": "brainware-academic-ai-v6", "object": "model", "owned_by": "brainware-university"}
         ]
     })
 
@@ -234,7 +235,6 @@ def chat_endpoint():
         }), 400
 
     try:
-        # Delegate inference to the Python Dynamic Academic AI Model
         response_data = ai_model.generate_exam_response(
             query=query,
             history=history,
@@ -268,16 +268,16 @@ if __name__ == '__main__':
     has_openai = ai_model.openai_gateway.is_available()
     has_gemini = ai_model.gemini_gateway.is_available()
 
-    print("=" * 64)
-    print("  Brainware Academic AI - Python Enterprise Server Running")
+    print("=" * 68)
+    print("  Brainware Academic AI - Python Enterprise Server Running (v6.0.0)")
     print(f"  URL:              http://localhost:{PORT}")
     print(f"  Health Check:     http://localhost:{PORT}/api/health")
     print(f"  Web Chat API:     http://localhost:{PORT}/api/chat (POST)")
-    print(f"  OpenAI Standards: http://localhost:{PORT}/v1/chat/completions (POST)")
-    print(f"  AI Model:         DynamicAcademicAIModel (Python Core Engine)")
-    print(f"  OpenAI Gateway:   {'Active ✓ (' + ai_model.openai_gateway.model + ')' if has_openai else 'Available with OPENAI_API_KEY'}")
-    print(f"  Gemini Gateway:   {'Active ✓' if has_gemini else 'Available with GEMINI_API_KEY'}")
-    print(f"  Vector RAG Engine:Active ✓ (1,254 Indexed University Solutions)")
-    print(f"  Semantic ML:      Active ✓ (Dynamic Exam Synthesizer)")
-    print("=" * 64)
+    print(f"  OpenAI API:       http://localhost:{PORT}/v1/chat/completions (POST)")
+    print(f"  AI Model:         DynamicAcademicAIModel (General-Purpose LLM Engine)")
+    print(f"  OpenAI Gateway:   {'Active ✓ (' + ai_model.openai_gateway.model + ')' if has_openai else 'Available with OPENAI_API_KEY in .env'}")
+    print(f"  Gemini Gateway:   {'Active ✓ (' + ai_model.gemini_gateway.primary_model + ')' if has_gemini else 'Available with GEMINI_API_KEY in .env'}")
+    print(f"  Vector RAG:       Active ✓ (1,254 Indexed University Solutions)")
+    print(f"  Live Web Search:  Active ✓ (DuckDuckGo & Encyclopedic Reference)")
+    print("=" * 68)
     app.run(host=HOST, port=PORT, threaded=True)
