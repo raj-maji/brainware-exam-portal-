@@ -1,16 +1,17 @@
 """
-Brainware Academic AI - Enterprise Universal Educational Backend Server (Python Implementation)
+Brainware Academic AI - Enterprise Universal Educational Backend Server (Python & Machine Learning)
 File: server.py
-Version: 6.0.0 - Powered by DynamicAcademicAIModel (Gemini & OpenAI Neural Engines)
+Version: 7.0.0 - Powered by DynamicAcademicAIModel (Python Scikit-Learn ML & LLM Architecture)
 
 Architecture:
-1. DynamicAcademicAIModel (academic_model.py): Pure Python AI engine implementing universal
-   system instruction, Google Gemini & OpenAI gateways, real-time web search, and vector RAG.
+1. DynamicAcademicAIModel (academic_model.py): 100% Python AI engine implementing universal
+   educational instruction, Scikit-Learn NLP Machine Learning pipeline, Google Gemini & OpenAI gateways,
+   NumPy TF-IDF vector RAG, and autonomous dynamic exam synthesis.
 2. Endpoints:
-   - POST /api/chat: Native web portal chat endpoint with document ingestion support.
+   - POST /api/chat: Web portal chat endpoint with document ingestion support.
    - POST /v1/chat/completions: Standard OpenAI Chat Completions API.
    - GET /v1/models: OpenAI-compatible model catalog.
-   - GET /api/health: Real-time health check showing active neural gateways.
+   - GET /api/health: Real-time health check showing active Machine Learning engine & neural gateways.
    - GET /api/config: Public configuration metadata.
    - GET /: Serves index.html and all static assets.
 3. Thread-safe Token-Bucket Rate Limiter (60 req/min per IP).
@@ -120,18 +121,19 @@ def handle_options(_subpath: str = ''):
 def health_check():
     has_openai = ai_model.openai_gateway.is_available()
     has_gemini = ai_model.gemini_gateway.is_available()
-    active_engine = "OpenAI GPT" if has_openai else ("Google Gemini" if has_gemini else "Unconfigured (.env)")
+    active_engine = "OpenAI GPT" if has_openai else ("Google Gemini" if has_gemini else "Python Machine Learning (Scikit-Learn)")
     return jsonify({
         "status": "healthy",
-        "service": "Brainware Academic AI Universal Backend (Python)",
-        "version": "6.0.0",
+        "service": "Brainware Academic AI Universal Backend (Python & Machine Learning)",
+        "version": "7.0.0",
         "runtime": f"Python {sys.version.split()[0]}",
         "modelEngine": "DynamicAcademicAIModel",
         "activeEngine": active_engine,
         "activeGateways": {
+            "sklearn_ml": hasattr(ai_model, 'ml_classifier') and ai_model.ml_classifier.intent_pipeline is not None,
             "openai_sdk": has_openai,
             "gemini_neural": has_gemini,
-            "vector_rag": ai_model.rag_model.matrix is not None
+            "vector_rag": ai_model.rag_model.tfidf_matrix is not None
         },
         "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     })
@@ -140,8 +142,8 @@ def health_check():
 def get_config():
     has_key = ai_model.openai_gateway.is_available() or ai_model.gemini_gateway.is_available()
     return jsonify({
-        "serviceName": "Brainware Academic AI (Python Edition)",
-        "modelEngine": "DynamicAcademicAIModel (Gemini & OpenAI)",
+        "serviceName": "Brainware Academic AI (Python & ML Edition)",
+        "modelEngine": "DynamicAcademicAIModel (Scikit-Learn ML & LLM)",
         "rateLimitWindow": "60 requests/minute",
         "hasServerKey": has_key
     })

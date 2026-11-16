@@ -1,43 +1,34 @@
 /**
- * Brainware Academic AI - Enterprise Universal Educational Frontend Engine
- * File: ai_tutor_engine.js
- * Version: 6.0.0 - Fully Integrated with Python LLM Backend (/api/chat)
+ * Brainware Academic AI - Clean Frontend UI Controller
+ * File: chat_ui.js
+ * Version: 7.0.0 - Pure UI Client (Zero AI logic in JavaScript)
  * 
- * Pipeline:
- * 1. Smart Backend Discovery (/api/chat and http://localhost:5000/api/chat)
- * 2. Multi-Format Document Ingestion (PDF.js, Mammoth Word, SheetJS Excel/CSV, JSZip PowerPoint, Image Base64)
- * 3. Primary Intelligence: Server-Side Python LLM Gateway (Gemini 1.5/2.0 Flash & OpenAI GPT-4o-mini)
- * 4. Multi-Turn Conversation Memory
- * 5. Full KaTeX LaTeX Math, Markdown, Syntax Highlighted Code Blocks, & Comparison Tables
- * 6. Interactive Public Controller (window.BrainwareAITutor)
+ * Responsibilities:
+ * - DOM event handling (Input, Submit, File Attachment, Drag-and-Drop)
+ * - Markdown & KaTeX LaTeX formatting
+ * - Speech synthesis & Clipboard helpers
+ * - Pure asynchronous API client: delegates 100% of intelligence to Python Machine Learning Backend (/api/chat)
  */
 
 (function () {
   'use strict';
 
-  // --- STATE MANAGEMENT ---
+  // --- UI CLIENT STATE ---
   let isGenerating = false;
-  let chatHistory = []; // Array of { role: 'user' | 'assistant' | 'model', text: string }
+  let chatHistory = []; // { role: 'user' | 'assistant' | 'model', text: string }
   let attachedFileData = null;
-  let activeBackendUrl = null;
+  let activeBackendUrl = '/api/chat';
 
   // =========================================================================
-  // 1. SMART BACKEND DISCOVERY
+  // 1. BACKEND DISCOVERY
   // =========================================================================
   async function resolveBackendEndpoint() {
-    if (activeBackendUrl) return activeBackendUrl;
-
-    const candidates = [
-      '/api/chat',
-      'http://localhost:5000/api/chat',
-      'http://127.0.0.1:5000/api/chat'
-    ];
-
+    const candidates = ['/api/chat', 'http://localhost:5000/api/chat', 'http://127.0.0.1:5000/api/chat'];
     for (const cand of candidates) {
       try {
         const testUrl = cand.replace(/\/chat$/, '/health');
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 1800);
+        const tid = setTimeout(() => ctrl.abort(), 1500);
         const res = await fetch(testUrl, { method: 'GET', signal: ctrl.signal });
         clearTimeout(tid);
         if (res.ok) {
@@ -46,13 +37,11 @@
         }
       } catch (e) {}
     }
-
-    activeBackendUrl = '/api/chat';
     return activeBackendUrl;
   }
 
   // =========================================================================
-  // 2. DOCUMENT INGESTION (PDF, Word, Excel, PPTX, Code, Images)
+  // 2. DOCUMENT ATTACHMENT HANDLER (PDF, Word, Excel, PPTX, Code, Images)
   // =========================================================================
   async function parseUploadedDocument(file) {
     const fileName = file.name || 'uploaded_document';
@@ -170,15 +159,14 @@
   }
 
   // =========================================================================
-  // 3. SECURE BACKEND API INTEGRATION (/api/chat)
+  // 3. PURE HTTP CLIENT CALL TO PYTHON BACKEND (/api/chat)
   // =========================================================================
-  async function queryLLMEngine(query, history = [], fileSnapshot = null) {
+  async function callPythonAcademicBackend(query, history = [], fileSnapshot = null) {
     const endpoint = await resolveBackendEndpoint();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
-
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,74 +184,23 @@
         if (data && data.success && data.text) {
           return {
             text: data.text,
-            source: data.source || 'backend-llm',
-            model: data.model || 'Universal Academic AI'
+            source: data.source || 'python-ml-model',
+            model: data.model || 'Brainware Academic AI'
           };
         } else if (data && data.error) {
           throw new Error(data.error);
         }
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${response.status} from backend`);
       }
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${response.status} from backend`);
     } catch (err) {
-      console.warn('Backend LLM query warning:', err);
+      clearTimeout(timeout);
       throw err;
     }
   }
 
   // =========================================================================
-  // 4. MASTER PUBLIC ANSWER PIPELINE
-  // =========================================================================
-  async function generateAcademicResponse(query, fileSnapshot = null) {
-    const qClean = query.trim();
-    const qLower = qClean.toLowerCase();
-
-    // 1. Conversational Greetings
-    const greetings = {
-      'hi': 'Hello! I am Brainware Academic AI, your worldwide educational intelligence. I can assist you across Computer Science, Mathematics, Sciences, Engineering, Medicine, Business, Humanities, and Languages. How can I assist with your studies today?',
-      'hello': 'Greetings! What academic subject, problem, or concept would you like to explore today?',
-      'hey': 'Hello! What educational question or calculation can I help you solve today?'
-    };
-    if (greetings[qLower]) {
-      return { text: greetings[qLower], source: 'conversational', model: 'Brainware AI' };
-    }
-
-    // 2. Delegate directly to the Python Backend LLM Engine
-    try {
-      const llmResult = await queryLLMEngine(query, chatHistory, fileSnapshot);
-      if (llmResult && llmResult.text) {
-        return llmResult;
-      }
-    } catch (err) {
-      return {
-        text: `### System Notice: Backend Service Error
-
-Unable to process inquiry through the Python Academic AI engine: **${err.message || 'Connection failure'}**.
-
----
-
-### Troubleshooting Steps:
-1. Ensure the Python backend server is actively running:
-   \`\`\`bash
-   python server.py
-   \`\`\`
-2. Verify that your \`GEMINI_API_KEY\` or \`OPENAI_API_KEY\` is configured in your server \`.env\` file.
-3. Check that port 5000 is open and accessible.`,
-        source: 'system-error',
-        model: 'Server Diagnostic'
-      };
-    }
-
-    return {
-      text: "### System Notice\n\nNo response was generated by the backend model. Please check server logs.",
-      source: 'system-error',
-      model: 'Server Diagnostic'
-    };
-  }
-
-  // =========================================================================
-  // 5. MARKDOWN & KATEX LATEX RENDERER
+  // 4. MARKDOWN & KATEX LATEX RENDERING
   // =========================================================================
   function renderMarkdown(md) {
     if (!md) return '';
@@ -325,7 +262,7 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
   }
 
   // =========================================================================
-  // 6. UI MESSAGING & CHAT RENDERING
+  // 5. DOM CHAT RENDERING
   // =========================================================================
   function appendMessageToUI(role, rawContent, source = null, model = null) {
     const thread = document.getElementById('aiChatThread');
@@ -339,8 +276,8 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
       sourceBadge = `<span class="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-medium ml-2"><i data-lucide="sparkles" class="w-3 h-3"></i> Google Gemini</span>`;
     } else if (source === 'openai-neural') {
       sourceBadge = `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium ml-2"><i data-lucide="zap" class="w-3 h-3"></i> OpenAI</span>`;
-    } else if (source === 'backend-llm') {
-      sourceBadge = `<span class="inline-flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-medium ml-2"><i data-lucide="cpu" class="w-3 h-3"></i> Neural LLM</span>`;
+    } else if (source === 'python-ml-model' || source === 'machine-learning') {
+      sourceBadge = `<span class="inline-flex items-center gap-1 text-[10px] text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-medium ml-2"><i data-lucide="cpu" class="w-3 h-3"></i> Python ML</span>`;
     }
 
     if (thread) {
@@ -401,7 +338,7 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
       popupThread.scrollTop = popupThread.scrollHeight;
     }
 
-    // Auto-render KaTeX math if loaded
+    // KaTeX LaTeX math auto-render
     if (typeof renderMathInElement !== 'undefined') {
       try {
         const lastEl = thread ? thread.lastElementChild : null;
@@ -436,7 +373,7 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-2">
         <span class="inline-block w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
-        <span class="font-medium text-slate-700">Synthesizing universal educational response...</span>
+        <span class="font-medium text-slate-700">Synthesizing response with Python Machine Learning Model...</span>
       </div>
     `;
     thread.appendChild(loader);
@@ -456,7 +393,7 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
   }
 
   // =========================================================================
-  // 7. PUBLIC CONTROLLER API: window.BrainwareAITutor
+  // 6. PUBLIC UI CONTROLLER (window.BrainwareAITutor)
   // =========================================================================
   window.BrainwareAITutor = {
     handleFileUpload: async function (event, isPopup = false) {
@@ -533,16 +470,17 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
       showLoadingIndicator(isPopup);
 
       try {
-        const response = await generateAcademicResponse(query, fileSnapshot);
+        // Pure delegation to the Python backend Machine Learning model
+        const response = await callPythonAcademicBackend(query, chatHistory, fileSnapshot);
         removeLoadingIndicator(isPopup);
 
         appendMessageToUI('model', response.text, response.source, response.model);
         chatHistory.push({ role: 'model', text: response.text });
 
       } catch (err) {
-        console.error('AI Answering Error:', err);
+        console.error('AI Backend Error:', err);
         removeLoadingIndicator(isPopup);
-        appendMessageToUI('model', `### System Notice\n\nAn unexpected error occurred while communicating with the Python AI engine: *${err.message || 'Service Unavailable'}*. Please verify server connectivity or try again.`);
+        appendMessageToUI('model', `### System Notice: Python Backend Connection Error\n\nUnable to reach Python Machine Learning engine: **${err.message || 'Service Unavailable'}**.\n\nPlease ensure \`python server.py\` is actively running on port 5000.`);
       } finally {
         isGenerating = false;
         if (sendBtn) sendBtn.disabled = false;
@@ -605,7 +543,7 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
             </div>
             <div class="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 shadow-sm text-xs sm:text-sm text-slate-800 leading-relaxed max-w-xl">
               <p class="font-bold text-slate-900 mb-1">Hello! I am Brainware Academic AI.</p>
-              <p class="text-xs text-slate-600">Conversation cleared. How can I help you today?</p>
+              <p class="text-xs text-slate-600">Powered by Python & Machine Learning. How can I help you today?</p>
             </div>
           </div>
         `;
@@ -617,7 +555,7 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
             <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">AI</div>
             <div class="bg-white border border-slate-200 rounded-xl rounded-tl-sm p-2.5 text-xs text-slate-800 leading-relaxed shadow-sm">
               <p class="font-bold text-slate-900">How can I help you?</p>
-              <p class="text-[11px] text-slate-600">Ask any question across all academic subjects.</p>
+              <p class="text-[11px] text-slate-600">Ask any educational question across all academic subjects.</p>
             </div>
           </div>
         `;
@@ -647,25 +585,16 @@ Unable to process inquiry through the Python Academic AI engine: **${err.message
       }
     },
 
-    generateAcademicResponse: generateAcademicResponse
+    updateStatusBadge: function () {
+      // Status badge updated from server health if present
+    }
   };
 
-  function stripObsoleteButtons() {
-    try {
-      const obsolete = document.querySelectorAll('button[onclick*="configureApiKey"], button[onclick*="configureBackendUrl"]');
-      obsolete.forEach(b => b.remove());
-    } catch (e) {}
-  }
-
   document.addEventListener('DOMContentLoaded', () => {
-    stripObsoleteButtons();
     resolveBackendEndpoint();
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       window.lucide.createIcons();
     }
-    setTimeout(stripObsoleteButtons, 50);
-    setTimeout(stripObsoleteButtons, 300);
-    setTimeout(stripObsoleteButtons, 1000);
   });
 
 })();
