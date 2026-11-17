@@ -43,7 +43,7 @@
     }
   </style>
   <script src="qset_datasets.js"></script>
-  <script src="portal_qa_index.js"></script>
+  <script src="portal_qa_index.js?v=20261118_v7_3_fix"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
@@ -54,7 +54,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="chat_ui.js?v=20261116_pure_ui"></script>
+  <script src="chat_ui.js?v=20261118_v7_3_fix"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
 
@@ -241,18 +241,23 @@
             </span>
           </div>
 
-          <form onsubmit="event.preventDefault(); BrainwareAITutor.askQuestion();" class="flex items-center gap-2">
+          <form onsubmit="event.preventDefault(); if(window.BrainwareAITutor) window.BrainwareAITutor.askQuestion();" class="flex items-center gap-2 relative z-10">
             <!-- Hidden File Input supporting all major formats -->
             <!-- Native Accessible File Input Label (100% Reliable Click & Tap on all Desktop & Mobile Browsers) -->
-            <input type="file" id="aiFileInput" class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.pptx,.ppt,.txt,.md,.json,.py,.java,.c,.cpp,.sql,.html,.css,.js,.png,.jpg,.jpeg,.webp" onchange="BrainwareAITutor.handleFileUpload(event)">
+            <input type="file" id="aiFileInput" class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.pptx,.ppt,.txt,.md,.json,.py,.java,.c,.cpp,.sql,.html,.css,.js,.png,.jpg,.jpeg,.webp" onchange="if(window.BrainwareAITutor) window.BrainwareAITutor.handleFileUpload(event)">
             <label for="aiFileInput" class="cursor-pointer p-3 text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-2xl border border-slate-200 transition flex items-center justify-center flex-shrink-0 min-w-[44px] min-h-[44px] select-none shadow-sm hover:shadow" title="Attach Document (PDF, Word, Excel, PPT, Code, or Image)">
               <i data-lucide="paperclip" class="w-4 h-4 pointer-events-none"></i>
             </label>
 
-            <input type="text" id="aiTutorInput" placeholder="Ask any question, or attach a Word, Excel, PPT, or PDF file..." class="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-50 focus:bg-white text-xs sm:text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition font-medium text-slate-900">
+            <input type="text" id="aiTutorInput"
+              onkeydown="if(event.key==='Enter'||event.keyCode===13){event.preventDefault();if(window.BrainwareAITutor)window.BrainwareAITutor.askQuestion();}"
+              placeholder="Ask any question, or attach a Word, Excel, PPT, or PDF file..."
+              class="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-50 focus:bg-white text-xs sm:text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition font-medium text-slate-900">
             
-            <button type="submit" id="aiSendBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold p-3 rounded-2xl text-xs sm:text-sm shadow-md transition flex items-center justify-center flex-shrink-0 min-w-[44px] min-h-[44px]">
-              <i data-lucide="send" class="w-4 h-4"></i>
+            <button type="button" id="aiSendBtn"
+              onclick="if(window.BrainwareAITutor) window.BrainwareAITutor.askQuestion();"
+              class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white font-bold p-3 rounded-2xl text-xs sm:text-sm shadow-md transition flex items-center justify-center flex-shrink-0 min-w-[44px] min-h-[44px] cursor-pointer">
+              <i data-lucide="send" class="w-4 h-4 pointer-events-none"></i>
             </button>
           </form>
         </div>
@@ -10079,9 +10084,30 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
       if (vivaSec) vivaSec.classList.add('hidden');
       if (aiSec) aiSec.classList.add('hidden');
 
+      // Manage Floating Messenger Widget visibility (hide on AI Tutor tab so it NEVER covers send button or input)
+      const fbWidget = document.getElementById('fbChatWidget');
+      if (fbWidget) {
+        if (tab === 'AI_TUTOR') {
+          fbWidget.classList.add('hidden');
+          fbWidget.style.display = 'none';
+        } else {
+          fbWidget.classList.remove('hidden');
+          fbWidget.style.display = 'flex';
+        }
+      }
+
       if (tab === 'AI_TUTOR') {
         if (aiSec) aiSec.classList.remove('hidden');
-        if (window.BrainwareAITutor) window.BrainwareAITutor.updateStatusBadge();
+        if (window.BrainwareAITutor && typeof window.BrainwareAITutor.closeChatPopup === 'function') {
+          window.BrainwareAITutor.closeChatPopup();
+        }
+        if (window.BrainwareAITutor && typeof window.BrainwareAITutor.updateStatusBadge === 'function') {
+          window.BrainwareAITutor.updateStatusBadge();
+        }
+        setTimeout(() => {
+          const input = document.getElementById('aiTutorInput');
+          if (input) input.focus();
+        }, 150);
       } else if (tab === 'QUESTION_SET') {
         if (qsetSec) qsetSec.classList.remove('hidden');
       } else if (tab === 'YIELD') {
@@ -10394,7 +10420,7 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
 </script>
 
     <!-- FACEBOOK / MESSENGER STYLE POPUP CHATBOX -->
-  <div id="fbChatWidget" class="fixed bottom-6 right-6 z-50 no-print flex flex-col items-end">
+  <div id="fbChatWidget" class="hidden fixed bottom-6 right-6 z-50 no-print flex flex-col items-end" style="display: none;">
     
     <!-- POPUP WINDOW -->
     <div id="fbChatPopup" class="hidden mb-3 w-[350px] sm:w-[380px] h-[500px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-fade-in">
@@ -10441,14 +10467,19 @@ const papersData = window.papersData = [{"id": "MCA37505", "programme": "Master 
             <button type="button" onclick="BrainwareAITutor.removeAttachedFile(true)" class="hover:text-red-600 ml-1 font-black">&times;</button>
           </span>
         </div>
-        <form onsubmit="event.preventDefault(); BrainwareAITutor.askQuestion(null, true);" class="flex items-center gap-1.5">
-          <input type="file" id="fbFileInput" class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.pptx,.ppt,.txt,.md,.json,.py,.java,.c,.cpp,.sql,.html,.css,.js,.png,.jpg,.jpeg,.webp" onchange="BrainwareAITutor.handleFileUpload(event, true)">
+        <form onsubmit="event.preventDefault(); if(window.BrainwareAITutor) window.BrainwareAITutor.askQuestion(null, true);" class="flex items-center gap-1.5">
+          <input type="file" id="fbFileInput" class="hidden" accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.pptx,.ppt,.txt,.md,.json,.py,.java,.c,.cpp,.sql,.html,.css,.js,.png,.jpg,.jpeg,.webp" onchange="if(window.BrainwareAITutor) window.BrainwareAITutor.handleFileUpload(event, true)">
           <label for="fbFileInput" class="cursor-pointer p-2 text-slate-500 hover:text-blue-600 bg-slate-100 rounded-xl text-xs transition flex items-center justify-center select-none" title="Attach Document, Excel, PPT, PDF, or Image">
             <i data-lucide="paperclip" class="w-3.5 h-3.5 pointer-events-none"></i>
           </label>
-          <input type="text" id="fbChatInput" placeholder="Ask a question..." class="flex-1 px-3 py-2 bg-slate-100 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
-          <button type="submit" id="fbSendBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-2 rounded-xl text-xs transition flex items-center justify-center min-w-[34px] min-h-[34px]">
-            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <input type="text" id="fbChatInput"
+            onkeydown="if(event.key==='Enter'||event.keyCode===13){event.preventDefault();if(window.BrainwareAITutor)window.BrainwareAITutor.askQuestion(null, true);}"
+            placeholder="Ask a question..."
+            class="flex-1 px-3 py-2 bg-slate-100 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <button type="button" id="fbSendBtn"
+            onclick="if(window.BrainwareAITutor) window.BrainwareAITutor.askQuestion(null, true);"
+            class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white p-2 rounded-xl text-xs transition flex items-center justify-center min-w-[34px] min-h-[34px] cursor-pointer">
+            <i data-lucide="send" class="w-3.5 h-3.5 pointer-events-none"></i>
           </button>
         </form>
       </div>

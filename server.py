@@ -263,6 +263,15 @@ def serve_static(path: str):
         return send_from_directory(BASE_DIR, path)
     return send_from_directory(BASE_DIR, 'index.html')
 
+@app.after_request
+def add_cache_control_headers(response):
+    # Disable aggressive mobile browser caching for dynamic portal assets
+    if request.path.endswith(('.html', '.js', '.json')):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 # =============================================================================
 # SERVER ENTRY POINT
 # =============================================================================

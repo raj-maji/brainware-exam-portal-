@@ -16,6 +16,7 @@
 
   // --- UI CLIENT STATE ---
   let isGenerating = false;
+  let generationStartTime = 0;
   let chatHistory = []; // { role: 'user' | 'assistant' | 'model', text: string }
   let attachedFileData = null;
   let activeBackendUrl = '/api/chat';
@@ -701,7 +702,13 @@
   function removeLoadingIndicator(isPopup = false) {
     const loaderId = isPopup ? 'fbAILoader' : 'mainAILoader';
     const loader = document.getElementById(loaderId);
-    if (loader) loader.remove();
+    if (loader) {
+      if (typeof loader.remove === 'function') {
+        loader.remove();
+      } else if (loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+    }
   }
 
   function escapeHtml(str) {
@@ -757,7 +764,15 @@
     },
 
     askQuestion: async function (customQuery = null, isPopup = false) {
-      if (isGenerating) return;
+      if (isGenerating) {
+        if (Date.now() - generationStartTime > 12000) {
+          console.warn('Recovering from stalled generation.');
+          isGenerating = false;
+        } else {
+          console.warn('Generation in progress, please wait.');
+          return;
+        }
+      }
 
       const inputId = isPopup ? 'fbChatInput' : 'aiTutorInput';
       const input = document.getElementById(inputId);
@@ -767,7 +782,13 @@
         query = `Analyze the attached educational document "${attachedFileData.name}" (${attachedFileData.type}) in detail. Provide an executive summary, list core formulas, and answer any embedded questions.`;
       }
 
-      if (!query || !query.trim()) return;
+      if (!query || !query.trim()) {
+        if (input && typeof input.focus === 'function') input.focus();
+        return;
+      }
+
+      isGenerating = true;
+      generationStartTime = Date.now();
 
       if (input && !customQuery) {
         input.value = '';
@@ -779,9 +800,16 @@
       appendMessageToUI('user', query);
       chatHistory.push({ role: 'user', text: query });
 
-      isGenerating = true;
-      const sendBtn = document.getElementById(isPopup ? 'fbSendBtn' : 'aiSendBtn');
-      if (sendBtn) sendBtn.disabled = true;
+      const mainSend = document.getElementById('aiSendBtn');
+      const popSend = document.getElementById('fbSendBtn');
+      if (mainSend) {
+        mainSend.disabled = true;
+        mainSend.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+      if (popSend) {
+        popSend.disabled = true;
+        popSend.classList.add('opacity-50', 'cursor-not-allowed');
+      }
 
       showLoadingIndicator(isPopup);
 
@@ -811,7 +839,16 @@
         chatHistory.push({ role: 'model', text: fallback.text });
       } finally {
         isGenerating = false;
-        if (sendBtn) sendBtn.disabled = false;
+        const send1 = document.getElementById('aiSendBtn');
+        const send2 = document.getElementById('fbSendBtn');
+        if (send1) {
+          send1.disabled = false;
+          send1.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        if (send2) {
+          send2.disabled = false;
+          send2.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
       }
     },
 
@@ -1094,7 +1131,52 @@
     }
   };
 
+  function attachChatInputListeners() {
+    const mainInput = document.getElementById('aiTutorInput');
+    const mainSend = document.getElementById('aiSendBtn');
+    if (mainInput && !mainInput.dataset.listenerAttached) {
+      mainInput.dataset.listenerAttached = 'true';
+      mainInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault();
+          window.BrainwareAITutor.askQuestion();
+        }
+      });
+    }
+    if (mainSend && !mainSend.dataset.listenerAttached) {
+      mainSend.dataset.listenerAttached = 'true';
+      mainSend.addEventListener('click', function (e) {
+        e.preventDefault();
+        window.BrainwareAITutor.askQuestion();
+      });
+    }
+
+    const popupInput = document.getElementById('fbChatInput');
+    const popupSend = document.getElementById('fbSendBtn');
+    if (popupInput && !popupInput.dataset.listenerAttached) {
+      popupInput.dataset.listenerAttached = 'true';
+      popupInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault();
+          window.BrainwareAITutor.askQuestion(null, true);
+        }
+      });
+    }
+    if (popupSend && !popupSend.dataset.listenerAttached) {
+      popupSend.dataset.listenerAttached = 'true';
+      popupSend.addEventListener('click', function (e) {
+        e.preventDefault();
+        window.BrainwareAITutor.askQuestion(null, true);
+      });
+    }
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    attachChatInputListeners();
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    attachChatInputListeners();
     resolveBackendEndpoint();
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       window.lucide.createIcons();
