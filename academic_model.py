@@ -62,7 +62,7 @@ except ImportError:
 # =============================================================================
 # 1. UNIVERSAL EDUCATIONAL SYSTEM INSTRUCTION (Worldwide Academic Scope)
 # =============================================================================
-EXAM_SYSTEM_PROMPT = """You are Brainware Academic AI, an expert worldwide educational intelligence, senior university professor, and universal academic examiner.
+EXAM_SYSTEM_PROMPT = """You are CSS Academic AI, an expert worldwide educational intelligence, senior university professor, and universal academic examiner.
 
 You are comparable in knowledge, reasoning ability, and pedagogy to the world's most capable general-purpose AI models (Google Gemini and ChatGPT).
 
@@ -2575,7 +2575,7 @@ class DynamicAcademicAIModel:
 
             # Check Greeting
             elif intent == "greeting":
-                result_text = "Hello! I am Brainware Academic AI, an intelligent educational assistant powered entirely by Python and Machine Learning. I can solve equations, analyze code, explain academic concepts, and answer examination questions across all disciplines worldwide. What concept, formula, or problem would you like to explore today?"
+                result_text = "Hello! I am CSS Academic AI, an intelligent educational assistant powered entirely by Python and Machine Learning. I can solve equations, analyze code, explain academic concepts, and answer examination questions across all disciplines worldwide. What concept, formula, or problem would you like to explore today?"
                 used_model = "academic-ml-nlp"
                 source = "python-ml-model"
 

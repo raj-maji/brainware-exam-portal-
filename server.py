@@ -124,7 +124,7 @@ def health_check():
     active_engine = "OpenAI GPT" if has_openai else ("Google Gemini" if has_gemini else "Python Machine Learning (Scikit-Learn)")
     return jsonify({
         "status": "healthy",
-        "service": "Brainware Academic AI Universal Backend (Python & Machine Learning)",
+        "service": "CSS Academic AI Universal Backend (Python & Machine Learning)",
         "version": "7.0.0",
         "runtime": f"Python {sys.version.split()[0]}",
         "modelEngine": "DynamicAcademicAIModel",
@@ -142,7 +142,7 @@ def health_check():
 def get_config():
     has_key = ai_model.openai_gateway.is_available() or ai_model.gemini_gateway.is_available()
     return jsonify({
-        "serviceName": "Brainware Academic AI (Python & ML Edition)",
+        "serviceName": "CSS Academic AI (Python & ML Edition)",
         "modelEngine": "DynamicAcademicAIModel (Scikit-Learn ML & LLM)",
         "rateLimitWindow": "60 requests/minute",
         "hasServerKey": has_key
@@ -280,7 +280,7 @@ if __name__ == '__main__':
     has_gemini = ai_model.gemini_gateway.is_available()
 
     print("=" * 68)
-    print("  Brainware Academic AI - Python Enterprise Server Running (v6.0.0)")
+    print("  CSS Academic AI - Python Enterprise Server Running (v6.0.0)")
     print(f"  URL:              http://localhost:{PORT}")
     print(f"  Health Check:     http://localhost:{PORT}/api/health")
     print(f"  Web Chat API:     http://localhost:{PORT}/api/chat (POST)")

@@ -229,7 +229,7 @@
           return {
             text: data.text,
             source: data.source || 'python-ml-model',
-            model: data.model || 'Brainware Academic AI'
+            model: data.model || 'CSS Academic AI'
           };
         } else if (data && data.error) {
           throw new Error(data.error);
@@ -602,7 +602,7 @@
           </div>
           <div class="max-w-3xl bg-white border border-slate-200/90 rounded-2xl rounded-tl-sm p-4 shadow-sm text-xs sm:text-sm text-slate-800 leading-relaxed flex-1">
             <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 text-[11px] text-slate-400">
-              <span class="font-bold text-slate-700 flex items-center">Brainware Academic AI ${sourceBadge}</span>
+              <span class="font-bold text-slate-700 flex items-center">CSS Academic AI ${sourceBadge}</span>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="BrainwareAITutor.copyMessageText(this)" class="hover:text-blue-600 transition flex items-center gap-1 text-[11px] font-medium" title="Copy answer">
                   <i data-lucide="copy" class="w-3 h-3"></i> Copy
@@ -907,7 +907,7 @@
               <i data-lucide="bot" class="w-4 h-4"></i>
             </div>
             <div class="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 shadow-sm text-xs sm:text-sm text-slate-800 leading-relaxed max-w-xl">
-              <p class="font-bold text-slate-900 mb-1">Hello! I am Brainware Academic AI.</p>
+              <p class="font-bold text-slate-900 mb-1">Hello! I am CSS Academic AI.</p>
               <p class="text-xs text-slate-600">Powered by Python & Machine Learning. How can I help you today?</p>
             </div>
           </div>
@@ -965,7 +965,7 @@
           <div class="relative max-w-lg w-full bg-white rounded-3xl shadow-2xl p-6 flex flex-col overflow-hidden" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                <i data-lucide="server" class="w-5 h-5 text-blue-600"></i> AI Backend Server Settings
+                <i data-lucide="server" class="w-5 h-5 text-blue-600"></i> CSS AI Backend Server Settings
               </h3>
               <button id="closeServerModalBtn" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition" onclick="document.getElementById('serverConfigModal').classList.add('hidden')">
                 ✕
@@ -1130,6 +1130,9 @@
       }
     }
   };
+
+  // CSS AI Tutor global alias
+  window.CSSAITutor = window.BrainwareAITutor;
 
   function attachChatInputListeners() {
     const mainInput = document.getElementById('aiTutorInput');

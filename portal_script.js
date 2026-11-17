@@ -359,7 +359,7 @@
       const headerBox = document.createElement('div');
       headerBox.className = 'text-center border-b pb-6 space-y-1';
       headerBox.innerHTML = `
-        <h2 class="text-2xl font-black tracking-tight text-slate-900">BRAINWARE UNIVERSITY</h2>
+        <h2 class="text-2xl font-black tracking-tight text-slate-900">CSS</h2>
         <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">School of Computational & Applied Sciences | Department of Computational Sciences</p>
         <p class="text-xs font-semibold text-blue-700">TERM-END EXAMINATION (ODD SEMESTER) — 2026</p>
         <div class="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-2 text-left text-xs bg-slate-50 p-3 rounded-xl">
