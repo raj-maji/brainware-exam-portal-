@@ -342,20 +342,17 @@ class VectorRAGModel:
             if not self.documents:
                 return
 
-            corpus_texts = []
-            for doc in self.documents[:3000]:
-                q_text = doc.get('q', '')
-                a_text = doc.get('a', '') or doc.get('ans', '')
-                clean_a = re.sub(r'<[^>]+>', ' ', a_text)
-                corpus_texts.append(f"{q_text} {clean_a}")
+            corpus_texts = [doc.get('q', '') for doc in self.documents]
 
             if HAS_SKLEARN:
-                self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=8000, sublinear_tf=True)
+                from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+                custom_stops = list(ENGLISH_STOP_WORDS.union({'what', 'is', 'the', 'difference', 'between', 'explain', 'define', 'does', 'mean'}))
+                self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words=custom_stops, max_features=15000, sublinear_tf=True)
                 self.tfidf_matrix = self.vectorizer.fit_transform(corpus_texts)
         except Exception as e:
             print(f"Notice: Vector RAG initialization: {e}", file=sys.stderr)
 
-    def retrieve(self, query: str, top_k: int = 2, min_similarity: float = 0.55) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = 2, min_similarity: float = 0.40) -> List[Dict[str, Any]]:
         """Retrieves top-K relevant knowledge vectors using cosine similarity."""
         if not HAS_SKLEARN or self.vectorizer is None or self.tfidf_matrix is None:
             return []
@@ -611,20 +608,21 @@ class DynamicMLExamSynthesizer:
     @classmethod
     def extract_acronym_key(cls, query: str) -> Optional[str]:
         """Detects if query is specifically an acronym request (e.g. 'mca full from', 'what is MCA', 'stands for DBMS')."""
-        q_lower = query.lower()
+        q_lower = query.lower().strip()
         # If the query is a comparison or contains complex process/code/problem words, do NOT treat as simple acronym
-        if any(w in q_lower for w in ["difference between", " vs ", "compare", "replication", "process of", "working of", "write a", "program", "solve", "balance"]):
+        if any(w in q_lower for w in ["difference between", " vs ", "compare", "replication", "process of", "working of", "write a", "program", "solve", "balance", "task", "explain briefly"]):
             return None
 
         # Check for explicit full form trigger: e.g. "mca full from", "dbms full form", "what does api stand for"
         is_explicit_acronym = bool(re.search(r'\bfull\s+(?:from|form)\b|\bstands\s+for\b|\bmeaning\s+of\b', q_lower))
 
         # Check short query (e.g. "what is mca", "what is dbms", "mca", "dbms")
-        words = re.findall(r'\b[A-Za-z]{2,6}\b', query)
-        for w in words:
+        raw_words = query.strip().split()
+        tokens = re.findall(r'\b[A-Za-z0-9]+\b', query)
+        for w in tokens:
             w_up = w.upper()
             if w_up in cls.ACRONYMS:
-                if is_explicit_acronym or len(words) <= 5:
+                if is_explicit_acronym or len(raw_words) <= 4:
                     return w_up
 
         return None
@@ -1563,7 +1561,7 @@ class DynamicAcademicAIModel:
                 web_context = f"[REAL-TIME WEB RETRIEVAL CONTEXT]:\n{web_results}"
 
         # 3. Vector RAG Retrieval
-        rag_results = self.rag_model.retrieve(user_query, top_k=2, min_similarity=0.60)
+        rag_results = self.rag_model.retrieve(user_query, top_k=2, min_similarity=0.40)
         grounding_context = ""
         if rag_results:
             chunks = []
@@ -1673,13 +1671,14 @@ class DynamicAcademicAIModel:
                     used_model = "academic-ml-matrix-engine"
                     source = "python-ml-model"
 
-            # Fallback to High-Scoring RAG Syllabus Solution
-            if not result_text and rag_results:
+            # Check Verified Question Bank RAG (for university syllabus questions)
+            if not result_text and rag_results and rag_results[0].get('similarity', 0) >= 0.40:
                 best = rag_results[0]
                 clean_ans = re.sub(r'<[^>]+>', '', best.get('a') or best.get('ans') or '').strip()
-                result_text = f"### {best.get('q')}\n\n{clean_ans}"
-                used_model = "academic-ml-vector-rag"
-                source = "python-ml-model"
+                if clean_ans:
+                    result_text = f"### {best.get('q')}\n\n{clean_ans}"
+                    used_model = "academic-ml-vector-rag"
+                    source = "python-ml-model"
 
             # Fallback to Deep Encyclopedic & Scholarly Synthesis
             if not result_text:
