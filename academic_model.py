@@ -325,7 +325,7 @@ class AcademicMLClassifier:
 def html_to_exam_markdown(html_str: str) -> str:
     """
     Transforms university question bank HTML answers into structured, point-wise
-    GFM Markdown with tables, bullet lists, bold emphasis, and clean paragraph breaks.
+    GFM Markdown with tables, bullet lists, bold emphasis, diagram images, and clean paragraph breaks.
     """
     if not html_str:
         return ""
@@ -355,6 +355,19 @@ def html_to_exam_markdown(html_str: str) -> str:
         return "\n\n" + "\n".join(md_table_lines) + "\n\n"
 
     text = re.sub(r'<table[^>]*>.*?</table>', table_replacer, text, flags=re.S | re.I)
+
+    # Convert image tags into standard GFM Markdown images BEFORE stripping HTML
+    def img_replacer(match):
+        tag = match.group(0)
+        src_m = re.search(r'src=["\']([^"\']+)["\']', tag, flags=re.I)
+        alt_m = re.search(r'alt=["\']([^"\']+)["\']', tag, flags=re.I)
+        src = src_m.group(1).strip() if src_m else ""
+        alt = alt_m.group(1).strip() if alt_m else "Exam Diagram / Schematic"
+        if src:
+            return f"\n\n![{alt}]({src})\n\n"
+        return ""
+
+    text = re.sub(r'<img[^>]+>', img_replacer, text, flags=re.I)
 
     # Convert list items & paragraph bullet points into clean point-wise presentation
     text = re.sub(r'<li[^>]*>(.*?)</li>', r'\n- \1', text, flags=re.S | re.I)
@@ -2010,6 +2023,319 @@ $$ \\text{BF}(N) = \\text{Height}(\\text{Left Subtree}) - \\text{Height}(\\text{
 - **Worst-Case Search Time:** $\\mathcal{O}(\\log n)$
 - **Worst-Case Insertion Time:** $\\mathcal{O}(\\log n)$
 - **Worst-Case Deletion Time:** $\\mathcal{O}(\\log n)$"""
+
+        # Minimum Edit Distance & Levenshtein Dynamic Programming
+        if "edit distance" in q_lower or "graffe" in q_lower or "levenshtein" in q_lower:
+            return """### Minimum Edit Distance (Levenshtein Distance) & Dynamic Programming
+
+**Formal Definition:**
+**Minimum Edit Distance** is the minimum number of character editing operations (Insertions, Deletions, and Substitutions) required to transform a source string $S$ of length $m$ into a target string $T$ of length $n$.
+
+---
+
+### 1. Dynamic Programming Recurrence Formulation
+
+Let $D[i, j]$ denote the minimum edit distance between prefix $S[1..i]$ and prefix $T[1..j]$:
+
+$$D[i, j] = \\min \\begin{cases} D[i-1, j] + \\text{cost}(\\text{del}) & \\text{(Deletion from } S\\text{)} \\\\ D[i, j-1] + \\text{cost}(\\text{ins}) & \\text{(Insertion into } S\\text{)} \\\\ D[i-1, j-1] + \\text{cost}(\\text{sub}) & \\text{(Substitution / Match)} \\end{cases}$$
+
+**Standard Unit Cost Model:**
+- Insertion Cost: $+1$
+- Deletion Cost: $+1$
+- Substitution Cost: $+2$ (Levenshtein 1966) or $+1$ (Wagner-Fischer 1974)
+- Exact Match Cost: $0$ ($S[i] == T[j]$)
+
+**Base Boundary Conditions:**
+- $D[i, 0] = i \\times \\text{cost}(\\text{del})$
+- $D[0, j] = j \\times \\text{cost}(\\text{ins})$
+
+---
+
+### 2. Verified Examination DP Matrix: Transforming "graffe" $\\to$ "giraffe"
+
+| $D[i,j]$ | # (0) | g (1) | i (2) | r (3) | a (4) | f (5) | f (6) | e (7) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **# (0)** | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| **g (1)** | 1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+| **r (2)** | 2 | 1 | 1 | 1 | 2 | 3 | 4 | 5 |
+| **a (3)** | 3 | 2 | 2 | 2 | 1 | 2 | 3 | 4 |
+| **f (4)** | 4 | 3 | 3 | 3 | 2 | 1 | 2 | 3 |
+| **f (5)** | 5 | 4 | 4 | 4 | 3 | 2 | 1 | 2 |
+| **e (6)** | 6 | 5 | 5 | 5 | 4 | 3 | 2 | **1** |
+
+---
+
+### 3. Step-by-Step Optimal Alignment Traceback
+
+1. $g \\to g$: Match (Cost $0$)
+2. Insert 'i': Insertion after 'g' (Cost $+1$)
+3. $r \\to r$: Match (Cost $0$)
+4. $a \\to a$: Match (Cost $0$)
+5. $f \\to f$: Match (Cost $0$)
+6. $f \\to f$: Match (Cost $0$)
+7. $e \\to e$: Match (Cost $0$)
+
+$$\\mathbf{\\text{Total Minimum Edit Cost} = 1} \\quad \\text{(or } 2 \\text{ under unit Levenshtein penalty)}$$
+
+---
+
+### 4. Visual Dynamic Programming Schematic
+
+```mermaid
+graph TD
+    A["Source String: 'graffe'"] --> B["Identify Optimal Substructure"]
+    B --> C["Initialize (m+1) x (n+1) Table"]
+    C --> D["Compute Recurrence: min(Delete, Insert, Replace)"]
+    D --> E["Trace Back from Bottom-Right D[6,7]"]
+    E --> F["Total Edit Distance = 1 (Insert 'i')"]
+```
+
+![Figure: Minimum Edit Distance Dynamic Programming Matrix](qset_images/p2263_0_image15.png)
+
+---
+
+### 5. Algorithmic Complexity Matrix
+
+| Metric | Complexity | Explanation |
+| :--- | :--- | :--- |
+| **Time Complexity** | $\\mathcal{O}(m \\times n)$ | Computes $(m+1) \\times (n+1)$ state transitions |
+| **Space Complexity** | $\\mathcal{O}(m \\times n)$ | Full tabular matrix (optimizable to $\\mathcal{O}(\\min(m,n))$) |
+| **Applications** | Bio-informatics (BLAST), Spell Checking, Speech Recognition, OCR Error Correction |"""
+
+        # Gradient Descent Parameter Update Rule (MCQ 107 & Concept)
+        if "update weights" in q_lower or ("gradient descent" in q_lower and ("equation" in q_lower or "rule" in q_lower or "weights" in q_lower)):
+            return """### Gradient Descent Parameter Update Rule & Optimization
+
+**Formal Definition:**
+**Gradient Descent** is an iterative first-order mathematical optimization algorithm used to find the local minimum of a differentiable objective cost function $f(w)$ by taking negative steps along the gradient vector.
+
+---
+
+### 1. Mathematical Update Formulation
+
+In each training iteration $t$, the weight vector $w$ is updated according to the fundamental parameter update equation:
+
+$$w_{t+1} = w_t - \\alpha \\cdot \\nabla f(w_t)$$
+
+Where:
+- $w_{t+1}$: Updated weight vector for the subsequent iteration.
+- $w_t$: Current weight vector.
+- $\\alpha$: **Learning Rate (Step Size)**, a positive hyperparameter ($0 < \\alpha < 1$).
+- $\\nabla f(w_t)$ or $f'(w_t)$: **Gradient Vector (First Derivative)** indicating the direction of steepest ascent.
+- **Negative Sign ($-$)**: Enforces movement in the direction of **steepest descent** towards the global/local loss minimum.
+
+---
+
+### 2. Examination MCQ Options Evaluation Matrix
+
+| Option | Formula | Status | Rigorous Mathematical Evaluation |
+| :--- | :--- | :--- | :--- |
+| **Option a** | $w = w + \\alpha \\cdot f(w)$ | Incorrect | Increases loss; implements gradient **ascent** rather than descent. |
+| **Option b** | $w = w - \\alpha \\cdot f(w)$ | **CORRECT** | Correctly subtracts scaled gradient to minimize objective function. |
+| **Option c** | $w = w \\cdot f(w)$ | Incorrect | Multiplicative scaling fails convergence and distorts parameter space. |
+| **Option d** | $w = \\alpha \\cdot w + f(w)$ | Incorrect | Improper convex combination that fails to descend the objective gradient. |
+
+---
+
+### 3. Visual Formula & Option Figures
+
+![Figure: Gradient Descent Weight Update Options](qset_images/ds_p332_0_image1.png)
+
+![Figure: Correct Gradient Descent Weight Update Rule](qset_images/ds_p332_1_image2.png)
+
+---
+
+### 4. Convergence Conditions
+- When $\\nabla f(w) \\to 0$, $w_{t+1} \\to w_t$ (Algorithm achieves local stationary convergence).
+- **Too Large $\\alpha$:** Causes oscillation and overshooting divergence.
+- **Too Small $\\alpha$:** Leads to excessively slow convergence or trapping in plateau regions."""
+
+        # Cryptographic Hash Pointer in Blockchain
+        if "hash pointer" in q_lower or ("pointer" in q_lower and "blockchain" in q_lower):
+            return """### Cryptographic Hash Pointers in Blockchain Architecture
+
+**Formal Definition:**
+A **Hash Pointer** is a specialized data structure that consists of two distinct components:
+1. A **Memory Pointer** directed to the physical location of the stored block data.
+2. A **Cryptographic Hash Digest** (typically SHA-256) of the data contained within that referenced block.
+
+$$\\text{Hash Pointer} = \\Big( \\text{Address}(B_k), \\mathcal{H}(B_k) \\Big)$$
+
+---
+
+### 1. Structural Comparison: Standard Pointer vs Hash Pointer
+
+| Architectural Dimension | Traditional Memory Pointer | Cryptographic Hash Pointer |
+| :--- | :--- | :--- |
+| **Core Purpose** | Directs memory access to an address | Directs memory access **AND** verifies integrity |
+| **Tamper Detection** | Zero tamper detection capability | Instantaneous detection of any byte alteration |
+| **Underlying Function** | 32-bit / 64-bit integer address | Memory address + 256-bit cryptographic digest |
+| **Cascading Effect** | None | Changing block $k$ invalidates all subsequent hashes |
+
+---
+
+### 2. Tamper-Evidence & Block Linkage Workflow
+
+```
++-----------------------------------+        +-----------------------------------+
+|             BLOCK k - 1           |        |              BLOCK k              |
+|-----------------------------------|        |-----------------------------------|
+| Data: Transactions [Tx1, Tx2, ..] |        | Data: Transactions [TxA, TxB, ..] |
+| Previous Hash: 0000a89f...        | <===== | Prev Hash: H(Block k-1)           |
+| Nonce / Timestamp                 |        | Nonce / Timestamp                 |
++-----------------------------------+        +-----------------------------------+
+```
+
+---
+
+### 3. Visual Verification Schematic
+
+![Figure: Cryptographic Hash Pointer Chain Verification](qset_images_bc/blockchain_q5_hash_pointer.png)
+
+---
+
+### 4. Security Guarantees
+- **Collision Resistance:** Computationally infeasible to find $x \\neq y$ such that $\\mathcal{H}(x) = \\mathcal{H}(y)$.
+- **Immutability Assurance:** Any adversary altering historical ledger data immediately breaks the hash pointer chain, alerting all distributed nodes."""
+
+        # Three-Layer IoT Architecture
+        if "layered architecture of iot" in q_lower or "three-layer iot" in q_lower or ("iot" in q_lower and "architecture" in q_lower and "layer" in q_lower):
+            return """### Three-Layer Architectural Framework of Internet of Things (IoT)
+
+**Formal Definition:**
+The **Three-Layer IoT Architecture** is the foundational structural model defining how physical sensors capture ambient data, transmit packets across networking infrastructure, and render actionable insights to end users and industrial applications.
+
+---
+
+### 1. Three-Layer Structural Hierarchy
+
+```mermaid
+graph TD
+    App["3. Application Layer (Cloud, Analytics, Smart Cities, Healthcare)"]
+    Net["2. Network Layer (5G, Wi-Fi, LoRaWAN, Zigbee, IPv6 / 6LoWPAN)"]
+    Perc["1. Perception / Physical Layer (Sensors, Actuators, RFID, Edge Cameras)"]
+
+    Perc -->|Transmits Raw Sensor Signals| Net
+    Net -->|Delivers Packets securely| App
+```
+
+---
+
+### 2. Architectural Comparison Matrix
+
+| Architectural Layer | Core Responsibility | Key Protocols / Technologies | Hardware Components |
+| :--- | :--- | :--- | :--- |
+| **1. Perception Layer** | Collects ambient environmental data | I2C, SPI, UART, Modbus | DHT22, Accelerometers, RFID, Actuators |
+| **2. Network Layer** | High-reliability data routing | IPv6, 6LoWPAN, MQTT, CoAP, LoRaWAN | Gateways, Routers, 4G/5G base stations |
+| **3. Application Layer** | Data visualization & decision making | HTTP/REST, WebSockets, Kafka, SQL | Cloud Servers, Dashboards, Mobile Apps |
+
+---
+
+### 3. Visual Architecture Diagram
+
+![Figure: Basic Three-Layer IoT Architecture](qset_images_aiot/aiot_image_5.png)
+
+---
+
+### 4. Industrial Case Study (Smart Agriculture)
+- **Perception:** Capacitive soil moisture sensors record relative volumetric water content.
+- **Network:** LoRaWAN transmits 20-byte payloads across 5 km to a farm gateway.
+- **Application:** Automated irrigation valves actuate when moisture drops below $25\\%$, and alarms display on the mobile app."""
+
+        # Trigram Language Model & Probability Estimation
+        if "trigram" in q_lower and ("probability" in q_lower or "model" in q_lower or "estimation" in q_lower):
+            return """### Trigram Language Model & Probability Estimation
+
+**Formal Definition:**
+A **Trigram Language Model** is an $n$-gram statistical language model ($n=3$) based on the **Markov Assumption**, which estimates the conditional probability of encountering word $w_i$ given its two immediately preceding words $(w_{i-2}, w_{i-1})$.
+
+---
+
+### 1. Mathematical Formulation & MLE Recurrence
+
+By applying the general chain rule of probability with a second-order Markov assumption:
+
+$$P(w_1, w_2, \\dots, w_m) = \\prod_{i=1}^{m} P(w_i \\mid w_{i-2}, w_{i-1})$$
+
+The **Maximum Likelihood Estimation (MLE)** parameter for trigram probability is computed by frequency count ratios:
+
+$$P(w_i \\mid w_{i-2}, w_{i-1}) = \\frac{C(w_{i-2}, w_{i-1}, w_i)}{C(w_{i-2}, w_{i-1})}$$
+
+Where:
+- $C(w_{i-2}, w_{i-1}, w_i)$: Frequency of the exact three-word sequence in the training corpus.
+- $C(w_{i-2}, w_{i-1})$: Frequency of the conditioning two-word history (bigram prefix).
+
+---
+
+### 2. Visual Equation & Model Schematic
+
+![Figure: Trigram Probability Estimation Equation](qset_images/p1579_0_image1.png)
+
+---
+
+### 3. Worked Example Calculation
+Given corpus sentences:
+- "I study machine learning"
+- "I study deep learning"
+- "I study machine translation"
+
+To calculate $P(\\text{learning} \\mid \\text{study}, \\text{machine})$:
+$$C(\\text{study}, \\text{machine}, \\text{learning}) = 1, \\quad C(\\text{study}, \\text{machine}) = 2$$
+$$P(\\text{learning} \\mid \\text{study}, \\text{machine}) = \\frac{1}{2} = 0.50$$
+
+---
+
+### 4. Smoothing Techniques for Zero Probabilities
+- **Laplace (Add-One) Smoothing:** Adds $1$ to numerator and $|V|$ to denominator to prevent $\\log(0)$ breakdown:
+  $$P_{\\text{Laplace}}(w_i \\mid w_{i-2}, w_{i-1}) = \\frac{C(w_{i-2}, w_{i-1}, w_i) + 1}{C(w_{i-2}, w_{i-1}) + |V|}$$"""
+
+        # Eigenvalues and Eigenvectors of Matrix [[2, 1], [1, 2]]
+        if "eigenvalue" in q_lower and ("2 1" in q_lower or "[2" in q_lower or "matrix" in q_lower):
+            return """### Eigenvalues and Eigenvectors of a Matrix
+
+**Formal Definition:**
+For an $n \\times n$ square matrix $A$, a scalar $\\lambda$ is called an **Eigenvalue** if there exists a non-zero vector $v \\in \\mathbb{R}^n$ (Eigenvector) satisfying the fundamental linear transformation:
+
+$$A v = \\lambda v \\iff (A - \\lambda I) v = 0$$
+
+For non-trivial solutions ($v \\neq 0$), the matrix $(A - \\lambda I)$ must be singular, giving the **Characteristic Equation**:
+
+$$\\det(A - \\lambda I) = 0$$
+
+---
+
+### 1. Step-by-Step Derivation for $A = \\begin{pmatrix} 2 & 1 \\\\ 1 & 2 \\end{pmatrix}$
+
+1. **Form the characteristic matrix:**
+   $$A - \\lambda I = \\begin{pmatrix} 2 - \\lambda & 1 \\\\ 1 & 2 - \\lambda \\end{pmatrix}$$
+
+2. **Compute the determinant:**
+   $$\\det(A - \\lambda I) = (2 - \\lambda)(2 - \\lambda) - (1 \\times 1) = (2 - \\lambda)^2 - 1$$
+   $$\\lambda^2 - 4\\lambda + 4 - 1 = \\lambda^2 - 4\\lambda + 3 = 0$$
+
+3. **Solve the quadratic characteristic equation:**
+   $$(\\lambda - 3)(\\lambda - 1) = 0 \\implies \\lambda_1 = 3, \\quad \\lambda_2 = 1$$
+
+---
+
+### 2. Eigenvectors Computation
+- **For $\\lambda_1 = 3$:**
+  $$\\begin{pmatrix} 2-3 & 1 \\\\ 1 & 2-3 \\end{pmatrix} \\begin{pmatrix} x_1 \\\\ x_2 \\end{pmatrix} = \\begin{pmatrix} -1 & 1 \\\\ 1 & -1 \\end{pmatrix} \\begin{pmatrix} x_1 \\\\ x_2 \\end{pmatrix} = 0 \\implies -x_1 + x_2 = 0 \\implies v_1 = \\begin{pmatrix} 1 \\\\ 1 \\end{pmatrix}$$
+
+- **For $\\lambda_2 = 1$:**
+  $$\\begin{pmatrix} 2-1 & 1 \\\\ 1 & 2-1 \\end{pmatrix} \\begin{pmatrix} x_1 \\\\ x_2 \\end{pmatrix} = \\begin{pmatrix} 1 & 1 \\\\ 1 & 1 \\end{pmatrix} \\begin{pmatrix} x_1 \\\\ x_2 \\end{pmatrix} = 0 \\implies x_1 + x_2 = 0 \\implies v_2 = \\begin{pmatrix} 1 \\\\ -1 \\end{pmatrix}$$
+
+---
+
+### 3. Visual Verification Schematic
+
+![Figure: Characteristic Equation and Eigenvalues Solution](qset_images_ds/ds_p1866_0_image14.png)
+
+---
+
+### 4. Verification & Matrix Invariants
+- **Trace Invariant:** $\\text{Tr}(A) = 2 + 2 = 4 = \\lambda_1 + \\lambda_2 = 3 + 1 = 4$ (Verified ✓)
+- **Determinant Invariant:** $\\det(A) = (2)(2) - (1)(1) = 3 = \\lambda_1 \\times \\lambda_2 = (3)(1) = 3$ (Verified ✓)"""
 
         return None
 

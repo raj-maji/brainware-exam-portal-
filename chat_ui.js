@@ -232,6 +232,26 @@
       `;
     });
 
+    // Markdown Images: ![alt](src)
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+      const cleanAlt = alt || 'Exam Diagram / Figure';
+      const cleanSrc = src.trim();
+      const escapedAlt = cleanAlt.replace(/'/g, "\\'");
+      return `
+        <div class="my-4 p-3 bg-slate-50/90 border border-slate-200/90 rounded-2xl shadow-sm text-center exam-image-container">
+          <div class="overflow-hidden rounded-xl bg-white border border-slate-100 flex items-center justify-center p-2.5">
+            <img src="${cleanSrc}" alt="${cleanAlt}" loading="lazy" class="max-w-full h-auto max-h-96 mx-auto rounded-lg object-contain cursor-zoom-in hover:scale-[1.01] transition" onclick="BrainwareAITutor.zoomImage(this.src, '${escapedAlt}')" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-xs text-slate-400 italic\\'>Diagram Image Preview: ${cleanAlt}</div>'"/>
+          </div>
+          <div class="flex items-center justify-between mt-2.5 px-2 text-[11px] text-slate-600 font-medium">
+            <span class="flex items-center gap-1.5"><i data-lucide="image" class="w-3.5 h-3.5 text-blue-600"></i> ${cleanAlt}</span>
+            <button type="button" onclick="BrainwareAITutor.zoomImage('${cleanSrc}', '${escapedAlt}')" class="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 text-[11px]">
+              <i data-lucide="maximize-2" class="w-3 h-3"></i> Enlarge
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
     html = html.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-blue-700 font-mono text-xs">$1</code>');
     html = html.replace(/^### (.*$)/gim, '<h3 class="text-sm sm:text-base font-bold text-slate-900 mt-3 mb-1.5 flex items-center gap-1.5">$1</h3>');
     html = html.replace(/^## (.*$)/gim, '<h2 class="text-base sm:text-lg font-black text-slate-950 mt-4 mb-2">$1</h2>');
@@ -629,6 +649,58 @@
 
     updateStatusBadge: function () {
       // Status badge updated from server health if present
+    },
+
+    zoomImage: function (src, alt) {
+      let modal = document.getElementById('examImageModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'examImageModal';
+        modal.className = 'fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 transition duration-200';
+        modal.onclick = (e) => {
+          if (e.target === modal || e.target.closest('#closeImageModalBtn')) {
+            modal.classList.add('hidden');
+          }
+        };
+        modal.innerHTML = `
+          <div class="relative max-w-4xl w-full max-h-[92vh] bg-white rounded-2xl shadow-2xl p-4 flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+              <h4 id="examImageModalTitle" class="text-sm font-bold text-slate-800 truncate pr-4 flex items-center gap-2">
+                <i data-lucide="image" class="w-4 h-4 text-blue-600"></i>
+                <span id="examImageModalTitleText"></span>
+              </h4>
+              <div class="flex items-center gap-2">
+                <a id="examImageDownloadBtn" href="" download="" target="_blank" class="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i> Download
+                </a>
+                <button id="closeImageModalBtn" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition" onclick="document.getElementById('examImageModal').classList.add('hidden')">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div class="overflow-auto flex-1 flex items-center justify-center p-3 bg-slate-50/60 rounded-xl">
+              <img id="examImageModalImg" src="" alt="" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-sm" />
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+      const titleElem = document.getElementById('examImageModalTitleText');
+      if (titleElem) titleElem.textContent = alt || 'Exam Diagram / Figure';
+      const imgElem = document.getElementById('examImageModalImg');
+      if (imgElem) {
+        imgElem.src = src;
+        imgElem.alt = alt || 'Exam Diagram';
+      }
+      const dl = document.getElementById('examImageDownloadBtn');
+      if (dl) {
+        dl.href = src;
+        dl.download = src.split('/').pop() || 'exam_diagram.png';
+      }
+      modal.classList.remove('hidden');
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     }
   };
 
