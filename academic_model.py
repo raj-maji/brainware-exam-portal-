@@ -25,6 +25,7 @@ import re
 import json
 import time
 import math
+import html
 import urllib.parse
 from typing import Dict, Any, List, Optional, Tuple, Union
 
@@ -319,6 +320,53 @@ class AcademicMLClassifier:
             except Exception:
                 pass
         return "Academic Studies"
+
+
+def html_to_exam_markdown(html_str: str) -> str:
+    """
+    Transforms university question bank HTML answers into structured, point-wise
+    GFM Markdown with tables, bullet lists, bold emphasis, and clean paragraph breaks.
+    """
+    if not html_str:
+        return ""
+    if "<" not in html_str and ">" not in html_str:
+        return html_str.strip()
+
+    text = html.unescape(html_str)
+
+    # Convert HTML tables into standard GFM Markdown tables
+    def table_replacer(match):
+        table_html = match.group(0)
+        rows = re.findall(r'<tr[^>]*>(.*?)</tr>', table_html, flags=re.S | re.I)
+        if not rows:
+            return ""
+        md_table_lines = []
+        is_first = True
+        for row in rows:
+            ths = re.findall(r'<th[^>]*>(.*?)</th>', row, flags=re.S | re.I)
+            tds = re.findall(r'<td[^>]*>(.*?)</td>', row, flags=re.S | re.I)
+            cells = [re.sub(r'<[^>]+>', '', c).strip() for c in (ths or tds)]
+            if not cells:
+                continue
+            md_table_lines.append("| " + " | ".join(cells) + " |")
+            if is_first:
+                md_table_lines.append("| " + " | ".join([":---" for _ in cells]) + " |")
+                is_first = False
+        return "\n\n" + "\n".join(md_table_lines) + "\n\n"
+
+    text = re.sub(r'<table[^>]*>.*?</table>', table_replacer, text, flags=re.S | re.I)
+
+    # Convert list items & paragraph bullet points into clean point-wise presentation
+    text = re.sub(r'<li[^>]*>(.*?)</li>', r'\n- \1', text, flags=re.S | re.I)
+    text = re.sub(r'<p[^>]*>\s*[•\-\*]\s*(.*?)</p>', r'\n- \1', text, flags=re.S | re.I)
+    text = re.sub(r'<p[^>]*>(.*?)</p>', r'\n\n\1\n\n', text, flags=re.S | re.I)
+    text = re.sub(r'<(?:strong|b)[^>]*>(.*?)</(?:strong|b)>', r'**\1**', text, flags=re.S | re.I)
+    text = re.sub(r'<div[^>]*font-bold[^>]*>(.*?)</div>', r'\n\n**\1**\n', text, flags=re.S | re.I)
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.I)
+    # Strip remaining container divs/spans
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    return text
 
 
 # =============================================================================
@@ -622,7 +670,13 @@ class DynamicMLExamSynthesizer:
         for w in tokens:
             w_up = w.upper()
             if w_up in cls.ACRONYMS:
-                if is_explicit_acronym or len(raw_words) <= 4:
+                # If explicit full-form request or single acronym word (e.g. "MCA", "BCA", "DBMS")
+                # For "What is DBMS?", route to full conceptual answer with ACID properties and architecture
+                if is_explicit_acronym:
+                    return w_up
+                if len(raw_words) == 1:
+                    return w_up
+                if len(raw_words) <= 4 and w_up not in ["DBMS", "RDBMS", "AI", "ML", "DNA"]:
                     return w_up
 
         return None
@@ -632,6 +686,75 @@ class DynamicMLExamSynthesizer:
         """Synthesizes an authentic, structured university-level answer for an acronym inquiry."""
         data = cls.ACRONYMS[acronym_key]
         curriculum_md = "\n".join([f"- **{c.split('(')[0].strip()}:** {c}" if '(' in c else f"- {c}" for c in data['curriculum']])
+
+        # Structured visual diagram tailored to the acronym
+        diagram_block = ""
+        if acronym_key == "MCA":
+            diagram_block = """```
++------------------------------------+       +------------------------------------+
+| Semester 1: Core CS Foundations    | ----> | Semester 2: Enterprise Systems     |
+| (Advanced DSA, OOP, OS, Networks)  |       | (Advanced DBMS, Web Eng, Cloud)    |
++------------------------------------+       +------------------------------------+
+                                                               |
+                                                               v
++------------------------------------+       +------------------------------------+
+| Semester 4: Industry Capstone      | <---- | Semester 3: Advanced AI & Systems  |
+| (Production Deployment & Defense)  |       | (Machine Learning, Deep Learning)  |
++------------------------------------+       +------------------------------------+
+```"""
+        elif acronym_key == "DBMS":
+            diagram_block = """```
++-------------------------------------------------------------+
+|   EXTERNAL LEVEL (User Views, Forms, SQL Client Dashboards) |
++-------------------------------------------------------------+
+                               |  SQL Queries (DML / DDL)
+                               v
++-------------------------------------------------------------+
+|   CONCEPTUAL LEVEL (Logical Schema, Entity-Relational Model)|
++-------------------------------------------------------------+
+                               |  Query Parser & Cost-Based Optimizer
+                               v
++-------------------------------------------------------------+
+|   INTERNAL LEVEL (Physical Storage, B+ Tree Indexes, Files)  |
++-------------------------------------------------------------+
+                               |
+        +-----------------------+-----------------------+
+        |                                               |
+        v                                               v
+[ Buffer Manager (RAM) ]                     [ Disk Storage (Tablespaces) ]
+[ Lock Manager & WAL Logs ]                  [ Secondary B+ Tree Index Files ]
+```"""
+        elif acronym_key == "NLP":
+            diagram_block = """```
+[Raw Text Input] ---> [Tokenization] ---> [POS Tagging] ---> [Syntactic Parsing] ---> [Semantic Analysis] ---> [Application]
+```"""
+        elif acronym_key in ["HTTP", "HTTPS"]:
+            diagram_block = """```
+[ Client Browser ]                             [ Web Server ]
+        |                                             |
+        |----------- 1. TCP 3-Way Handshake ---------->|
+        |<---------- SYN / SYN-ACK / ACK -------------|
+        |                                             |
+        |--- 2. TLS 1.3 Cryptographic Handshake ----->|
+        |<-- ServerHello + Certificate + ServerKey ---|
+        |                                             |
+        |=== 3. Encrypted Symmetric Session (AES-GCM)=|
+        |======== Encrypted HTTP GET / POST =========>|
+```"""
+        else:
+            diagram_block = f"""```
+[ {acronym_key} Specification ] ---> [ Core Domain Framework ] ---> [ Practical Application ]
+```"""
+
+        # Structured curriculum comparison / feature table
+        table_rows = []
+        for idx, item in enumerate(data['curriculum'], 1):
+            parts = item.split('(')
+            title = parts[0].strip()
+            details = parts[1].replace(')', '').strip() if len(parts) > 1 else "Core Theory & Lab Practice"
+            table_rows.append(f"| **Pillar {idx}: {title}** | {details} | Compulsory Theoretical & Practical Coursework |")
+
+        table_md = "\n".join(table_rows)
 
         return f"""### {data['full_name']} ({acronym_key})
 
@@ -646,19 +769,26 @@ class DynamicMLExamSynthesizer:
 
 ---
 
-### 2. Core Curricular Syllabus & Technical Pillars
-In modern university academic curricula, study of **{acronym_key}** systematically encompasses:
-{curriculum_md}
+### 2. Architectural Framework & Progression Diagram
+{diagram_block}
 
 ---
 
-### 3. Eligibility & Academic Prerequisites
+### 3. Core Curricular Syllabus & Technical Matrix
+
+| Curricular Pillar | Core Focus & Covered Technologies | Academic Examination Weight |
+| :--- | :--- | :--- |
+{table_md}
+
+---
+
+### 4. Eligibility & Academic Prerequisites
 - **Entry Qualifications:** {data['eligibility']}
 - **Academic Focus:** Analytical problem solving, theoretical rigor, lab-based practical implementations, and capstone examinations.
 
 ---
 
-### 4. Professional Career Trajectories & Industry Applications
+### 5. Professional Career Trajectories & Industry Applications
 Graduates and specialists in **{data['full_name']}** qualify for key industry positions:
 - **Primary Roles:** {data['career_outcomes']}
 - **Industry Scope:** IT Consulting, Software Engineering, Global Enterprise Solutions, Banking & FinTech, and Scholarly Research."""
@@ -684,35 +814,55 @@ Graduates and specialists in **{data['full_name']}** qualify for key industry po
             x_val = rhs_step / a
             x_str = f"{int(x_val)}" if x_val.is_integer() else f"{x_val:.2f}"
 
-            return f"""### Step-by-Step Algebraic Solution
+            return f"""### Step-by-Step Algebraic Solution: Linear Equation
 
 **Problem Statement:**
-Solve the linear equation for $x$:
+Solve the first-degree linear equation for $x$:
 $$ {a}x {sign} {b} = {c} $$
 
 ---
 
-### 1. Theoretical Principle (Properties of Equality)
-To isolate the variable $x$, we apply inverse operations maintaining equality on both sides of the relation:
-1. **Additive Property of Equality:** Add or subtract the constant term from both sides.
-2. **Multiplicative / Division Property of Equality:** Divide both sides by the coefficient of $x$.
+### 1. Algebraic Balance Principle Diagram
+
+```
+       [ Left Hand Side (LHS) ]                 [ Right Hand Side (RHS) ]
+           {a}x {sign} {b}            ========              {c}
+                  |                                          |
+                  v  (Apply Inverse Operation: {step1_sign} {b})    v
+                 {a}x                 ========             {rhs_step}
+                  |                                          |
+                  v  (Divide by Coefficient: / {a})          v
+                   x                  ========             {x_str}
+```
 
 ---
 
-### 2. Step-by-Step Mathematical Derivation
+### 2. Structured Algebraic Operations Matrix
 
-**Step 1: Isolate the variable term**
-Subtract ${b}$ from both sides (applying the inverse of addition):
-$$ {a}x {sign} {b} {step1_sign} {b} = {c} {step1_sign} {b} $$
-$$ {a}x = {rhs_step} $$
-
-**Step 2: Solve for $x$ by dividing by the coefficient ${a}$**
-$$ x = \\frac{{{rhs_step}}}{{{a}}} $$
-$$ x = {x_str} $$
+| Step Number | Mathematical Operation | Algebraic Execution | Axiomatic Principle |
+| :--- | :--- | :--- | :--- |
+| **Step 1: Given** | Initial Statement | ${a}x {sign} {b} = {c}$ | Identity of Given Equation |
+| **Step 2: Isolate Term** | Subtraction / Addition of Constant | ${a}x {sign} {b} {step1_sign} {b} = {c} {step1_sign} {b} \\implies {a}x = {rhs_step}$ | Additive / Subtraction Property of Equality |
+| **Step 3: Solve for $x$** | Division by Coefficient | $\\frac{{{a}x}}{{{a}}} = \\frac{{{rhs_step}}}{{{a}}} \\implies x = {x_str}$ | Multiplicative / Division Property of Equality |
+| **Step 4: Verification** | Direct Substitution Check | ${a}({x_str}) {sign} {b} = {a * (int(x_val) if x_val.is_integer() else x_val)} {sign} {b} = {c}$ | Reflexive Axiom of Equality ($\text{{LHS}} \\equiv \text{{RHS}}$) |
 
 ---
 
-### 3. Formal Verification Check
+### 3. Step-by-Step Mathematical Derivation
+
+1. **Step 1 (Isolate Variable Term):**
+   Subtract ${b}$ from both sides to eliminate the scalar constant:
+   $$ {a}x {sign} {b} {step1_sign} {b} = {c} {step1_sign} {b} $$
+   $$ {a}x = {rhs_step} $$
+
+2. **Step 2 (Isolate Unknown Variable $x$):**
+   Divide both sides of the equation by the coefficient ${a}$:
+   $$ x = \\frac{{{rhs_step}}}{{{a}}} $$
+   $$ \\mathbf{{x = {x_str}}} $$
+
+---
+
+### 4. Formal Verification Proof
 Substitute $x = {x_str}$ back into the original equation:
 $$ \\text{{L.H.S.}} = {a}({x_str}) {sign} {b} = {a * (int(x_val) if x_val.is_integer() else x_val)} {sign} {b} = {c} $$
 $$ \\text{{R.H.S.}} = {c} $$
@@ -726,11 +876,38 @@ $$\\mathbf{{x = {x_str}}}$$"""
             return """### Newton's Second Law of Motion: Formal Derivation & Principles
 
 **Formal Statement:**
-Newton's Second Law states that the time rate of change of linear momentum of a body is directly proportional to the applied resultant net external force and takes place in the direction of the force.
+Newton's Second Law of Motion states that the time rate of change of linear momentum of an object is directly proportional to the applied resultant net external force and acts along the rectilinear direction of that force.
 
 ---
 
-### 1. Mathematical Formulation & Derivation (Calculus Method)
+### 1. Free-Body Force Diagram
+
+```
+                         ^ Normal Reaction Force (N)
+                         |
+                 +---------------+
+                 |  Mass Block   |  -----> Net Applied External Force (F_net)
+                 |    (m kg)     |  -----> Resultant Acceleration (a = F/m)
+                 +---------------+
+                         |
+                         v Gravitational Force (W = mg)
+```
+
+---
+
+### 2. Kinematic Variables & SI Dimensional Matrix
+
+| Physical Quantity | Variable Symbol | SI Unit | Dimensional Formula | Vector or Scalar |
+| :--- | :--- | :--- | :--- | :--- |
+| **Resultant Net Force** | $\\vec{F}_{\\text{net}}$ | Newton ($\\text{N} = \\text{kg}\\cdot\\text{m/s}^2$) | $[M^1 L^1 T^{-2}]$ | Vector (Collinear with $\\vec{a}$) |
+| **Inertial Mass** | $m$ | Kilogram ($\\text{kg}$) | $[M^1 L^0 T^0]$ | Invariant Scalar Quantity |
+| **Acceleration** | $\\vec{a}$ | Metres per second squared ($\\text{m/s}^2$) | $[M^0 L^1 T^{-2}]$ | Vector ($\\vec{a} = \\frac{d\\vec{v}}{dt}$) |
+| **Linear Momentum** | $\\vec{p} = m\\vec{v}$ | Kilogram-metre per second ($\\text{kg}\\cdot\\text{m/s}$) | $[M^1 L^1 T^{-1}]$ | Vector (Collinear with $\\vec{v}$) |
+| **Mechanical Impulse** | $\\vec{J} = \\int \\vec{F}\\,dt$ | Newton-second ($\\text{N}\\cdot\\text{s}$) | $[M^1 L^1 T^{-1}]$ | Vector (Equal to $\\Delta \\vec{p}$) |
+
+---
+
+### 3. Calculus Derivation (Time-Derivative of Momentum)
 
 Let:
 - $m$ = Invariant inertial mass of the body (in $\\text{kg}$)
@@ -741,28 +918,22 @@ Let:
 From Newton's fundamental definition:
 $$ \\vec{F}_{\\text{net}} \\propto \\frac{d\\vec{p}}{dt} $$
 
-Introducing the constant of proportionality $k$ (where $k = 1$ in SI units):
+Introducing the constant of proportionality $k$ (where $k = 1$ in the SI metric system):
 $$ \\vec{F}_{\\text{net}} = \\frac{d}{dt}(m\\vec{v}) $$
 
-Applying the product rule of calculus:
+Applying the Leibniz product rule of differential calculus:
 $$ \\vec{F}_{\\text{net}} = m\\frac{d\\vec{v}}{dt} + \\vec{v}\\frac{dm}{dt} $$
 
-For classical non-relativistic systems with constant mass ($\\frac{dm}{dt} = 0$):
-Since acceleration $\\vec{a} = \\frac{d\\vec{v}}{dt}$:
+For classical non-relativistic mechanics where mass is constant ($\\frac{dm}{dt} = 0$):
+Since instantaneous acceleration is defined as $\\vec{a} = \\frac{d\\vec{v}}{dt}$:
 $$ \\mathbf{\\vec{F}_{\\text{net}} = m\\vec{a}} $$
 
 ---
 
-### 2. Units and Dimensions
-- **SI Unit:** Newton ($\text{N}$), where $1\\,\\text{N} = 1\\,\\text{kg}\\cdot\\text{m/s}^2$.
-- **Dimensional Formula:** $[M^1 L^1 T^{-2}]$.
-
----
-
-### 3. Key Physical Invariants & Examination Points
-1. **Vector Nature:** Force and acceleration are collinear; acceleration occurs exclusively in the direction of the net force vector.
-2. **Impulse-Momentum Theorem:** Integrating over time yields $\\vec{J} = \\int \\vec{F}\\,dt = \\Delta \\vec{p}$.
-3. **Inertial Reference Frames:** Valid strictly in non-accelerating inertial frames; non-inertial frames require fictitious (d'Alembert) forces."""
+### 4. Key Physical Invariants & Examination Points
+1. **Directional Collinearity:** Force and acceleration are collinear vector quantities; acceleration occurs strictly in the vector direction of the net unbalanced force.
+2. **Impulse-Momentum Theorem:** Integrating the force over an infinitesimal duration yields $\\vec{J} = \\int_{t_1}^{t_2} \\vec{F}\\,dt = \\Delta \\vec{p} = m\\vec{v}_f - m\\vec{v}_i$.
+3. **Inertial Reference Frame:** Valid strictly within non-accelerating frames; non-inertial accelerating reference frames require fictitious d'Alembert forces ($\\vec{F}_{\\text{fictitious}} = -m\\vec{a}_{\\text{frame}}$)."""
 
         return None
 
@@ -779,14 +950,32 @@ An optimal primality test validates whether an integer $n > 1$ has no positive d
 
 ---
 
-### 1. Algorithmic Strategy & Time Complexity
-- **Brute Force:** Testing all integers up to $n$ yields $O(n)$ complexity.
-- **Square Root Bound ($O(\\sqrt{n})$):** Divisors always appear in conjugate pairs $(a, b)$ such that $a \\times b = n$. If both $a, b > \\sqrt{n}$, their product exceeds $n$. Hence, verifying factors up to $\\sqrt{n}$ guarantees mathematical correctness.
-- **$6k \\pm 1$ Optimization:** All prime numbers greater than 3 can be expressed in the form $6k \\pm 1$. By pre-checking divisibility by 2 and 3, we test factors with step size 6.
+### 1. Factor Symmetry & Divisor Pairing Diagram
+
+```
+Integer n = a * b
+If both a, b > sqrt(n), then a * b > sqrt(n) * sqrt(n) = n (Contradiction!)
+Therefore, at least one factor must lie in the interval [2, floor(sqrt(n))].
+
+[ 2 ] ===== (Check Divisibility up to sqrt(n)) =====> [ floor(sqrt(n)) ]
+                                                               |
+                                                               v
+         No Factors Found in [2, sqrt(n)]  =====>  Number is Guaranteed PRIME!
+```
 
 ---
 
-### 2. Fully Annotated JavaScript Implementation
+### 2. Algorithmic Complexity Comparison Matrix
+
+| Primality Algorithm | Factor Bound Evaluated | Time Complexity | Auxiliary Space | University Evaluation Note |
+| :--- | :--- | :--- | :--- | :--- |
+| **Brute-Force Search** | All integers from $2$ to $n-1$ | $\\mathcal{O}(n)$ | $\\mathcal{O}(1)$ | Highly inefficient; times out for large $n$. |
+| **Square-Root Bound** | All integers from $2$ to $\\lfloor\\sqrt{n}\\rfloor$ | $\\mathcal{O}(\\sqrt{n})$ | $\\mathcal{O}(1)$ | Optimal deterministic factor verification bound. |
+| **$6k \\pm 1$ Optimization**| Pre-checks $2, 3$; steps of $6$ up to $\\sqrt{n}$ | $\\mathcal{O}(\\sqrt{n})$ with $\\approx \\frac{1}{3}$ factor steps | $\\mathcal{O}(1)$ | Production standard for competitive programming and exam scripts. |
+
+---
+
+### 3. Fully Annotated JavaScript Implementation
 
 ```javascript
 /**
@@ -830,9 +1019,9 @@ testValues.forEach(val => {
 
 ---
 
-### 3. Complexity Analysis
-- **Time Complexity:** $\\mathcal{O}(\\sqrt{n})$ in the worst case (when $n$ is prime).
-- **Space Complexity:** $\\mathcal{O}(1)$ auxiliary memory since only primitive scalar pointers are maintained."""
+### 4. Complexity & Execution Analysis
+1. **Time Complexity:** $\\mathcal{O}(\\sqrt{n})$ in the worst case (when $n$ is prime). Pre-filtering multiples of 2 and 3 eliminates $66.6\\%$ of potential divisor operations.
+2. **Space Complexity:** $\\mathcal{O}(1)$ strict auxiliary memory since only primitive scalar loop registers are maintained."""
 
         return None
 
@@ -845,11 +1034,21 @@ testValues.forEach(val => {
         if "mitosis" in q_lower and "meiosis" in q_lower:
             return """### Comparative Analysis: Mitosis vs Meiosis
 
-In Cellular Biology and Genetics, **Mitosis** and **Meiosis** are the two primary mechanisms of eukaryotic cell division.
+In Cellular Biology and Genetics, **Mitosis** and **Meiosis** represent the two foundational mechanisms of eukaryotic cell division.
 
 ---
 
-### Comprehensive Examination Comparison Matrix
+### 1. Eukaryotic Cell Division Lifecycle Flowchart
+
+```
+MITOSIS:  [ 2n Diploid Somatic Cell ] ===(1 Nuclear Division)===> [ 2n ] [ 2n ] (2 Genetically Identical Clones)
+
+MEIOSIS:  [ 2n Diploid Germ Cell ] ===(Meiosis I)===> [ n ] [ n ] ===(Meiosis II)===> [ n ][ n ][ n ][ n ] (4 Unique Gametes)
+```
+
+---
+
+### 2. Comprehensive Examination Comparison Matrix
 
 | Comparative Dimension | Mitosis (Equational Division) | Meiosis (Reductional Division) | University Exam Notes |
 | :--- | :--- | :--- | :--- |
@@ -862,7 +1061,7 @@ In Cellular Biology and Genetics, **Mitosis** and **Meiosis** are the two primar
 
 ---
 
-### Examination Summary Takeaway
+### 3. Examination Summary & Clinical Takeaways
 1. **Clinical / Biological Significance:** Failure in mitosis leads to oncogenesis (uncontrolled tumor proliferation); failure in meiosis (nondisjunction) leads to aneuploidy (e.g. Trisomy 21 / Down syndrome).
 2. **Key Stages to Diagram in Exam:** Show Chiasma formation in Pachytene stage of Prophase I for Meiosis."""
 
@@ -874,7 +1073,25 @@ In Operating Systems, **Processes** and **Threads** represent the primary units 
 
 ---
 
-### Comprehensive Examination Comparison Matrix
+### 1. Process Virtual Address Space Memory Architecture Diagram
+
+```
++--------------------------------------------------------+
+| PROCESS VIRTUAL ADDRESS SPACE                          |
+|  [ Text Segment / Code ]       [ Global / Static Data ]|
+|  [ Shared Dynamic Heap ]                               |
+|                                                        |
+|  +--------------------+        +--------------------+  |
+|  | THREAD 1           |        | THREAD 2           |  |
+|  | - Private Stack    |        | - Private Stack    |  |
+|  | - Registers / PC   |        | - Registers / PC   |  |
+|  +--------------------+        +--------------------+  |
++--------------------------------------------------------+
+```
+
+---
+
+### 2. Comprehensive Examination Comparison Matrix
 
 | Comparison Criteria | Process (Heavyweight Execution) | Thread (Lightweight Execution) | University Exam Notes |
 | :--- | :--- | :--- | :--- |
@@ -887,7 +1104,7 @@ In Operating Systems, **Processes** and **Threads** represent the primary units 
 
 ---
 
-### Examination Summary Takeaway
+### 3. Examination Summary Takeaway
 1. **PCB vs TCB:** A process is represented by a **Process Control Block (PCB)**; a thread is represented by a **Thread Control Block (TCB)**.
 2. **Real-world Paradigm:** Google Chrome runs tabs as separate **processes** for security and crash isolation, whereas web servers like Nginx or Node.js use worker threads/event-loops for maximum concurrent throughput."""
 
@@ -899,7 +1116,24 @@ In Operating Systems, **Processes** and **Threads** represent the primary units 
 
 ---
 
-### Comprehensive Technical Comparison Matrix
+### 1. Protocol Connection & TLS 1.3 Cryptographic Handshake Flowchart
+
+```
+[ Client Browser ]                             [ Web Server ]
+        |                                             |
+        |----------- 1. TCP 3-Way Handshake ---------->| (Port 80 for HTTP / 443 for HTTPS)
+        |<---------- SYN / SYN-ACK / ACK -------------|
+        |                                             |
+        |--- 2. TLS 1.3 Cryptographic Handshake ----->| (HTTPS Only)
+        |<-- ServerHello + Certificate + ServerKey ---|
+        |                                             |
+        |=== 3. Encrypted Symmetric Session (AES-GCM)=|
+        |======== Encrypted HTTP GET / POST =========>|
+```
+
+---
+
+### 2. Comprehensive Technical Comparison Matrix
 
 | Technical Parameter | HTTP (Hypertext Transfer Protocol) | HTTPS (HTTP Secure over TLS/SSL) | University Examination Notes |
 | :--- | :--- | :--- | :--- |
@@ -912,11 +1146,11 @@ In Operating Systems, **Processes** and **Threads** represent the primary units 
 
 ---
 
-### The TLS Handshake Mechanism (HTTPS Connection Setup)
-1. **ClientHello:** Client transmits supported cipher suites and random nonce.
-2. **ServerHello:** Server selects cipher suite, presents digital X.509 certificate and server public key.
-3. **Key Exchange (Diffie-Hellman):** Client and server derive a shared symmetric master key.
-4. **Encrypted Session:** Subsequent application data is symmetrically encrypted (e.g. AES-256-GCM) with high computational throughput."""
+### 3. The TLS 1.3 Handshake Mechanism (Point-by-Point Execution)
+1. **ClientHello:** Client initiates connection, sending supported cryptographic cipher suites (e.g. `TLS_AES_256_GCM_SHA384`), TLS version, and ephemeral Diffie-Hellman key share.
+2. **ServerHello:** Server selects the optimal cipher suite, presents its X.509 digital certificate signed by a Certificate Authority (CA), and sends its corresponding key share.
+3. **Cryptographic Key Derivation:** Both parties independently calculate the shared symmetric session key without transmitting secret keys across the network.
+4. **Encrypted Session Pipeline:** All subsequent application payload (HTTP headers, bodies, cookies) is symmetrically encrypted with zero plaintext leakage."""
 
         return None
 
@@ -924,6 +1158,99 @@ In Operating Systems, **Processes** and **Threads** represent the primary units 
     def synthesize_concept_solution(cls, query: str) -> Optional[str]:
         """Synthesizes comprehensive, high-scoring university examination answers for core academic concepts."""
         q_lower = query.lower()
+
+        # Database Management Systems (DBMS) & ACID Properties
+        if "dbms" in q_lower or "database management system" in q_lower or "acid properties" in q_lower or (q_lower.startswith("database") and len(q_lower.split()) <= 4):
+            return """### Database Management Systems (DBMS) & Transaction Management
+
+**Formal Definition:**
+A **Database Management System (DBMS)** is specialized software that manages, queries, and maintains structured data stores while guaranteeing concurrent data integrity, fault recovery, and transactional reliability.
+
+---
+
+### 1. 3-Tier ANSI-SPARC Architecture & Query Execution Engine
+
+```
++-------------------------------------------------------------+
+|   EXTERNAL LEVEL (User Views, Forms, SQL Client Dashboards) |
++-------------------------------------------------------------+
+                               |  SQL Queries (DML / DDL)
+                               v
++-------------------------------------------------------------+
+|   CONCEPTUAL LEVEL (Logical Schema, Entity-Relational Model)|
++-------------------------------------------------------------+
+                               |  Query Parser & Cost-Based Optimizer
+                               v
++-------------------------------------------------------------+
+|   INTERNAL LEVEL (Physical Storage, B+ Tree Indexes, Files)  |
++-------------------------------------------------------------+
+                               |
+        +-----------------------+-----------------------+
+        |                                               |
+        v                                               v
+[ Buffer Manager (RAM) ]                     [ Disk Storage (Tablespaces) ]
+[ Lock Manager & WAL Logs ]                  [ Secondary B+ Tree Index Files ]
+```
+
+---
+
+### 2. Transaction State Transition Machine
+
+```
+                 +------------+
+                 |   Active   |
+                 +------------+
+                    /        \\
+                   /          \\
+                  v            v
+       +-------------------+  +------------+
+       |Partially Committed|  |   Failed   |
+       +-------------------+  +------------+
+                  |                 |
+                  v                 v
+            +-----------+     +------------+
+            | Committed |     |  Aborted   |
+            +-----------+     +------------+
+```
+
+---
+
+### 3. RDBMS vs NoSQL Architectural Comparison Matrix
+
+| Architectural Parameter | Relational DBMS (RDBMS) | Non-Relational (NoSQL) | University Examination Notes |
+| :--- | :--- | :--- | :--- |
+| **Data Storage Model** | Structured 2D Tables (Relations with Tuples/Attributes) | Document (JSON), Key-Value, Columnar, Graph | RDBMS enforces rigid mathematical relation schemas. |
+| **Schema Rigidity** | Fixed, predefined schema (DDL migrations required) | Dynamic, schema-less (Flexible JSON documents) | NoSQL accommodates rapidly evolving unstructured datasets. |
+| **Transactional Model** | ACID Compliant (Strict Atomicity & Serializability) | BASE Compliant (Basically Available, Soft-state, Eventual) | RDBMS preferred for banking; NoSQL for distributed high-throughput. |
+| **Scaling Strategy** | Vertical Scaling (Scale-Up: CPU, RAM, NVMe) | Horizontal Scaling (Scale-Out: Distributed Sharding) | RDBMS joins are expensive across distributed nodes. |
+| **Query Language** | Standardized Declarative SQL | Proprietary APIs / JSON Query Filters | SQL supports complex relational JOIN operations. |
+| **Representative Systems**| PostgreSQL, MySQL, Oracle Database, SQLite | MongoDB, Apache Cassandra, Redis, Neo4j | Enterprise benchmarks choose engines based on CAP trade-offs. |
+
+---
+
+### 4. The ACID Properties (Point-by-Point Analysis)
+
+A transaction is a logical unit of database processing. To preserve consistency, every transaction must strictly satisfy all four **ACID** properties:
+
+1. **Atomicity (All-or-Nothing Property):**
+   - *Mechanism:* Either all operations comprising a transaction execute successfully to completion, or the entire transaction is aborted and rolled back.
+   - *Failure Scenario:* If power fails during an inter-bank fund transfer after debiting Account A but before crediting Account B, the debit is rolled back.
+   - *Engine Implementation:* Enforced via Write-Ahead Logging (WAL) and undo-logs in the database storage engine.
+
+2. **Consistency (Integrity Invariant):**
+   - *Mechanism:* A transaction transforms the database from one valid state satisfying all schema invariants to another valid state.
+   - *Failure Scenario:* A transaction attempting to violate a `FOREIGN KEY` constraint, check constraint, or negative balance rule is rejected.
+   - *Engine Implementation:* Enforced by relational constraints, assertions, and cascade triggers.
+
+3. **Isolation (Concurrent Non-Interference):**
+   - *Mechanism:* Concurrent transactions execute independently without observing intermediate uncommitted states of other transactions.
+   - *Failure Scenario:* Prevents dirty reads, non-repeatable reads, and phantom reads.
+   - *Engine Implementation:* Enforced using Two-Phase Locking (2PL), Timestamp Ordering, or Multi-Version Concurrency Control (MVCC).
+
+4. **Durability (Persistent Survival):**
+   - *Mechanism:* Once a transaction commits, its modifications are permanently recorded in non-volatile storage, surviving subsequent power outages or crashes.
+   - *Failure Scenario:* A server crash immediately following a `COMMIT` statement does not lose recorded data.
+   - *Engine Implementation:* Enforced by flushing redo-logs to disk during checkpointing."""
 
         # Java
         if "what is java" in q_lower or (q_lower.startswith("java") and len(q_lower.split()) <= 4):
@@ -934,7 +1261,8 @@ In Operating Systems, **Processes** and **Threads** represent the primary units 
 
 ---
 
-### 1. The Core Architectural Philosophy: WORA
+### 1. The Core Architectural Philosophy: WORA Principle
+
 Java is engineered around the principle of **"Write Once, Run Anywhere" (WORA)**:
 1. **Java Compiler (`javac`):** Compiles high-level human-readable `.java` source code into intermediate, platform-neutral architectural instructions termed **Java Bytecode** (`.class` files).
 2. **Java Virtual Machine (JVM):** An abstract execution machine that interprets and dynamically compiles (via Just-In-Time - JIT compiler) bytecode into native CPU machine code specific to the host operating system.
@@ -948,20 +1276,62 @@ Java is engineered around the principle of **"Write Once, Run Anywhere" (WORA)**
 
 ---
 
-### 2. Foundational Pillars of Object-Oriented Programming (OOP)
-Java strictly enforces the four pillars of OOP:
-- **Encapsulation:** Binding data variables and the methods that manipulate them into a cohesive class unit while restricting unauthorized access via private access modifiers and public getters/setters.
-- **Inheritance:** Enabling a subclass to acquire attributes and behaviors from a superclass using the `extends` keyword, facilitating code reusability and establishing is-a relationships.
-- **Polymorphism:** The ability of an entity to take multiple forms—divided into compile-time polymorphism (method overloading) and runtime polymorphism (method overriding via dynamic method dispatch).
-- **Abstraction:** Hiding complex underlying implementation details and exposing only the essential interface to the user using abstract classes and interfaces.
+### 2. 5-Layer JVM Execution Engine & Runtime Memory Architecture
+
+| Component | Sub-Systems | Primary Operational Role | Memory & Execution Scope |
+| :--- | :--- | :--- | :--- |
+| **ClassLoader Subsystem** | Bootstrap, Extension, Application Loaders | Dynamically loads `.class` bytecode files into memory; verifies bytecode security. | Per-JVM instance. |
+| **Heap Memory** | Young Gen (Eden, S0, S1), Old Gen (Tenured) | Runtime data area where all objects and instance arrays are allocated. | Shared across all threads. |
+| **Stack Memory** | Frame, Local Variables, Operand Stack | Stores method activation records, call frames, and primitive variables. | Thread-private (isolated). |
+| **Execution Engine** | Interpreter, JIT Compiler, Garbage Collector | Translates bytecode into native CPU instructions; performs adaptive profiling. | Global execution pipeline. |
+| **Garbage Collector** | G1, ZGC, Parallel GC, CMS | Reclaims heap memory occupied by unreachable objects via reachability analysis. | Background daemon threads. |
 
 ---
 
-### 3. Memory Architecture & Automatic Garbage Collection
-Java memory is segmented into distinct runtime data areas:
-- **Heap Memory:** Common memory pool shared across all threads where all objects and instance arrays are allocated at runtime.
-- **Stack Memory:** Thread-private memory maintaining stack frames for method invocations, storing local primitive variables and object memory references.
-- **Automatic Garbage Collection (GC):** A background daemon thread that automatically scans the heap, identifies unreferenced unreachable objects via reachability analysis, and reclaims their memory space, eliminating manual memory leaks and dangling pointer errors."""
+### 3. Foundational Pillars of Object-Oriented Programming (OOP)
+
+1. **Encapsulation:**
+   - Binding state variables and the methods manipulating them into a cohesive class unit.
+   - Enforcing data hiding using access modifiers (`private`, `protected`, `public`) and getter/setter methods.
+2. **Inheritance:**
+   - Enabling a child subclass to inherit attributes and behaviors from a parent superclass via the `extends` keyword.
+   - Promotes code reusability and forms hierarchical taxonomy.
+3. **Polymorphism:**
+   - The capacity of an entity to exhibit multiple behaviors depending on invocation context.
+   - Divided into Compile-Time (Method Overloading) and Runtime (Method Overriding via `vtable` dynamic method dispatch).
+4. **Abstraction:**
+   - Hiding complex underlying implementation mechanics while revealing only clean interfaces via abstract classes and `interface` definitions.
+
+---
+
+### 4. Complete Annotated Production Java Implementation
+
+```java
+// Production-grade demonstration of Object-Oriented Java
+public class AcademicPortalDemo {
+    public static void main(String[] args) {
+        System.out.println("Java Virtual Machine (JVM) Execution Initialized.");
+        Student student = new Student("Yuvaraj", 101, "Computer Science");
+        student.displayDetails();
+    }
+}
+
+class Student {
+    private String name;
+    private int rollNumber;
+    private String department;
+
+    public Student(String name, int rollNumber, String department) {
+        this.name = name;
+        this.rollNumber = rollNumber;
+        this.department = department;
+    }
+
+    public void displayDetails() {
+        System.out.println("Student: " + name + " | Roll: " + rollNumber + " | Dept: " + department);
+    }
+}
+```"""
 
         # C++ Programming Language
         if "c++" in q_lower and ("what is" in q_lower or "explain" in q_lower or "language" in q_lower):
@@ -972,24 +1342,49 @@ Java memory is segmented into distinct runtime data areas:
 
 ---
 
-### 1. Key Architectural Paradigms
-C++ uniquely bridges low-level systems programming with high-level architectural abstraction:
-- **Procedural Programming:** Functions, structured control flow, and deterministic execution sequences.
-- **Object-Oriented Programming (OOP):** User-defined types (classes), data encapsulation, inheritance, and runtime polymorphism via virtual function tables (`vtable`).
-- **Generic Programming:** Compile-time templates enabling type-independent algorithms and data structures via metaprogramming.
-- **Low-Level Hardware Access:** Direct memory manipulation through raw pointers, explicit memory layout control, and bit-level operations.
+### 1. C++ Compilation & Linking Pipeline Diagram
+
+```
+[ Source File: main.cpp ] + [ Header Files: <iostream>, math.h ]
+                         |
+                         v  Preprocessor (g++ -E: macro expansion, include resolution)
+               [ Translation Unit: main.i ]
+                         |
+                         v  Compiler (g++ -S: AST, optimization, code generation)
+             [ Assembly Code: main.s (x86_64) ]
+                         |
+                         v  Assembler (as: machine instruction translation)
+              [ Object Code: main.o (ELF/COFF) ]
+                         |
+                         v  Linker (ld: symbol resolution, STL & libc binding)
+            [ Standalone Native Executable: main.exe ]
+```
 
 ---
 
-### 2. Core Pillars of C++ Engineering
-1. **Zero-Overhead Principle:** Stroustrup's design axiom dictating that:
-   - What you don't use, you don't pay for.
-   - What you do use, you couldn't hand-code any better.
-2. **RAII (Resource Acquisition Is Initialization):** A foundational idiom tying resource life cycle (memory allocation, file handles, network sockets, mutex locks) to object lifetime, guaranteeing automatic deterministic release upon scope termination via destructors.
-3. **The Standard Template Library (STL):** A standardized, performant collection of generic classes and algorithms:
+### 2. Systems Programming Comparison Matrix (C++ vs C vs Java vs Rust)
+
+| Architectural Dimension | C++ (ISO Standard C++20) | C (ISO C17) | Java (OpenJDK 21 LTS) | Rust (Edition 2021) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Programming Paradigm** | Multi-paradigm (OOP, Generic, Procedural) | Imperative Procedural | Pure Object-Oriented | Multi-paradigm (Trait-based, Functional) |
+| **Memory Management** | RAII + Manual Pointers (`std::unique_ptr`) | Explicit Manual (`malloc` / `free`) | Automatic Tracing Garbage Collector | Compile-Time Ownership & Borrow Checker |
+| **Runtime Overhead** | Zero-Cost Abstractions (Direct Native) | Minimal (Direct Native) | JVM Bytecode & JIT Compilation | Zero-Cost Abstractions (Direct Native) |
+| **Polymorphism Model** | Compile-Time (Templates) & Runtime (`vtable`)| Function Pointers | Runtime Dynamic Dispatch (`vtable`) | Compile-time Monomorphization & Trait Objects |
+| **Hardware Access** | Direct Raw Pointer Arithmetic & Inline ASM | Direct Raw Pointer Arithmetic | Sandboxed inside JVM Memory | Safe Pointer Abstractions (`unsafe` blocks) |
+
+---
+
+### 3. Core Pillars of C++ Engineering
+
+1. **Zero-Overhead Principle:**
+   - Stroustrup's foundational design axiom: What you don't use, you don't pay for. What you do use, you couldn't hand-code any better.
+2. **RAII (Resource Acquisition Is Initialization):**
+   - Resource lifetime (heap memory, socket, mutex, file descriptor) is strictly bound to object lifetime; destructor guarantees cleanup upon exiting scope.
+3. **The Standard Template Library (STL):**
    - *Containers:* `std::vector`, `std::list`, `std::map`, `std::unordered_map`.
-   - *Iterators:* Central abstractions connecting containers with algorithms.
-   - *Algorithms:* `std::sort` ($O(n \\log n)$ introsort), `std::find`, `std::binary_search`."""
+   - *Algorithms:* `std::sort` ($O(n \\log n)$ introsort), `std::binary_search`.
+4. **Pointers, References & Direct Memory Semantics:**
+   - Direct memory manipulation via raw pointers (`*ptr`), reference aliases (`&ref`), and smart pointers (`std::unique_ptr`, `std::shared_ptr`)."""
 
         # Data Structures
         if "data structure" in q_lower and ("explain" in q_lower or "what is" in q_lower):
@@ -1027,7 +1422,15 @@ Array  Linked  Stack Queue                  Trees                         Graphs
 | **Queue (FIFO)** | $\\mathcal{O}(n)$ | $\\mathcal{O}(n)$ | $\\mathcal{O}(1)$ (enqueue) | $\\mathcal{O}(1)$ (dequeue) | CPU scheduling, asynchronous message buffers, BFS traversal. |
 | **Binary Search Tree** | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | Ordered associative lookups (worst case $\\mathcal{O}(n)$ if skewed). |
 | **AVL / Red-Black Tree**| $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | Guaranteed $\\mathcal{O}(\\log n)$ worst-case balanced operations. |
-| **Hash Table** | $\\text{N/A}$ | $\\mathcal{O}(1)$ | $\\mathcal{O}(1)$ | $\\mathcal{O}(1)$ | Key-value dictionary lookups via hash functions. |"""
+| **Hash Table** | $\\text{N/A}$ | $\\mathcal{O}(1)$ | $\\mathcal{O}(1)$ | $\\mathcal{O}(1)$ | Key-value dictionary lookups via hash functions. |
+
+---
+
+### 3. Classification & Selection Criteria in Software Engineering
+
+1. **Direct Access vs Sequential Traversal:** Arrays deliver instant $\\mathcal{O}(1)$ access via index arithmetic, whereas linked lists require sequential $\\mathcal{O}(n)$ pointer hops.
+2. **Dynamic Resizing vs Memory Locality:** Arrays require contiguous memory blocks and reallocation overhead when resizing; linked structures allocate scattered dynamic nodes at runtime.
+3. **Hierarchical Modeling vs Network Topology:** Trees model parent-child hierarchies (filesystems, XML/DOM); graphs model arbitrary relationships (social networks, routing topologies)."""
 
         # Polymorphism in Java
         if "polymorphism" in q_lower and "java" in q_lower:
@@ -1038,18 +1441,36 @@ Array  Linked  Stack Queue                  Trees                         Graphs
 
 ---
 
-### 1. The Two Types of Polymorphism
+### 1. Method Dispatch Workflow Diagram
 
-1. **Compile-Time (Static) Polymorphism — Method Overloading:**
-   - Multiple methods in the same class share the same identifier but have distinct parameter signatures (different number, order, or data types of arguments).
-   - Resolved statically by the compiler at compile-time based on method signatures.
-2. **Runtime (Dynamic) Polymorphism — Method Overriding:**
-   - A subclass provides a specific implementation of a method already declared in its parent superclass with the identical signature and return type.
-   - Resolved dynamically at runtime using **Dynamic Method Dispatch** via the JVM's Virtual Method Table (**`vtable`**).
+```
+                POLYMORPHISM IN JAVA
+                         |
+         +---------------+---------------+
+         |                               |
+COMPILE-TIME POLYMORPHISM       RUNTIME POLYMORPHISM
+   (Method Overloading)          (Method Overriding)
+         |                               |
+Resolved by javac at compile    Resolved dynamically at runtime
+time using argument signatures. using JVM Virtual Table (vtable).
+```
 
 ---
 
-### 2. Complete Annotated Java Implementation
+### 2. Compile-Time vs Runtime Polymorphism Matrix
+
+| Evaluation Dimension | Compile-Time (Method Overloading) | Runtime (Method Overriding) | Examination Significance |
+| :--- | :--- | :--- | :--- |
+| **Resolution Phase** | Compile-Time (Static Binding by `javac`) | Runtime (Dynamic Method Dispatch by JVM) | Overriding incurs negligible dynamic lookup overhead. |
+| **Class Scope** | Occurs within the *same* class | Occurs between *Superclass* and *Subclass* | Requires inheritance hierarchy (`extends` / `implements`). |
+| **Method Signature** | Must differ in parameter count, type, or order | Must be strictly *identical* in name and parameters | Return type must be identical or covariant. |
+| **Access Modifiers** | Can be changed freely without restriction | Cannot reduce visibility in subclass (e.g. `public` -> `protected` forbidden) | Preserves Liskov Substitution Principle (LSP). |
+| **Private/Static/Final** | Overloading is permitted | Overriding is strictly *forbidden* | Static methods are bonded at compile-time (hidden, not overridden). |
+| **Underlying Mechanism** | Compiler name mangling based on type descriptors | JVM `invokevirtual` bytecode opcode using `vtable` pointer | Enables polymorphic collections (`List<Shape> shapes`). |
+
+---
+
+### 3. Complete Annotated Java Implementation
 
 ```java
 // Superclass demonstrating abstract contract
@@ -1123,18 +1544,63 @@ $$\\text{Stoichiometry: } 6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\to \\text{C}_6
 
 ---
 
-### 2. The Two Sequential Biochemical Phases
+### 2. Dual-Phase Photosynthetic Energy Flowchart Diagram
 
-#### Phase A: Light-Dependent Reactions (Thylakoid Membrane)
-- **Photolysis of Water:** Hill reaction splits water molecules into protons, electrons, and oxygen gas:
-  $$ 2\\text{H}_2\\text{O} \\xrightarrow{h\\nu} 4\\text{H}^+ + 4e^- + \\text{O}_2 $$
-- **Z-Scheme Electron Transport Chain:** Photons excite chlorophyll pigments in **Photosystem II (P680)** and **Photosystem I (P700)**.
-- **Photophosphorylation:** Proton gradient across the thylakoid lumen drives ATP Synthase, generating high-energy assimilatory power: **$\\text{ATP}$** and **$\\text{NADPH}$**.
+```
+                       SOLAR RADIANT ENERGY (Photons)
+                                     |
+                                     v
++-------------------------------------------------------------------------+
+| LIGHT-DEPENDENT PHASE (Thylakoid Membrane)                              |
+|                                                                         |
+|  H2O  ------------> [ Photolysis: 2H2O -> 4H+ + 4e- + O2 ] --------> O2 |
+|                             |                                           |
+|                             v  (Z-Scheme Electron Transport Chain)      |
+|                      [ PS II (P680) -> Cytochrome b6f -> PS I (P700) ]  |
+|                             |                                           |
+|                             v  (Photophosphorylation)                   |
+|                   Generates Assimilatory Power:                         |
+|                     [ ATP ]  and  [ NADPH ]                             |
++-------------------------------------------------------------------------+
+                               |
+                               v  (Energy Transferred to Stroma)
++-------------------------------------------------------------------------+
+| LIGHT-INDEPENDENT PHASE / CALVIN CYCLE (Chloroplast Stroma)             |
+|                                                                         |
+|  CO2  ------------> [ 1. Carbon Fixation via RuBisCO Enzyme ]           |
+|                             |                                           |
+|                             v                                           |
+|                     [ 2. Reduction Phase: ATP + NADPH ]                 |
+|                             |                                           |
+|                             v                                           |
+|                     [ 3. Regeneration of RuBP (Ribulose 1,5-bisP) ]     |
+|                             |                                           |
+|                             v                                           |
+|                SYNTHESIS OF CARBOHYDRATE (C6H12O6)                      |
++-------------------------------------------------------------------------+
+```
 
-#### Phase B: Light-Independent Reactions / Calvin Cycle (Chloroplast Stroma)
-1. **Carbon Fixation:** The enzyme **RuBisCO** (Ribulose-1,5-bisphosphate carboxylase-oxygenase) catalyzes the fixation of atmospheric $\\text{CO}_2$ with 5-carbon RuBP to produce an unstable 6-carbon intermediate that immediately cleaves into two molecules of 3-phosphoglycerate (3-PGA).
-2. **Reduction Phase:** ATP and NADPH reduce 3-PGA into glyceraldehyde-3-phosphate (G3P / triose phosphate), the precursor to glucose.
-3. **Regeneration of RuBP:** Complex enzymatic steps consume ATP to regenerate RuBP, ensuring continuous cycle turnover."""
+---
+
+### 3. Light-Dependent vs Light-Independent (Calvin Cycle) Matrix
+
+| Physiological Parameter | Light-Dependent Reactions | Light-Independent Reactions (Calvin Cycle) |
+| :--- | :--- | :--- |
+| **Sub-Cellular Site** | Thylakoid Grana & Lamellae | Chloroplast Stroma (fluid matrix) |
+| **Direct Light Dependence** | Absolutely mandatory (driven by photon absorption) | Independent of direct light (requires products of light phase) |
+| **Initial Reactants** | Solar photons, $\\text{H}_2\\text{O}$, $\\text{ADP}$, $\\text{NADP}^+$ | $\\text{CO}_2$, $\\text{ATP}$, $\\text{NADPH}$, $\\text{RuBP}$ |
+| **Primary Catalytic Engine** | Photosystems II & I, ATP Synthase | **RuBisCO** (Ribulose-1,5-bisphosphate carboxylase/oxygenase)|
+| **End Products** | Chemical energy ($\\text{ATP}$, $\\text{NADPH}$) + Metabolic $\\text{O}_2$ | Stable hexose carbohydrates ($\\text{C}_6\\text{H}_{12}\\text{O}_6$) |
+
+---
+
+### 4. Step-by-Step Biochemical Breakdown
+1. **Photolysis of Water:** Hill reaction splits water: $2\\text{H}_2\\text{O} \\xrightarrow{h\\nu} 4\\text{H}^+ + 4e^- + \\text{O}_2$.
+2. **Z-Scheme Transport:** Excitation of electrons in Photosystem II (P680) and Photosystem I (P700).
+3. **Photophosphorylation:** Proton gradient drives ATP Synthase to generate ATP and NADPH.
+4. **Carbon Fixation (Calvin Cycle):** RuBisCO fixes atmospheric $\\text{CO}_2$ with RuBP to yield 3-phosphoglycerate (3-PGA).
+5. **Reduction Phase:** ATP and NADPH convert 3-PGA into glyceraldehyde-3-phosphate (G3P).
+6. **Regeneration of RuBP:** ATP phosphorylates triose phosphates to regenerate RuBP, completing cycle turnover."""
 
         # DNA Replication
         if "dna replication" in q_lower or ("dna" in q_lower and "process" in q_lower):
@@ -1145,26 +1611,47 @@ $$\\text{Stoichiometry: } 6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\to \\text{C}_6
 
 ---
 
-### 1. Key Enzymatic Machinery
+### 1. Replication Fork Molecular Architecture Diagram
 
-| Enzyme / Factor | Specific Biochemical Function in Replication |
-| :--- | :--- |
-| **DNA Helicase** | Unwinds and unzips the parental double helix at the Origin of Replication (OriC) by hydrolyzing ATP, breaking hydrogen bonds between base pairs. |
-| **Single-Strand DNA-Binding Proteins (SSBs)** | Bind cooperatively to exposed single-stranded DNA to prevent premature re-annealing and hairpin secondary structures. |
-| **Topoisomerase (DNA Gyrase)** | Relieves positive supercoiling and torsional strain ahead of the advancing replication fork by creating transient phosphodiester nicks. |
-| **RNA Primase** | Synthesizes short complementary RNA primers (~10-12 nucleotides) providing the free $3'\\text{-OH}$ group required by DNA polymerases. |
-| **DNA Polymerase III** | The primary catalytic replicase in prokaryotes; synthesizes new DNA strands in the strict $5' \\to 3'$ direction with proofreading ($3' \\to 5'$ exonuclease). |
-| **DNA Polymerase I** | Excises RNA primers via $5' \\to 3'$ exonuclease activity and fills the resulting gaps with deoxynucleotides. |
-| **DNA Ligase** | Catalyzes the formation of phosphodiester bonds to seal nicks between Okazaki fragments, joining the sugar-phosphate backbone. |
+```
+                                 Parental DNA (5' to 3')
+                      =====================================\\
+                                                            \\
+                      Leading Strand (Continuous Synthesis)  \\
+                      5' ---------------------------------> 3'\\
+                         ===================================== \\  Replication Fork
+                                                                \\ (Helicase Unwinds)
+                                                                /
+                         <-----   <-----   <-----              /
+                      3' Okazaki  Okazaki  Okazaki            /
+                         Fragment Fragment Fragment          /
+                      Lagging Strand (Discontinuous)        /
+                      =====================================/
+                                 Parental DNA (3' to 5')
+```
 
 ---
 
-### 2. Step-by-Step Mechanism of the Replication Fork
+### 2. Complete Enzymatic Machinery & Functional Matrix
 
-1. **Initiation:** Initiator proteins bind to specific origin sequences, creating a bidirectional replication bubble with two active replication forks.
-2. **Continuous Synthesis (Leading Strand):** Oriented $3' \\to 5'$ towards the fork, enabling DNA Polymerase III to synthesize the daughter strand continuously in the $5' \\to 3'$ direction.
-3. **Discontinuous Synthesis (Lagging Strand):** Oriented $5' \\to 3'$ away from the fork; synthesized in short fragments (1,000–2,000 bp in prokaryotes) called **Okazaki fragments**.
-4. **Termination & Maturation:** DNA Ligase covalently seals the nicked fragments, and newly synthesized DNA re-coils into stable double helices."""
+| Enzyme / Biochemical Factor | Prokaryotic Form | Primary Catalytic Action | Proofreading Activity |
+| :--- | :--- | :--- | :--- |
+| **DNA Helicase** | DnaB | Hydrolyzes ATP to break hydrogen bonds, unwinding parental double helix. | N/A |
+| **Single-Strand Binding Proteins** | SSB | Stabilizes single-stranded DNA templates, preventing premature re-annealing. | N/A |
+| **Topoisomerase / DNA Gyrase** | Gyrase | Induces transient negative supercoiling, relieving downstream torsional strain. | N/A |
+| **RNA Primase** | DnaG | Synthesizes short 10-12 nt RNA primers providing free $3'\\text{-OH}$ primer termini. | N/A |
+| **DNA Polymerase III** | Pol III Core | Primary replicative polymerase; elongates daughter strand in strict $5' \\to 3'$. | $3' \\to 5'$ Exonuclease |
+| **DNA Polymerase I** | Pol I | Excises RNA primers ($5' \\to 3'$) and replaces them with deoxynucleotides. | $5' \\to 3'$ & $3' \\to 5'$ |
+| **DNA Ligase** | Ligase | Forms phosphodiester bonds to covalently seal nicks between Okazaki fragments. | N/A |
+
+---
+
+### 3. Step-by-Step Mechanism of the Replication Fork
+1. **Initiation at Origin (OriC):** DnaA initiator proteins recognize specific consensus sequences, unwinding DNA into a replication bubble.
+2. **Unwinding & Tension Relief:** Helicase unwinds the double helix while DNA Gyrase relieves positive supercoiling ahead of the fork.
+3. **Leading Strand Synthesis:** RNA Primase deposits a primer; DNA Polymerase III continuously elongates the strand $5' \\to 3'$ toward the advancing fork.
+4. **Lagging Strand Synthesis:** Synthesized discontinuously away from the fork in short Okazaki fragments (1,000-2,000 nucleotides).
+5. **Primer Excision & Ligation:** DNA Polymerase I removes RNA primers via $5' \\to 3'$ exonuclease action and replaces them with DNA; DNA Ligase covalently seals nicks."""
 
         # Opportunity Cost in Economics
         if "opportunity cost" in q_lower:
@@ -1175,28 +1662,46 @@ In economic theory, **Opportunity Cost** represents the value or benefit of the 
 
 ---
 
-### 1. Theoretical Foundations: Scarcity & Choice
-- Economics studies the allocation of scarce productive resources having alternative uses.
-- Whenever resources (land, labor, capital, time) are deployed toward producing good $X$, society automatically sacrifices the potential production of good $Y$.
+### 1. Production Possibility Frontier (PPF) Trade-Off Diagram
+
+```
+Capital Goods (Y)
+  ^
+  |  * Combination A (All Capital Goods)
+  |   \\
+  |    \\  * Combination B
+  |     \\
+  |      \\  * Combination C
+  |       \\
+  |        * Combination D (All Consumer Goods)
+  +----------------------------------------------------> Consumer Goods (X)
+  Slope of PPF = Marginal Rate of Transformation (MRT) = - dY / dX
+```
 
 ---
 
-### 2. Graphical Representation: Production Possibility Frontier (PPF)
-On a Production Possibility Frontier, opportunity cost is quantified by the downward slope of the frontier, known as the **Marginal Rate of Transformation (MRT)**:
+### 2. Production Possibility Schedule & Marginal Rate of Transformation (MRT)
 
-$$ \\text{MRT}_{xy} = -\\frac{\\Delta Y}{\\Delta X} $$
-
-Where:
-- $\\Delta Y$ = Quantity of Good $Y$ sacrificed.
-- $\\Delta X$ = Quantity of Good $X$ gained.
-- The concave curvature of the standard PPF illustrates the **Law of Increasing Opportunity Cost** (resources are not perfectly adaptable to all production processes).
+| Production Combination | Consumer Goods (Units of $X$) | Capital Goods (Units of $Y$) | Opportunity Cost / $\\text{MRT}_{xy}$ ($\\Delta Y / \\Delta X$) |
+| :--- | :--- | :--- | :--- |
+| **A** | $0$ | $15$ | $-$ |
+| **B** | $1$ | $14$ | $1$ Capital Good sacrificed per unit of $X$ |
+| **C** | $2$ | $12$ | $2$ Capital Goods sacrificed per unit of $X$ |
+| **D** | $3$ | $9$ | $3$ Capital Goods sacrificed per unit of $X$ |
+| **E** | $4$ | $5$ | $4$ Capital Goods sacrificed per unit of $X$ |
+| **F** | $5$ | $0$ | $5$ Capital Goods sacrificed per unit of $X$ |
 
 ---
 
-### 3. Explicit vs Implicit Costs
-$$\\text{Total Economic Cost} = \\text{Explicit (Accounting) Costs} + \\text{Implicit Opportunity Costs}$$
-- **Explicit Costs:** Direct out-of-pocket monetary expenditures (e.g. paying employees' wages, raw material purchase, utility bills).
-- **Implicit Costs:** The non-monetary value of resources already owned by the firm deployed without direct market payment (e.g. forgone interest on self-invested capital, forgone salary the entrepreneur could have earned working elsewhere)."""
+### 3. Theoretical Framework & Examination Principles
+
+1. **Law of Increasing Opportunity Cost:**
+   - As production of good $X$ increases, the opportunity cost in terms of good $Y$ forgone rises steadily.
+   - *Reason:* Productive resources are specialized and not perfectly adaptable across distinct manufacturing domains.
+2. **Explicit vs Implicit Costs:**
+   - $\\text{Total Economic Cost} = \\text{Explicit (Accounting) Costs} + \\text{Implicit Opportunity Costs}$.
+   - *Explicit Costs:* Out-of-pocket cash payments (wages, raw materials, factory rent).
+   - *Implicit Costs:* Non-monetary opportunity costs of owned resources (forgone interest on personal equity, forgone salary)."""
 
         # Causes of World War I
         if "world war i" in q_lower or "causes of world war" in q_lower or "causes of ww1" in q_lower:
@@ -1207,28 +1712,43 @@ World War I was triggered by an explosive convergence of long-term structural ge
 
 ---
 
-### 1. Structural Long-Term Causes: The M-A-I-N Framework
+### 1. European Alliance & Crisis Escalation Flowchart Diagram
 
-1. **M — Militarism:**
-   - The rapid industrialization of warfare produced massive standing armies and naval expansion.
-   - The Anglo-German naval arms race (construction of HMS Dreadnought battleships) destabilized maritime power dynamics.
-   - Rigorous military mobilization timetables (such as Germany's Schlieffen Plan) meant that diplomatic mobilization was equivalent to an irreversible declaration of war.
-2. **A — Alliances (The Web of Treaties):**
-   - Europe was partitioned into two armed camps bound by mutual defense obligations:
-     - **Triple Entente:** Great Britain, France, and the Russian Empire.
-     - **Triple Alliance:** Germany, Austria-Hungary, and Italy.
-   - A bilateral conflict between Austria-Hungary and Serbia was structurally guaranteed to trigger a continent-wide domino effect.
-3. **I — Imperialism:**
-   - Intense imperial competition among European powers for African and Asian colonies ("The Scramble for Africa") generated acute friction (e.g. the Moroccan Crises of 1905 and 1911).
-4. **N — Nationalism:**
-   - Intense Pan-Slavic nationalism in the Balkan peninsula ("The Powder Keg of Europe") challenged the multi-ethnic Austro-Hungarian Empire.
+```
++-------------------------------------------------------------+
+| TRIPLE ALLIANCE (Central Powers): Germany, Austria-Hungary  |
++-------------------------------------------------------------+
+                               ^
+                               | Geopolitical Rivalry & Arms Race
+                               v
++-------------------------------------------------------------+
+| TRIPLE ENTENTE (Allied Powers): Great Britain, France, Russia|
++-------------------------------------------------------------+
+                               |
+                               v  June 28, 1914
+    [ Sarajevo Assassination of Archduke Franz Ferdinand by Gavrilo Princip ]
+                               |
+                               v  The July Diplomatic Crisis
+         Austria-Hungary Ultimatum -> Russian General Mobilization
+               -> Germany Declares War -> Britain Enters Conflict
+```
 
 ---
 
-### 2. The Immediate Catalyst (The Spark)
-On **June 28, 1914**, Archduke **Franz Ferdinand**, heir presumptive to the Austro-Hungarian throne, and his wife Sophie were assassinated in Sarajevo, Bosnia, by **Gavrilo Princip**, a 19-year-old Serbian nationalist belonging to the secret society *The Black Hand*.
+### 2. The M-A-I-N Long-Term Causes Matrix
 
-This assassination unleashed the **July Crisis**: Austria-Hungary issued an ultimatum to Serbia, Russia mobilized to protect its Slavic ally, Germany declared war on Russia and France, and Britain entered after Germany violated Belgian neutrality."""
+| Long-Term Cause | Core Historical Drivers | Key Powers Involved | Impact on 1914 Escalation |
+| :--- | :--- | :--- | :--- |
+| **M — Militarism** | Anglo-German Naval Arms Race (HMS Dreadnought); massive standing conscript armies. | Germany, Great Britain, France, Russia | Military mobilization timetables (Schlieffen Plan) made war irreversible once ordered. |
+| **A — Alliances** | Secret diplomatic pacts and mutual defense commitments dividing Europe into armed camps. | Triple Entente vs Triple Alliance | Guaranteed a localized Balkan conflict would escalate into a continent-wide war. |
+| **I — Imperialism** | Colonial competition for African and Asian resources ("Scramble for Africa", Moroccan Crises). | Britain, France, Germany, Ottoman Empire | Created constant friction and diplomatic brinkmanship between empires. |
+| **N — Nationalism** | Pan-Slavic nationalism seeking independence from the Austro-Hungarian Empire. | Serbia, Austro-Hungarian Empire, Russia | Created the "Powder Keg of Europe" in the Balkan peninsula. |
+
+---
+
+### 3. The Immediate Catalyst (The Spark of 1914)
+1. **The Assassination:** On **June 28, 1914**, Archduke **Franz Ferdinand**, heir presumptive to the Austro-Hungarian throne, was assassinated in Sarajevo by **Gavrilo Princip**, a member of the Serbian nationalist secret society *The Black Hand*.
+2. **The July Crisis:** Austria-Hungary issued an ultimatum to Serbia. When Serbia accepted only conditionally, Austria-Hungary declared war. Russia mobilized to defend its Slavic ally, activating alliance tripwires that engulfed the continent."""
 
         # Machine Learning
         if "machine learning" in q_lower and ("what is" in q_lower or "explain" in q_lower or "types" in q_lower):
@@ -1239,10 +1759,10 @@ This assassination unleashed the **July Crisis**: Austria-Hungary issued an ulti
 
 ---
 
-### 1. The Three Primary Learning Paradigms
+### 1. Machine Learning Taxonomical Tree
 
 ```
-                           Machine Learning
+                           MACHINE LEARNING
                                   |
          +------------------------+------------------------+
          |                                                 |
@@ -1259,19 +1779,20 @@ Regression Classification                        Clustering Dimensionality Reduc
 
 ---
 
-### 2. Detailed Technical Breakdown
+### 2. Core ML Paradigms Comparison Matrix
 
-1. **Supervised Learning:**
-   - Objective: Learn a hypothesis function $h_\\theta: \\mathcal{X} \\to \\mathcal{Y}$ minimizing an empirical loss function $\\mathcal{L}(y, \\hat{y})$.
-   - *Regression:* Output is continuous ($y \\in \\mathbb{R}$). Algorithms: Ordinary Least Squares (OLS), Ridge/Lasso, Support Vector Regression.
-   - *Classification:* Output is discrete categorical ($y \\in \\{1, \\dots, K\\}$). Algorithms: Logistic Regression, Support Vector Machines (SVM), Random Forests, Deep Neural Networks.
-2. **Unsupervised Learning:**
-   - Objective: Discover latent geometric structures, probability densities, or groupings in unlabeled datasets $\\{x_i\\}_{i=1}^N$.
-   - *Clustering:* Partition data into $k$ coherent clusters minimizing within-cluster sum of squares (K-Means, Agglomerative Hierarchical, DBSCAN).
-   - *Dimensionality Reduction:* Project high-dimensional feature vectors into lower-dimensional subspaces while preserving maximal variance (Principal Component Analysis - PCA).
-3. **Reinforcement Learning (RL):**
-   - Formulated as a **Markov Decision Process (MDP)**: $(S, A, P, R, \\gamma)$.
-   - An agent interacts with an environment, selecting actions $a_t \\in A$ given state $s_t \\in S$ to maximize expected cumulative discounted reward $G_t = \\sum_{k=0}^\\infty \\gamma^k R_{t+k+1}$."""
+| Paradigm | Training Data Required | Objective / Optimization Goal | Key Algorithms | University Examination Applications |
+| :--- | :--- | :--- | :--- | :--- |
+| **Supervised Learning** | Labeled pairs $\\{(x_i, y_i)\\}_{i=1}^N$ | Minimize empirical risk: $\\min_\\theta \\sum \\mathcal{L}(y_i, f_\\theta(x_i))$ | Linear/Logistic Regression, SVM, Random Forests, Deep ANNs | Medical diagnosis, spam filtering, credit scoring. |
+| **Unsupervised Learning** | Unlabeled feature vectors $\\{x_i\\}_{i=1}^N$ | Discover latent geometric structure, clusters, or distributions | K-Means, DBSCAN, PCA, Autoencoders | Customer segmentation, anomaly detection, genomic clustering. |
+| **Reinforcement Learning** | Environmental state, action, reward $(S, A, P, R, \\gamma)$ | Maximize expected cumulative discounted return: $\\mathbb{E}[\\sum \\gamma^t R_t]$ | Q-Learning, SARSA, Deep Q-Networks (DQN), PPO | Autonomous robotics, algorithmic game playing (AlphaGo). |
+
+---
+
+### 3. Detailed Technical Breakdown
+1. **Supervised Regression & Classification:** Continuous predictions ($y \\in \\mathbb{R}$) vs discrete categorical predictions ($y \\in \\{1, \\dots, K\\}$).
+2. **Unsupervised Clustering & Dimensionality Reduction:** Grouping patterns by intra-cluster distance vs projecting high-dimensional data onto orthogonal eigenvectors of maximum variance (PCA).
+3. **Reinforcement Learning:** Agents interacting with environments formulated as Markov Decision Processes (MDPs)."""
 
         # Neural Network Working
         if "neural network" in q_lower and ("working" in q_lower or "explain" in q_lower or "how does" in q_lower):
@@ -1282,59 +1803,118 @@ An **Artificial Neural Network (ANN)** is a computational model inspired by biol
 
 ---
 
-### 1. Core Architectural Topology
-A standard Multi-Layer Perceptron (MLP) consists of:
-1. **Input Layer:** Receives the feature vector $\\mathbf{x} = [x_1, x_2, \\dots, x_d]^T$.
-2. **Hidden Layers:** Performs non-linear feature extractions via learned weight matrices $\\mathbf{W}^{[l]}$ and bias vectors $\\mathbf{b}^{[l]}$.
-3. **Output Layer:** Produces predictions $\\hat{\\mathbf{y}}$ (scalar for regression, probability distribution for classification).
+### 1. Multi-Layer Perceptron (MLP) Tensor Flow Diagram
+
+```
+[ INPUT LAYER: x ]       [ HIDDEN LAYER: h ]          [ OUTPUT LAYER: y_hat ]
+       (d Features)            (k Neurons)                (C Classes / Scalar)
+
+      +--------+               +--------+
+      |  x_1   | ------------> |  h_1   | ------------+
+      +--------+ \\           / +--------+ \\           |
+                  \\         /              \\          v
+      +--------+   \\       /   +--------+   \\    +--------+
+      |  x_2   | ---+-----+--> |  h_2   | ---+-> | y_hat  | ---> Loss L(y, y_hat)
+      +--------+   /       \\   +--------+   /    +--------+
+                  /         \\              /          ^
+      +--------+ /           \\ +--------+ /           |
+      |  x_d   | ------------> |  h_k   | ------------+
+      +--------+               +--------+
+                     W^[1], b^[1]             W^[2], b^[2]
+                     z = Wx + b               z = Wh + b
+                     a = sigma(z)             y_hat = softmax(z)
+          ===================================================>
+                           FORWARD PASS
+          <===================================================
+                   BACKWARD PASS (dL/dW via Chain Rule)
+```
 
 ---
 
-### 2. Forward Propagation (Inference)
-For each layer $l$ from $1$ to $L$:
+### 2. Activation Functions Comparison Matrix
 
-$$\\mathbf{z}^{[l]} = \\mathbf{W}^{[l]} \\mathbf{a}^{[l-1]} + \\mathbf{b}^{[l]}$$
-$$\\mathbf{a}^{[l]} = \\sigma\\left(\\mathbf{z}^{[l]}\\right)$$
-
-Where:
-- $\\mathbf{z}^{[l]}$ = Affine linear combination vector.
-- $\\mathbf{W}^{[l]} \\in \\mathbb{R}^{n_l \\times n_{l-1}}$ = Learnable parameter weight matrix.
-- $\\mathbf{b}^{[l]} \\in \\mathbb{R}^{n_l}$ = Bias vector.
-- $\\sigma(\\cdot)$ = Non-linear activation function (e.g. $\\text{ReLU}(z) = \\max(0, z)$, $\\text{Sigmoid}(z) = \\frac{1}{1 + e^{-z}}$, or $\\text{Softmax}$).
+| Activation Function | Mathematical Formulation | Output Range $(\\mathcal{Y})$ | Derivative $\\sigma'(z)$ | Primary Network Application |
+| :--- | :--- | :--- | :--- | :--- |
+| **Rectified Linear Unit (ReLU)** | $\\text{ReLU}(z) = \\max(0, z)$ | $[0, +\\infty)$ | $1$ if $z > 0$, else $0$ | Hidden layers in Deep CNNs, MLPs (prevents vanishing gradient). |
+| **Sigmoid (Logistic)** | $\\sigma(z) = \\frac{1}{1 + e^{-z}}$ | $(0, 1)$ | $\\sigma(z)(1 - \\sigma(z))$ | Binary classification output layer, gating in LSTMs. |
+| **Hyperbolic Tangent (Tanh)** | $\\tanh(z) = \\frac{e^z - e^{-z}}{e^z + e^{-z}}$ | $(-1, +1)$ | $1 - \\tanh^2(z)$ | Zero-centered hidden layers, RNN recurrent cell states. |
+| **Softmax** | $\\text{Softmax}(z_i) = \\frac{e^{z_i}}{\\sum_j e^{z_j}}$ | $(0, 1), \\sum y_i = 1$ | $S_i(\\delta_{ij} - S_j)$ | Multi-class classification output layer (probability distribution). |
+| **Leaky ReLU** | $\\max(\\alpha z, z), \\alpha \\approx 0.01$ | $(-\\infty, +\\infty)$ | $1$ if $z > 0$, else $\\alpha$ | Eliminates the "Dying ReLU" neuron extinction problem. |
 
 ---
 
-### 3. Loss Computation & Backward Propagation (Training)
-1. **Loss Evaluation:** Measure prediction divergence via objective function (e.g. Mean Squared Error or Categorical Cross-Entropy):
-   $$\\mathcal{L}(\\mathbf{y}, \\hat{\\mathbf{y}}) = -\\sum_{k=1}^K y_k \\ln(\\hat{y}_k)$$
-2. **Backpropagation (The Calculus Chain Rule):** Compute gradients of the loss function with respect to every weight parameter:
-   $$\\frac{\\partial \\mathcal{L}}{\\partial \\mathbf{W}^{[l]}} = \\frac{\\partial \\mathcal{L}}{\\partial \\mathbf{z}^{[l]}} (\\mathbf{a}^{[l-1]})^T$$
-3. **Gradient Descent Optimization:** Update weights iteratively with learning rate $\\alpha$:
-   $$\\mathbf{W}^{[l]} \\leftarrow \\mathbf{W}^{[l]} - \\alpha \\frac{\\partial \\mathcal{L}}{\\partial \\mathbf{W}^{[l]}}$$"""
+### 3. Step-by-Step Computational Workflow
+
+1. **Forward Propagation (Inference):**
+   - For layer $l$:
+     $$\\mathbf{z}^{[l]} = \\mathbf{W}^{[l]} \\mathbf{a}^{[l-1]} + \\mathbf{b}^{[l]}$$
+     $$\\mathbf{a}^{[l]} = \\sigma(\\mathbf{z}^{[l]})$$
+2. **Loss Evaluation:**
+   - Categorical cross-entropy for multi-class classification:
+     $$\\mathcal{L}(\\mathbf{y}, \\hat{\\mathbf{y}}) = -\\sum_{k=1}^K y_k \\ln(\\hat{y}_k)$$
+3. **Backpropagation (Calculus Chain Rule):**
+   - Compute sensitivity vectors and parameter gradients:
+     $$\\frac{\\partial \\mathcal{L}}{\\partial \\mathbf{W}^{[l]}} = \\frac{\\partial \\mathcal{L}}{\\partial \\mathbf{z}^{[l]}} (\\mathbf{a}^{[l-1]})^T$$
+4. **Gradient Descent Parameter Update:**
+   - Update weights with learning rate $\\alpha$:
+     $$\\mathbf{W}^{[l]} \\leftarrow \\mathbf{W}^{[l]} - \\alpha \\frac{\\partial \\mathcal{L}}{\\partial \\mathbf{W}^{[l]}}$$"""
 
         # Law of Demand
         if "law of demand" in q_lower:
             return """### The Law of Demand: Statement, Graphical Schedule & Theoretical Causes
 
 **Formal Economic Statement:**
-The **Law of Demand** states that, *ceteris paribus* (all other economic factors such as consumer income, tastes, and prices of related goods remaining constant), there exists an **inverse relationship** between the price of a good and the quantity demanded of that good:
+The **Law of Demand** states that, *ceteris paribus* (all other economic determinants such as consumer income, tastes, preferences, and prices of related substitute/complementary goods remaining constant), there exists an **inverse relationship** between the price of a commodity and its quantity demanded:
 
 $$ P \\uparrow \\implies Q_d \\downarrow \\quad \\text{and} \\quad P \\downarrow \\implies Q_d \\uparrow $$
 
 ---
 
-### 1. Underlying Theoretical Foundations for Downward Slope
-Why does the demand curve slope downward from left to right?
-1. **Law of Diminishing Marginal Utility:** As a consumer consumes successive units of a commodity, the additional utility (satisfaction) derived from each additional unit declines ($MU_x \\downarrow$). Hence, the consumer is willing to purchase more units only if the price drops ($P_x = MU_x$).
-2. **Income Effect:** A decline in the price of a good increases the consumer's real purchasing power (real income), enabling them to purchase a higher quantity of the good with the same nominal budget.
-3. **Substitution Effect:** When good $X$ becomes cheaper relative to substitute good $Y$, consumers substitute the cheaper good $X$ in place of the more expensive good $Y$.
-4. **New Consumers Entering the Market:** Lower prices make the product affordable to a broader demographic of consumers who could not purchase at higher price points.
+### 1. Downward-Sloping Market Demand Curve
+
+```
+Price (P)
+  ^
+  |  P1 +--------* (Point A)
+  |     |        \\
+  |  P2 +---------+-------* (Point B)
+  |     |         |        \\
+  |     |         |         \\  Demand Curve (D)
+  +-----+---------+----------+---------------------> Quantity Demanded (Q)
+        0        Q1         Q2
+```
 
 ---
 
-### 2. Exceptions to the Law of Demand (Upward Sloping Demand)
-- **Giffen Goods:** Highly inferior goods lacking close substitutes where a price rise consumes so much real income that consumers buy more of it (positive price elasticity).
-- **Veblen Goods (Conspicuous Consumption):** Luxury status goods (e.g. Rolex watches, luxury sports cars) where higher prices signal social prestige."""
+### 2. Market Demand Schedule Matrix
+
+| Price per Unit (\\$) | Quantity Demanded (Units) | Total Consumer Expenditure (\\$) | Elasticity Classification |
+| :--- | :--- | :--- | :--- |
+| **\\$5.00** | $10$ | \\$50.00 | Relatively Elastic |
+| **\\$4.00** | $20$ | \\$80.00 | Elastic Segment |
+| **\\$3.00** | $35$ | \\$105.00 | Unitary Elastic ($E_d = 1$) |
+| **\\$2.00** | $55$ | \\$110.00 | Inelastic Segment |
+| **\\$1.00** | $80$ | \\$80.00 | Highly Inelastic ($E_d < 1$) |
+
+---
+
+### 3. Four Theoretical Causes for Downward Slope
+
+1. **Law of Diminishing Marginal Utility:**
+   - As a consumer consumes successive units of a good, the marginal utility ($MU$) derived from each additional unit declines.
+   - A rational consumer buys additional units only if the market price drops to equal marginal utility ($P = MU$).
+2. **Income Effect:**
+   - When the price of a good declines, consumer real purchasing power (real income) rises, allowing them to purchase greater quantity with the same nominal budget.
+3. **Substitution Effect:**
+   - When commodity $X$ becomes cheaper relative to substitute commodity $Y$, consumers substitute the cheaper good $X$ in place of $Y$.
+4. **Demographic Expansion:**
+   - Lower price points make the good accessible to new tiers of buyers who could not previously afford the item.
+
+---
+
+### 4. Exceptions to the Law of Demand (Upward Sloping)
+- **Giffen Goods:** Highly inferior necessities lacking close substitutes; a price increase consumes so much real income that consumers buy more of it.
+- **Veblen Goods (Conspicuous Consumption):** Luxury status commodities where higher price signals prestige."""
 
         # Research Methodology
         if "research methodology" in q_lower:
@@ -1381,37 +1961,55 @@ An **AVL Tree** (named after Soviet inventors Georgy Adelson-Velsky and Evgenii 
 
 ---
 
-### 1. The Balance Factor Condition
+### 1. The 4 Balancing Rotations Flowchart
+
+```
+                          UNBALANCED AVL NODE (|BF| > 1)
+                                        |
+          +-----------------------------+-----------------------------+
+          |                                                           |
+    SINGLE ROTATIONS                                           DOUBLE ROTATIONS
+          |                                                           |
+  +-------+-------+                                           +-------+-------+
+  |               |                                           |               |
+Left-Left (LL)  Right-Right (RR)                            Left-Right (LR) Right-Left (RL)
+Single Right    Single Left                                 Left on Child,  Right on Child,
+Rotation        Rotation                                    Right on Parent Left on Parent
+```
+
+---
+
+### 2. Binary Search Tree Balancing Comparison Matrix
+
+| Tree Structure | Height Bound ($h$) | Search Time | Insertion Time | Rebalancing Rotations per Insert |
+| :--- | :--- | :--- | :--- | :--- |
+| **Standard BST** | $\\mathcal{O}(n)$ (Worst Skewed) | $\\mathcal{O}(n)$ | $\\mathcal{O}(n)$ | None (Degrades to linked list) |
+| **AVL Tree** | $\\le 1.44 \\log_2(n)$ (Strictly Balanced) | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | At most $1$ single or double rotation |
+| **Red-Black Tree** | $\\le 2 \\log_2(n+1)$ (Looser Balance) | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | At most $2$ rotations + recoloring |
+| **B-Tree** | $\\mathcal{O}(\\log_M n)$ (Multi-way) | $\\mathcal{O}(\\log n)$ | $\\mathcal{O}(\\log n)$ | Node splitting / merging |
+
+---
+
+### 3. The Balance Factor Condition & Rotations Breakdown
+
 For every node $N$ in an AVL tree, the **Balance Factor** $\\text{BF}(N)$ must satisfy:
 $$ \\text{BF}(N) = \\text{Height}(\\text{Left Subtree}) - \\text{Height}(\\text{Right Subtree}) \\in \\{-1, 0, +1\\} $$
 
-If following an insertion or deletion $|\\text{BF}(N)| > 1$, the tree is rebalanced using tree rotations.
-
----
-
-### 2. The Four Balancing Rotations
-
 1. **Left-Left (LL) Heavy $\\implies$ Single Right Rotation:**
-   - Unbalance caused by an insertion into the left subtree of the left child.
-   - Rotates node to the right to restore balance.
+   - Insertion occurred into the left subtree of the left child ($\\\\text{{BF}} = +2$).
 2. **Right-Right (RR) Heavy $\\implies$ Single Left Rotation:**
-   - Unbalance caused by an insertion into the right subtree of the right child.
-   - Rotates node to the left to restore balance.
+   - Insertion occurred into the right subtree of the right child ($\\\\text{{BF}} = -2$).
 3. **Left-Right (LR) Heavy $\\implies$ Double Rotation (Left-then-Right):**
-   - Unbalance caused by an insertion into the right subtree of the left child.
-   - Step 1: Perform Left Rotation on left child.
-   - Step 2: Perform Right Rotation on parent.
+   - Step 1: Left rotation on left child. Step 2: Right rotation on parent.
 4. **Right-Left (RL) Heavy $\\implies$ Double Rotation (Right-then-Left):**
-   - Unbalance caused by an insertion into the left subtree of the right child.
-   - Step 1: Perform Right Rotation on right child.
-   - Step 2: Perform Left Rotation on parent.
+   - Step 1: Right rotation on right child. Step 2: Left rotation on parent.
 
 ---
 
-### 3. Complexity Guarantees
+### 4. Complexity Guarantees
 - **Worst-Case Search Time:** $\\mathcal{O}(\\log n)$
-- **Worst-Case Insertion Time:** $\\mathcal{O}(\\log n)$ (at most two rotations needed)
-- **Worst-Case Deletion Time:** $\\mathcal{O}(\\log n)$ (may require up to $\\mathcal{O}(\\log n)$ rotations)"""
+- **Worst-Case Insertion Time:** $\\mathcal{O}(\\log n)$
+- **Worst-Case Deletion Time:** $\\mathcal{O}(\\log n)$"""
 
         return None
 
@@ -1566,7 +2164,7 @@ class DynamicAcademicAIModel:
         if rag_results:
             chunks = []
             for r in rag_results:
-                clean_ans = re.sub(r'<[^>]+>', ' ', r.get('a') or r.get('ans') or '').strip()
+                clean_ans = html_to_exam_markdown(r.get('a') or r.get('ans') or '')
                 chunks.append(f"University Reference Question: {r.get('q')}\nReference Solution:\n{clean_ans}")
             grounding_context = "[UNIVERSITY QUESTION BANK REFERENCE]:\n" + "\n\n---\n\n".join(chunks)
 
@@ -1674,7 +2272,7 @@ class DynamicAcademicAIModel:
             # Check Verified Question Bank RAG (for university syllabus questions)
             if not result_text and rag_results and rag_results[0].get('similarity', 0) >= 0.40:
                 best = rag_results[0]
-                clean_ans = re.sub(r'<[^>]+>', '', best.get('a') or best.get('ans') or '').strip()
+                clean_ans = html_to_exam_markdown(best.get('a') or best.get('ans') or '')
                 if clean_ans:
                     result_text = f"### {best.get('q')}\n\n{clean_ans}"
                     used_model = "academic-ml-vector-rag"
@@ -1712,18 +2310,29 @@ class DynamicAcademicAIModel:
 ---
 
 ### 1. Conceptual Framework & Definition
-In university curricula and academic examinations, **{clean_title}** forms an integral topic of study within **{domain}**. It is investigated through theoretical proofs, empirical laws, and systematic domain mechanisms.
+In university curricula and academic examinations, **{clean_title}** forms an essential subject of study within **{domain}**. It is investigated through theoretical proofs, empirical laws, and systematic domain mechanisms.
 
 ---
 
-### 2. Theoretical Principles & Invariants
-- **Core Principles:** Governed by established formal, theoretical, or empirical laws ensuring system consistency and predictable execution bounds.
-- **Analytical Methods:** Evaluated using qualitative taxonomies, mathematical modeling, and comparative benchmarks.
-- **Real-World Implementation:** Applied across modern industrial workflows, research laboratories, and institutional systems.
+### 2. System Architecture & Processing Workflow
+
+```
+[ Theoretical Input / Axioms ] ---> [ Analytical Processing ] ---> [ Verified Academic Solution ]
+```
 
 ---
 
-### 3. Examination Strategy & Best Practices
+### 3. Examination Taxonomy & Assessment Criteria
+
+| Curricular Dimension | Scholarly Method & Invariants | University Grading Weight |
+| :--- | :--- | :--- |
+| **Foundational Theory** | Formal axiomatic formulation, historical provenance, and conceptual definitions. | High (Defines primary marks) |
+| **Analytical Rigor** | Mathematical proofs, quantitative models, and algorithmic complexities. | High (Critical for full credit) |
+| **Empirical Application** | Real-world case studies, system implementations, and experimental evidence. | Moderate (Demonstrates practical mastery) |
+
+---
+
+### 4. Examination Strategy & Best Practices
 - **Define Formally:** Open the answer with an unambiguous definition highlighting historical and theoretical origins.
 - **Structural Headings:** Partition response into theoretical foundations, architectural mechanisms, and real-world case studies.
 - **Mathematical / Schematic Rigor:** State all equations with standard SI units and illustrate workflows with diagrams."""

@@ -206,6 +206,15 @@
     if (!md) return '';
     let html = md;
 
+    // Mermaid diagrams
+    html = html.replace(/```mermaid\n([\s\S]*?)```/g, (match, code) => {
+      return `
+        <div class="my-3 p-3 bg-slate-50/80 border border-slate-200 rounded-xl overflow-x-auto flex justify-center shadow-sm">
+          <div class="mermaid text-xs font-sans">${code.trim()}</div>
+        </div>
+      `;
+    });
+
     // Code blocks with syntax highlighting & Copy Button
     html = html.replace(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, (match, lang, code) => {
       const language = lang || 'code';
@@ -233,7 +242,7 @@
     html = html.replace(/\*([^*]+)\*/g, '<em class="italic text-slate-700">$1</em>');
 
     // Tables
-    html = html.replace(/((?:\|[^\n]+\|\r?\n)+)/g, (tableText) => {
+    html = html.replace(/((?:\|[^\n]+\|(?:\r?\n|$))+)/g, (tableText) => {
       const rows = tableText.trim().split('\n').filter(r => r.trim());
       if (rows.length < 2) return tableText;
       let tableHtml = '<div class="overflow-x-auto my-3 rounded-xl border border-slate-200 shadow-sm"><table class="min-w-full text-xs text-left divide-y divide-slate-200">';
@@ -255,7 +264,27 @@
       return tableHtml;
     });
 
-    html = html.replace(/^\s*-\s+(.*$)/gim, '<li class="ml-4 list-disc text-slate-700 mb-1">$1</li>');
+    // Unordered lists
+    html = html.replace(/(?:^\s*[-*]\s+.*(?:\r?\n|$))+/gm, (listBlock) => {
+      const items = listBlock.trim().split('\n').map(line => {
+        const content = line.replace(/^\s*[-*]\s+/, '').trim();
+        return `<li class="ml-4 list-disc text-slate-700 leading-relaxed mb-1">${content}</li>`;
+      }).join('');
+      return `<ul class="my-2.5 pl-2 space-y-1">${items}</ul>`;
+    });
+
+    // Ordered numbered lists
+    html = html.replace(/(?:^\s*\d+\.\s+.*(?:\r?\n|$))+/gm, (listBlock) => {
+      const items = listBlock.trim().split('\n').map(line => {
+        const m = line.match(/^\s*(\d+)\.\s+(.*)$/);
+        if (m) {
+          return `<li class="ml-5 list-decimal text-slate-700 leading-relaxed mb-1"><span class="font-semibold text-slate-900">${m[1]}.</span> ${m[2]}</li>`;
+        }
+        return `<li class="ml-5 list-decimal text-slate-700 leading-relaxed mb-1">${line}</li>`;
+      }).join('');
+      return `<ol class="my-2.5 pl-2 space-y-1 list-none">${items}</ol>`;
+    });
+
     html = html.replace(/\n\n+/g, '</p><p class="mb-2 leading-relaxed text-slate-800">');
 
     return `<p class="mb-2 leading-relaxed text-slate-800">${html}</p>`;
@@ -350,6 +379,19 @@
             ],
             throwOnError: false
           });
+        }
+      } catch (e) {}
+    }
+
+    // Mermaid diagram auto-render
+    if (typeof mermaid !== 'undefined') {
+      try {
+        const lastEl = thread ? thread.lastElementChild : null;
+        if (lastEl) {
+          const mNodes = lastEl.querySelectorAll('.mermaid');
+          if (mNodes.length > 0) {
+            mermaid.init(undefined, mNodes);
+          }
         }
       } catch (e) {}
     }
