@@ -329,7 +329,43 @@
     // Java
     if (/\bjava\b/.test(query) && !/\bjavascript\b/.test(query)) {
       return {
-        text: `### University Examination Analysis: Java Programming Language & Architecture\n\n**Disciplinary Classification:** Computer Science & Software Engineering  \n**Curricular Reference:** Object-Oriented Software Development\n\n---\n\n### 1. Conceptual Definition & Paradigm\n**Java** is a high-level, class-based, object-oriented, concurrent, and secure programming language developed by Sun Microsystems (now Oracle Corporation) in 1995. It was engineered under the core philosophy of **WORA ("Write Once, Run Anywhere")**, enabling compiled Java code to execute across any operating system without recompilation.\n\n### 2. Architectural Pillars\n• **Java Virtual Machine (JVM):** Abstract execution engine that loads, verifies, and executes Java bytecode, performing Just-In-Time (JIT) compilation to native CPU instructions.\n• **Java Runtime Environment (JRE):** Provides class libraries and runtime binaries necessary to run Java programs.\n• **Java Development Kit (JDK):** Comprehensive development suite containing the compiler (\`javac\`), debugger, archiver (\`jar\`), and JRE.\n• **Bytecode (\`.class\` files):** Intermediate machine-independent bytecode produced by \`javac\`.\n• **Automatic Memory Management:** Garbage Collector (GC) dynamically reclaims unreferenced heap objects, preventing dangling pointers and memory leaks.\n\n### 3. Core Object-Oriented Principles (OOP)\n1. **Encapsulation:** Binding data and methods into a single unit (class) with access specifiers (\`private\`, \`protected\`, \`public\`).\n2. **Inheritance:** Hierarchical code reusability using the \`extends\` keyword.\n3. **Polymorphism:** Method Overloading (compile-time) and Method Overriding (runtime).\n4. **Abstraction:** Hiding complex implementation details using \`abstract\` classes and \`interface\` contracts.\n\n### 4. Implementation Demonstration\n```java\n// Demonstration of OOP principles and execution in Java\npublic class JavaDemo {\n    public static void main(String[] args) {\n        System.out.println("Java: Robust, Platform-Independent, Object-Oriented Execution");\n    }\n}\n```\n\n### 5. Examination Summary\nJava delivers cross-platform portability through bytecode interpretation on the JVM, robust memory safety through garbage collection, and strict type safety across enterprise and academic systems.`,
+        text: [
+          '### University Examination Analysis: Java Programming Language & Architecture',
+          '',
+          '**Disciplinary Classification:** Computer Science & Software Engineering',
+          '**Curricular Reference:** Object-Oriented Software Development',
+          '',
+          '---',
+          '',
+          '### 1. Conceptual Definition & Paradigm',
+          '**Java** is a high-level, class-based, object-oriented, concurrent, and secure programming language developed by Sun Microsystems (now Oracle Corporation) in 1995. It was engineered under the core philosophy of **WORA ("Write Once, Run Anywhere")**, enabling compiled Java code to execute across any operating system without recompilation.',
+          '',
+          '### 2. Architectural Pillars',
+          '• **Java Virtual Machine (JVM):** Abstract execution engine that loads, verifies, and executes Java bytecode, performing Just-In-Time (JIT) compilation to native CPU instructions.',
+          '• **Java Runtime Environment (JRE):** Provides class libraries and runtime binaries necessary to run Java programs.',
+          '• **Java Development Kit (JDK):** Comprehensive development suite containing the compiler (`javac`), debugger, archiver (`jar`), and JRE.',
+          '• **Bytecode (`.class` files):** Intermediate machine-independent bytecode produced by `javac`.',
+          '• **Automatic Memory Management:** Garbage Collector (GC) dynamically reclaims unreferenced heap objects, preventing dangling pointers and memory leaks.',
+          '',
+          '### 3. Core Object-Oriented Principles (OOP)',
+          '1. **Encapsulation:** Binding data and methods into a single unit (class) with access specifiers (`private`, `protected`, `public`).',
+          '2. **Inheritance:** Hierarchical code reusability using the `extends` keyword.',
+          '3. **Polymorphism:** Method Overloading (compile-time) and Method Overriding (runtime).',
+          '4. **Abstraction:** Hiding complex implementation details using `abstract` classes and `interface` contracts.',
+          '',
+          '### 4. Implementation Demonstration',
+          '```java',
+          '// Demonstration of OOP principles and execution in Java',
+          'public class JavaDemo {',
+          '    public static void main(String[] args) {',
+          '        System.out.println("Java: Robust, Platform-Independent, Object-Oriented Execution");',
+          '    }',
+          '}',
+          '```',
+          '',
+          '### 5. Examination Summary',
+          'Java delivers cross-platform portability through bytecode interpretation on the JVM, robust memory safety through garbage collection, and strict type safety across enterprise and academic systems.'
+        ].join('\n'),
         source: 'campus-concept-engine',
         model: 'Universal Computer Science Knowledge Base'
       };
@@ -338,7 +374,23 @@
     // Python
     if (/\bpython\b/.test(query)) {
       return {
-        text: `### University Examination Analysis: Python Programming Language\n\n**Disciplinary Classification:** Computer Science & Data Intelligence  \n**Curricular Reference:** Interpreted High-Level Programming & Machine Learning\n\n---\n\n### 1. Conceptual Definition & Paradigm\n**Python** is an interpreted, high-level, dynamically typed, multi-paradigm programming language created by Guido van Rossum in 1991. It emphasizes exceptional code readability and clean syntax through PEP 8 standards, supporting object-oriented, functional, and procedural programming.\n\n### 2. Architectural Features\n• **Dynamic Typing:** Variable types are resolved at runtime without explicit declarations.\n• **Comprehensive Ecosystem:** De-facto standard for AI, Machine Learning, Data Science (NumPy, SciPy, Pandas, Scikit-Learn, PyTorch, TensorFlow).\n• **Automatic Memory Management:** Utilizes reference counting and cyclic generational garbage collection.\n• **Interpreted Execution:** Source code is translated into bytecode (\`.pyc\`) and executed by the Python Virtual Machine (PVM).`,
+        text: [
+          '### University Examination Analysis: Python Programming Language',
+          '',
+          '**Disciplinary Classification:** Computer Science & Data Intelligence',
+          '**Curricular Reference:** Interpreted High-Level Programming & Machine Learning',
+          '',
+          '---',
+          '',
+          '### 1. Conceptual Definition & Paradigm',
+          '**Python** is an interpreted, high-level, dynamically typed, multi-paradigm programming language created by Guido van Rossum in 1991. It emphasizes exceptional code readability and clean syntax through PEP 8 standards, supporting object-oriented, functional, and procedural programming.',
+          '',
+          '### 2. Architectural Features',
+          '• **Dynamic Typing:** Variable types are resolved at runtime without explicit declarations.',
+          '• **Comprehensive Ecosystem:** De-facto standard for AI, Machine Learning, Data Science (NumPy, SciPy, Pandas, Scikit-Learn, PyTorch, TensorFlow).',
+          '• **Automatic Memory Management:** Utilizes reference counting and cyclic generational garbage collection.',
+          '• **Interpreted Execution:** Source code is translated into bytecode (`.pyc`) and executed by the Python Virtual Machine (PVM).'
+        ].join('\n'),
         source: 'campus-concept-engine',
         model: 'Universal Computer Science Knowledge Base'
       };
@@ -347,7 +399,25 @@
     // DBMS
     if (/\bdbms\b/.test(query) || /\bdatabase management\b/.test(query)) {
       return {
-        text: `### University Examination Analysis: Database Management System (DBMS)\n\n**Disciplinary Classification:** Computer Science & Information Technology  \n**Curricular Reference:** Relational Database Systems & Transaction Processing\n\n---\n\n### 1. Definition & System Architecture\nA **Database Management System (DBMS)** is specialized system software designed to define, construct, manipulate, query, and maintain persistent, structured databases while guaranteeing data integrity, security, and multi-user concurrency control.\n\n### 2. The ACID Guarantee Matrix\n| Property | Academic Definition | Mechanism |\n| :--- | :--- | :--- |\n| **Atomicity** | "All or nothing" transaction execution | Write-Ahead Logging (WAL) & Rollbacks |\n| **Consistency** | Database transitions from one valid state to another | Integrity constraints & Foreign Keys |\n| **Isolation** | Concurrent transactions execute without interference | Multi-Version Concurrency Control (MVCC) / Two-Phase Locking (2PL) |\n| **Durability** | Committed data persists across system crashes | Non-volatile disk writes & Redo logs |`,
+        text: [
+          '### University Examination Analysis: Database Management System (DBMS)',
+          '',
+          '**Disciplinary Classification:** Computer Science & Information Technology',
+          '**Curricular Reference:** Relational Database Systems & Transaction Processing',
+          '',
+          '---',
+          '',
+          '### 1. Definition & System Architecture',
+          'A **Database Management System (DBMS)** is specialized system software designed to define, construct, manipulate, query, and maintain persistent, structured databases while guaranteeing data integrity, security, and multi-user concurrency control.',
+          '',
+          '### 2. The ACID Guarantee Matrix',
+          '| Property | Academic Definition | Mechanism |',
+          '| :--- | :--- | :--- |',
+          '| **Atomicity** | "All or nothing" transaction execution | Write-Ahead Logging (WAL) & Rollbacks |',
+          '| **Consistency** | Database transitions from one valid state to another | Integrity constraints & Foreign Keys |',
+          '| **Isolation** | Concurrent transactions execute without interference | Multi-Version Concurrency Control (MVCC) / Two-Phase Locking (2PL) |',
+          '| **Durability** | Committed data persists across system crashes | Non-volatile disk writes & Redo logs |'
+        ].join('\n'),
         source: 'campus-concept-engine',
         model: 'Universal Computer Science Knowledge Base'
       };
@@ -356,7 +426,30 @@
     // Android
     if (/\bandroid\b/.test(query) && (/\btechnology\b/.test(query) || /\bwhat is\b/.test(query) || /\barchitecture\b/.test(query))) {
       return {
-        text: `### University Examination Analysis: Android Operating System & Architecture\n\n**Disciplinary Classification:** Mobile Computing & Embedded Systems  \n**Curricular Reference:** MCA37510A - Android Application Development\n\n---\n\n### 1. Definition\n**Android** is an open-source, Linux-based mobile operating system developed by Google and the Open Handset Alliance. It is engineered for touchscreen mobile devices, smart TVs, wearables, and embedded automotive interfaces.\n\n### 2. Five-Layer Architecture\n1. **Linux Kernel:** Device drivers (Camera, Display, Wi-Fi), power management, process scheduling, and low-level memory allocation.\n2. **Hardware Abstraction Layer (HAL):** Standard interfaces exposing device hardware capabilities to high-level Java API framework.\n3. **Android Runtime (ART):** Ahead-of-Time (AOT) and Just-in-Time (JIT) compiler converting DEX (Dalvik Executable) bytecode into native machine instructions.\n4. **Application Framework:** Core APIs including ActivityManager, NotificationManager, ContentProviders, and WindowManager.\n5. **Applications:** Built-in and third-party user-facing apps.\n\n### 3. Core Android Components\n• **Activity:** Single UI screen with user interaction.\n• **Service:** Background operation with no UI.\n• **Broadcast Receiver:** System-wide message listener.\n• **Content Provider:** Manages shared application data (e.g. SQLite databases).`,
+        text: [
+          '### University Examination Analysis: Android Operating System & Architecture',
+          '',
+          '**Disciplinary Classification:** Mobile Computing & Embedded Systems',
+          '**Curricular Reference:** MCA37510A - Android Application Development',
+          '',
+          '---',
+          '',
+          '### 1. Definition',
+          '**Android** is an open-source, Linux-based mobile operating system developed by Google and the Open Handset Alliance. It is engineered for touchscreen mobile devices, smart TVs, wearables, and embedded automotive interfaces.',
+          '',
+          '### 2. Five-Layer Architecture',
+          '1. **Linux Kernel:** Device drivers (Camera, Display, Wi-Fi), power management, process scheduling, and low-level memory allocation.',
+          '2. **Hardware Abstraction Layer (HAL):** Standard interfaces exposing device hardware capabilities to high-level Java API framework.',
+          '3. **Android Runtime (ART):** Ahead-of-Time (AOT) and Just-in-Time (JIT) compiler converting DEX (Dalvik Executable) bytecode into native machine instructions.',
+          '4. **Application Framework:** Core APIs including ActivityManager, NotificationManager, ContentProviders, and WindowManager.',
+          '5. **Applications:** Built-in and third-party user-facing apps.',
+          '',
+          '### 3. Core Android Components',
+          '• **Activity:** Single UI screen with user interaction.',
+          '• **Service:** Background operation with no UI.',
+          '• **Broadcast Receiver:** System-wide message listener.',
+          '• **Content Provider:** Manages shared application data (e.g. SQLite databases).'
+        ].join('\n'),
         source: 'campus-concept-engine',
         model: 'Universal Computer Science Knowledge Base'
       };
