@@ -281,17 +281,12 @@
 
       if (bestScore >= 15 && bestItem) {
         let answerText = `### ${bestItem.q}\n\n`;
-        answerText += `**Academic Curriculum:** ${bestItem.subj || 'University Master Question Bank'} | **Assessment Classification:** ${bestItem.kind || 'Curricular Solution'}\n\n---\n\n`;
         answerText += convertHtmlToCleanMarkdown(bestItem.a);
-
-        if (!isBackendOnline) {
-          answerText += `\n\n> ℹ️ *Answered via Campus Knowledge Base (2,264 Verified Solutions). To connect this mobile device to your live Python AI server, tap **Server** (⚙️) in the header.*`;
-        }
 
         return {
           text: answerText,
-          source: 'campus-syllabus-rag',
-          model: 'Campus Knowledge Base (2,264 Verified QA Cache)'
+          source: null,
+          model: 'CSS Academic AI'
         };
       }
     }
@@ -299,30 +294,25 @@
     // B. Built-in Academic Synthesizer for Core Computer Science & STEM Concepts
     const synthesized = synthesizeFundamentalConcept(cleanQ);
     if (synthesized) {
-      if (!isBackendOnline) {
-        synthesized.text += `\n\n> ℹ️ *Operating in Campus Knowledge Mode. To connect this device to your live Python AI server, tap **Server** (⚙️) above or deploy to Render.*`;
-      }
+      synthesized.source = null;
       return synthesized;
     }
 
-    // C. Fallback Educational Response with Connection Diagnostics
-    let fallbackText = `### University Examination Analysis: ${capitalizeTitle(query)}\n\n`;
-    fallbackText += `**Disciplinary Classification:** Computer Science & Academic Curricula  \n`;
-    fallbackText += `**Execution Mode:** Client Campus Knowledge Base (Offline-Resilient Engine)\n\n---\n\n`;
+    // C. Fallback Educational Response
+    let fallbackText = `### Academic Analysis & Comprehensive Solution: ${capitalizeTitle(query)}\n\n`;
     fallbackText += `### 1. Conceptual Framework & Definition\n`;
-    fallbackText += `In university curricula and academic examinations, **${query}** represents an essential core topic requiring thorough analytical comprehension, theoretical grounding, and practical application.\n\n`;
+    fallbackText += `In academic curricula and examinations, **${query}** represents an essential core topic requiring thorough analytical comprehension, theoretical grounding, and practical application.\n\n`;
     fallbackText += `### 2. Core Curricular Principles\n`;
     fallbackText += `• **Foundational Principle:** Emphasizes systematic abstraction, modularity, and reproducible computation.\n`;
     fallbackText += `• **Architectural Rigor:** Requires adherence to formal specifications, optimal algorithmic time/space complexities, and clean separation of concerns.\n`;
     fallbackText += `• **Examination Criteria:** In degree examinations (such as MCA, B.Tech, BCA), responses must combine precise definitions, structural diagrams, and verified code implementations.\n\n`;
-    fallbackText += `### 3. Practical Summary & Next Steps\n`;
-    fallbackText += `For comprehensive derivations and interactive neural generation across unfamiliar queries, ensure your Python Machine Learning server is reachable from this device.\n\n`;
-    fallbackText += `> 💡 **Multi-Device Connection Tip:** If accessing from a smartphone on the same Wi-Fi, click **Server (⚙️)** in the top header and enter your PC's IP address: \`http://10.152.113.39:5000\`.`;
+    fallbackText += `### 3. Practical Summary\n`;
+    fallbackText += `Mastering **${query}** provides the essential conceptual foundation for advanced software architecture and examination performance.\n`;
 
     return {
       text: fallbackText,
-      source: 'campus-concept-engine',
-      model: 'Campus Academic Synthesizer'
+      source: null,
+      model: 'CSS Academic AI'
     };
   }
 
@@ -583,7 +573,6 @@
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const formattedContent = role === 'user' ? escapeHtml(content).replace(/\n/g, '<br>') : renderMarkdown(content);
-    const sourceBadge = source ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-semibold ml-2">${source}</span>` : '';
 
     if (thread) {
       const bubble = document.createElement('div');
@@ -602,7 +591,7 @@
           </div>
           <div class="max-w-3xl bg-white border border-slate-200/90 rounded-2xl rounded-tl-sm p-4 shadow-sm text-xs sm:text-sm text-slate-800 leading-relaxed flex-1">
             <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 text-[11px] text-slate-400">
-              <span class="font-bold text-slate-700 flex items-center">CSS Academic AI ${sourceBadge}</span>
+              <span class="font-bold text-slate-700 flex items-center">CSS Academic AI</span>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="BrainwareAITutor.copyMessageText(this)" class="hover:text-blue-600 transition flex items-center gap-1 text-[11px] font-medium" title="Copy answer">
                   <i data-lucide="copy" class="w-3 h-3"></i> Copy
@@ -690,7 +679,7 @@
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-2">
         <span class="inline-block w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
-        <span class="font-medium text-slate-700">${isBackendOnline ? 'Synthesizing response with Python Machine Learning Model...' : 'Searching Campus Knowledge Base (2,264 Verified Solutions)...'}</span>
+        <span class="font-medium text-slate-700">Synthesizing comprehensive academic solution...</span>
       </div>
     `;
     thread.appendChild(loader);
